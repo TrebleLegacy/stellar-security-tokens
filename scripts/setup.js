@@ -1,4 +1,4 @@
-import { Server, Networks, Keypair, Asset, Operation, TransactionBuilder, BASE_FEE } from '@stellar/stellar-sdk';
+import { Horizon, Networks, Keypair, Asset, Operation, TransactionBuilder, BASE_FEE } from '@stellar/stellar-sdk';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -23,7 +23,7 @@ const friendbotUrl = network === 'testnet'
   ? 'https://friendbot.stellar.org'
   : null;
 
-const stellarServer = new Server(horizonUrl);
+const stellarServer = new Horizon.Server(horizonUrl);
 const networkPassphrase = network === 'testnet' ? Networks.TESTNET : Networks.PUBLIC;
 
 const colors = {
