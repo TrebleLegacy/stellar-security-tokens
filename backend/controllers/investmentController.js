@@ -1,15 +1,35 @@
 import { Investor } from '../models/Investor.js';
 import { Token } from '../models/Token.js';
+import { Investment } from '../models/Investment.js';
 import { StellarService } from '../services/stellar.service.js';
 import { PaymentService } from '../services/payment.service.js';
 import { getTreasuryKeypair } from '../config/stellar.js';
+import { addDistributionJob, isQueueAvailable } from '../services/distributionQueue.service.js';
+import crypto from 'crypto';
 
 const SIN01_ASSET_CODE = 'SIN01';
-const USDC_PAYMENT_WINDOW_MINUTES = parseInt(process.env.USDC_PAYMENT_WINDOW_MINUTES || '10', 10);
+const USDC_PAYMENT_WINDOW_MINUTES = parseInt(process.env.USDC_PAYMENT_WINDOW_MINUTES || '2', 10);
+
+/**
+ * Gera memo único para transação Stellar
+ * @param {number} investmentId - ID do investimento
+ * @param {number} investorId - ID do investidor
+ * @param {string} assetCode - Código do asset
+ * @returns {string} Memo único (máximo 28 caracteres)
+ */
+function generateInvestmentMemo(investmentId, investorId, assetCode) {
+  // Formato: INV-{investmentId}-{hash}
+  // Limita a 28 caracteres (limite do Stellar)
+  const hash = crypto.createHash('sha256')
+    .update(`${investmentId}-${investorId}-${assetCode}-${Date.now()}`)
+    .digest('hex')
+    .substring(0, 8);
+  return `INV-${investmentId}-${hash}`.substring(0, 28);
+}
 
 export const purchaseInvestment = async (req, res, next) => {
   try {
-    const { investorId, usdcAmount, assetCode = SIN01_ASSET_CODE } = req.body;
+    const { investorId, usdcAmount, assetCode = SIN01_ASSET_CODE, offerId } = req.body;
 
     if (!usdcAmount || parseFloat(usdcAmount) <= 0) {
       return res.status(400).json({
@@ -48,8 +68,20 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
-    // Verificar se pagamento USDC foi recebido antes de distribuir tokens
+    const tokenAmount = parseFloat(usdcAmount);
     const treasuryKeypair = getTreasuryKeypair();
+
+    // Criar registro de investimento primeiro
+    const investment = await Investment.create({
+      investor_id: investorId,
+      offer_id: offerId || null,
+      asset_code: assetCode,
+      usdc_amount: usdcAmount,
+      token_amount: tokenAmount,
+      memo: null, // Será gerado quando pagamento for detectado
+    });
+
+    // Verificar se pagamento USDC já foi recebido
     const usdcPayment = await StellarService.verifyUSDCPayment(
       investor.stellar_public_key,
       usdcAmount,
@@ -58,62 +90,286 @@ export const purchaseInvestment = async (req, res, next) => {
     );
 
     if (!usdcPayment) {
-      return res.status(400).json({
-        success: false,
-        error: 'USDC payment not found',
-        message: `Please send ${usdcAmount} USDC to ${treasuryKeypair.publicKey()} first. ` +
-                 `Payment must be sent within the last ${USDC_PAYMENT_WINDOW_MINUTES} minutes.`,
-        treasuryAddress: treasuryKeypair.publicKey(),
-        requiredAmount: usdcAmount,
+      // Pagamento ainda não recebido, retornar instruções
+      return res.status(202).json({
+        success: true,
+        message: 'Investment created. Please send USDC payment.',
+        data: {
+          investment: {
+            id: investment.id,
+            status: investment.status,
+            usdcAmount: parseFloat(usdcAmount),
+            tokenAmount: tokenAmount,
+            assetCode: assetCode,
+          },
+          paymentInstructions: {
+            treasuryAddress: treasuryKeypair.publicKey(),
+            requiredAmount: usdcAmount,
+            assetCode: 'USDC',
+            windowMinutes: USDC_PAYMENT_WINDOW_MINUTES,
+            message: `Send ${usdcAmount} USDC to ${treasuryKeypair.publicKey()} within ${USDC_PAYMENT_WINDOW_MINUTES} minutes`,
+          },
+        },
       });
     }
 
-    const tokenAmount = parseFloat(usdcAmount);
+    // Pagamento encontrado, processar distribuição
+    // Tentar usar fila se disponível, senão processar sincronamente
+    if (isQueueAvailable()) {
+      return await processInvestmentPaymentWithQueue(investment, usdcPayment, req, res, next);
+    } else {
+      return await processInvestmentPayment(investment, usdcPayment, req, res, next);
+    }
+  } catch (error) {
+    next(error);
+  }
+};
 
-    const stellarResult = await StellarService.distributeTokens(
-      assetCode,
-      investor.stellar_public_key,
-      tokenAmount.toString()
-    );
+/**
+ * Processa pagamento USDC usando fila assíncrona (com retry automático)
+ * @param {Object} investment - Investimento criado
+ * @param {Object} usdcPayment - Dados do pagamento USDC
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+async function processInvestmentPaymentWithQueue(investment, usdcPayment, req, res, next) {
+  try {
+    // Verificar idempotência: se já existe distribuição para este pagamento
+    const existingDistribution = await Token.findDistributionByUSDC(usdcPayment.transactionHash);
+    
+    if (existingDistribution) {
+      await Investment.updateStatus(investment.id, {
+        status: 'distributed',
+        usdc_payment_hash: usdcPayment.transactionHash,
+        distribution_tx_hash: existingDistribution.transaction_hash,
+      });
 
-    const distribution = await Token.createDistribution({
-      investorId,
-      assetCode,
-      amount: tokenAmount,
-      transactionHash: stellarResult.transactionHash,
-      usdcPaymentHash: usdcPayment.transactionHash,
+      return res.status(200).json({
+        success: true,
+        message: 'Investment already processed (idempotency)',
+        data: {
+          investment: {
+            id: investment.id,
+            status: 'distributed',
+          },
+          distribution: existingDistribution,
+        },
+      });
+    }
+
+    // Buscar investidor para obter chave pública
+    const investor = await Investor.findById(investment.investor_id);
+    if (!investor || !investor.stellar_public_key) {
+      throw new Error(`Investor ${investment.investor_id} not found or missing Stellar key`);
+    }
+
+    // Gerar memo único
+    const memo = generateInvestmentMemo(investment.id, investment.investor_id, investment.asset_code);
+
+    // Atualizar investment com hash do pagamento
+    await Investment.updateStatus(investment.id, {
+      status: 'payment_received',
+      usdc_payment_hash: usdcPayment.transactionHash,
     });
 
-    res.status(201).json({
+    // Adicionar job à fila para processamento assíncrono com retry
+    const job = await addDistributionJob({
+      investmentId: investment.id,
+      investorPublicKey: investor.stellar_public_key,
+      assetCode: investment.asset_code,
+      amount: investment.token_amount.toString(),
+      memo,
+    });
+
+    res.status(202).json({
       success: true,
-      message: 'Investment purchased successfully',
+      message: 'Payment received. Token distribution queued for processing.',
       data: {
-        investor: {
-          id: investor.id,
-          name: investor.name,
-          email: investor.email,
-        },
         investment: {
-          usdcAmount: parseFloat(usdcAmount),
-          tokenAmount: tokenAmount,
-          assetCode: assetCode,
-          exchangeRate: 1.0,
+          id: investment.id,
+          status: 'payment_received',
+          usdcAmount: parseFloat(investment.usdc_amount),
+          tokenAmount: parseFloat(investment.token_amount),
+          assetCode: investment.asset_code,
         },
-        distribution: {
-          id: distribution.id,
-          amount: distribution.amount,
-          transactionHash: distribution.transaction_hash,
-          createdAt: distribution.created_at,
-        },
-        transaction: {
-          hash: stellarResult.transactionHash,
-          ledger: stellarResult.ledger,
+        queue: {
+          jobId: job.id,
+          status: 'queued',
+          message: 'Distribution will be processed automatically with retry on failure',
         },
         usdcPayment: {
           transactionHash: usdcPayment.transactionHash,
           ledger: usdcPayment.ledger,
           verifiedAt: usdcPayment.createdAt,
         },
+      },
+    });
+  } catch (error) {
+    await Investment.updateStatus(investment.id, {
+      status: 'failed',
+      error_message: error.message,
+    });
+    next(error);
+  }
+}
+
+/**
+ * Processa pagamento USDC e distribui tokens (síncrono, fallback)
+ * @param {Object} investment - Investimento criado
+ * @param {Object} usdcPayment - Dados do pagamento USDC
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ * @param {Function} next - Next middleware
+ */
+async function processInvestmentPayment(investment, usdcPayment, req, res, next) {
+  try {
+    // Verificar idempotência: se já existe distribuição para este pagamento
+    const existingDistribution = await Token.findDistributionByUSDC(usdcPayment.transactionHash);
+    
+    if (existingDistribution) {
+      // Já processado, atualizar investment e retornar distribuição existente
+      await Investment.updateStatus(investment.id, {
+        status: 'distributed',
+        usdc_payment_hash: usdcPayment.transactionHash,
+        distribution_tx_hash: existingDistribution.transaction_hash,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: 'Investment already processed (idempotency)',
+        data: {
+          investment: {
+            id: investment.id,
+            status: 'distributed',
+          },
+          distribution: existingDistribution,
+        },
+      });
+    }
+
+    // Verificar se investment já foi processado
+    const currentInvestment = await Investment.findById(investment.id);
+    if (currentInvestment.status === 'distributed') {
+      return res.status(200).json({
+        success: true,
+        message: 'Investment already processed',
+        data: {
+          investment: currentInvestment,
+        },
+      });
+    }
+
+    // Gerar memo único
+    const memo = generateInvestmentMemo(investment.id, investment.investor_id, investment.asset_code);
+
+    // Atualizar investment com hash do pagamento
+    await Investment.updateStatus(investment.id, {
+      status: 'payment_received',
+      usdc_payment_hash: usdcPayment.transactionHash,
+    });
+
+    // Distribuir tokens com memo
+    const stellarResult = await StellarService.distributeTokens(
+      investment.asset_code,
+      (await Investor.findById(investment.investor_id)).stellar_public_key,
+      investment.token_amount.toString(),
+      { memo }
+    );
+
+    // Criar distribuição (com verificação de idempotência interna)
+    const distribution = await Token.createDistribution({
+      investorId: investment.investor_id,
+      assetCode: investment.asset_code,
+      amount: investment.token_amount,
+      transactionHash: stellarResult.transactionHash,
+      usdcPaymentHash: usdcPayment.transactionHash,
+      offerId: investment.offer_id,
+      memo,
+    });
+
+    // Atualizar investment com hash da distribuição
+    await Investment.updateStatus(investment.id, {
+      status: 'distributed',
+      distribution_tx_hash: stellarResult.transactionHash,
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Investment purchased successfully',
+      data: {
+        investment: {
+          id: investment.id,
+          status: 'distributed',
+          usdcAmount: parseFloat(investment.usdc_amount),
+          tokenAmount: parseFloat(investment.token_amount),
+          assetCode: investment.asset_code,
+        },
+        distribution: {
+          id: distribution.id,
+          amount: distribution.amount,
+          transactionHash: distribution.transaction_hash,
+          memo: distribution.memo,
+          createdAt: distribution.created_at,
+        },
+        transactions: {
+          usdcPayment: {
+            hash: usdcPayment.transactionHash,
+            ledger: usdcPayment.ledger,
+            verifiedAt: usdcPayment.createdAt,
+          },
+          tokenDistribution: {
+            hash: stellarResult.transactionHash,
+            ledger: stellarResult.ledger,
+            memo: memo,
+          },
+        },
+      },
+    });
+  } catch (error) {
+    // Marcar investment como failed em caso de erro
+    try {
+      await Investment.updateStatus(investment.id, {
+        status: 'failed',
+        error_message: error.message,
+      });
+    } catch (updateError) {
+      console.error('Failed to update investment status:', updateError);
+    }
+    next(error);
+  }
+}
+
+/**
+ * Verifica status de um investimento
+ * GET /api/investments/:id/status
+ */
+export const getInvestmentStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const investment = await Investment.findById(parseInt(id));
+
+    if (!investment) {
+      return res.status(404).json({
+        success: false,
+        error: 'Investment not found',
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        id: investment.id,
+        status: investment.status,
+        usdcAmount: parseFloat(investment.usdc_amount),
+        tokenAmount: parseFloat(investment.token_amount),
+        assetCode: investment.asset_code,
+        usdcPaymentHash: investment.usdc_payment_hash,
+        distributionTxHash: investment.distribution_tx_hash,
+        memo: investment.memo,
+        errorMessage: investment.error_message,
+        createdAt: investment.created_at,
+        updatedAt: investment.updated_at,
       },
     });
   } catch (error) {

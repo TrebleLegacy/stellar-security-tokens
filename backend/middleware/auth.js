@@ -70,3 +70,43 @@ export const optionalAuth = (req, res, next) => {
   next();
 };
 
+/**
+ * Middleware para requerer role específica
+ * @param {string|Array<string>} allowedRoles - Role(s) permitido(s)
+ */
+export const requireRole = (allowedRoles) => {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  
+  return (req, res, next) => {
+    authenticateToken(req, res, () => {
+      if (!roles.includes(req.user.role)) {
+        return res.status(403).json({
+          success: false,
+          error: `Access denied. Required role: ${roles.join(' or ')}`,
+        });
+      }
+      next();
+    });
+  };
+};
+
+/**
+ * Middleware para verificar se o usuário pode acessar seus próprios dados
+ * Para investidores: verifica se o ID do parâmetro corresponde ao ID do usuário
+ */
+export const requireOwnData = (req, res, next) => {
+  authenticateToken(req, res, () => {
+    const resourceId = parseInt(req.params.id || req.params.investorId);
+    const userId = req.user.userId;
+
+    if (resourceId !== userId) {
+      return res.status(403).json({
+        success: false,
+        error: 'Access denied. You can only access your own data.',
+      });
+    }
+
+    next();
+  });
+};
+

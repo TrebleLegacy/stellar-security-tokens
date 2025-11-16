@@ -4,7 +4,7 @@ import { StellarService } from '../services/stellar.service.js';
 
 export const issueToken = async (req, res, next) => {
   try {
-    const { assetCode, totalSupply, description } = req.body;
+    const { assetCode, totalSupply, description, offerId } = req.body;
 
     const existingToken = await Token.findByAssetCode(assetCode);
     if (existingToken) {
@@ -21,6 +21,8 @@ export const issueToken = async (req, res, next) => {
       issuerPublicKey: stellarResult.issuerPublicKey,
       totalSupply,
       description,
+      offerId: offerId || null,
+      issuedBy: req.user?.userId || null,
     });
 
     res.status(201).json({
@@ -40,8 +42,9 @@ export const getTokens = async (req, res, next) => {
   try {
     const limit = parseInt(req.query.limit || '100', 10);
     const offset = parseInt(req.query.offset || '0', 10);
+    const offerId = req.query.offer_id ? parseInt(req.query.offer_id, 10) : null;
 
-    const tokens = await Token.findAll(limit, offset);
+    const tokens = await Token.findAll(limit, offset, offerId);
 
     res.json({
       success: true,
@@ -119,11 +122,16 @@ export const distributeTokens = async (req, res, next) => {
       amount
     );
 
+    // Buscar offer_id do token se existir
+    const offerId = token?.offer_id || null;
+
     const distribution = await Token.createDistribution({
       investorId,
       assetCode,
       amount,
       transactionHash: stellarResult.transactionHash,
+      offerId,
+      memo: null, // Memo não usado em distribuições manuais
     });
 
     res.status(201).json({

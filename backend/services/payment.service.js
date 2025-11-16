@@ -1,6 +1,7 @@
 import { query, getClient } from '../config/database.js';
 import { Investor } from '../models/Investor.js';
 import { Token } from '../models/Token.js';
+import { Offer } from '../models/Offer.js';
 import { StellarService } from './stellar.service.js';
 import { EmailService } from './email.service.js';
 import {
@@ -87,15 +88,20 @@ export class PaymentService {
    * @returns {string} returns.investors[].token_balance - Saldo de tokens (soma de distribuições)
    * @throws {Error} Se houver erro ao consultar o banco de dados
    */
-  static async getInvestorsWithBalances(assetCode = 'SIN01') {
+  static async getInvestorsWithBalances(assetCode = 'SIN01', offerId = null) {
     try {
-      logger.info('Fetching investors with balances', { assetCode });
+      logger.info('Fetching investors with balances', { assetCode, offerId });
 
       // Buscar taxa de juros do token
-      const tokenResult = await query(
-        'SELECT annual_interest_rate FROM tokens WHERE asset_code = $1',
-        [assetCode]
-      );
+      let tokenQuery = 'SELECT annual_interest_rate FROM tokens WHERE asset_code = $1';
+      const tokenParams = [assetCode];
+      
+      if (offerId) {
+        tokenQuery += ' AND offer_id = $2';
+        tokenParams.push(offerId);
+      }
+      
+      const tokenResult = await query(tokenQuery, tokenParams);
       
       const annualInterestRate = tokenResult.rows[0]?.annual_interest_rate 
         ? parseFloat(tokenResult.rows[0].annual_interest_rate) 
@@ -104,23 +110,47 @@ export class PaymentService {
       logger.info(`Token interest rate: ${annualInterestRate}%`, { assetCode });
 
       // Buscar investidores com saldos
-      const result = await query(
-        `SELECT 
-          i.id,
-          i.name,
-          i.email,
-          i.stellar_public_key,
-          i.kyc_status,
-          COALESCE(SUM(td.amount), 0) as token_balance
-        FROM investors i
-        LEFT JOIN token_distributions td ON td.investor_id = i.id AND td.asset_code = $1
-        WHERE i.kyc_status = 'approved' 
-          AND i.stellar_public_key IS NOT NULL
-        GROUP BY i.id, i.name, i.email, i.stellar_public_key, i.kyc_status
-        HAVING COALESCE(SUM(td.amount), 0) > 0
-        ORDER BY i.id`,
-        [assetCode]
-      );
+      let investorQuery;
+      const investorParams = [assetCode];
+      
+      if (offerId) {
+        investorQuery = `
+          SELECT 
+            i.id,
+            i.name,
+            i.email,
+            i.stellar_public_key,
+            i.kyc_status,
+            COALESCE(SUM(td.amount), 0) as token_balance
+          FROM investors i
+          LEFT JOIN token_distributions td ON td.investor_id = i.id AND td.asset_code = $1 AND td.offer_id = $2
+          WHERE i.kyc_status = 'approved' 
+            AND i.stellar_public_key IS NOT NULL
+          GROUP BY i.id, i.name, i.email, i.stellar_public_key, i.kyc_status
+          HAVING COALESCE(SUM(td.amount), 0) > 0
+          ORDER BY i.id
+        `;
+        investorParams.push(offerId);
+      } else {
+        investorQuery = `
+          SELECT 
+            i.id,
+            i.name,
+            i.email,
+            i.stellar_public_key,
+            i.kyc_status,
+            COALESCE(SUM(td.amount), 0) as token_balance
+          FROM investors i
+          LEFT JOIN token_distributions td ON td.investor_id = i.id AND td.asset_code = $1
+          WHERE i.kyc_status = 'approved' 
+            AND i.stellar_public_key IS NOT NULL
+          GROUP BY i.id, i.name, i.email, i.stellar_public_key, i.kyc_status
+          HAVING COALESCE(SUM(td.amount), 0) > 0
+          ORDER BY i.id
+        `;
+      }
+      
+      const result = await query(investorQuery, investorParams);
 
       logger.info(`Found ${result.rows.length} investors with balances`);
       return {
@@ -314,8 +344,8 @@ export class PaymentService {
             `INSERT INTO interest_payments (
               investor_id, asset_code, token_balance, interest_rate, 
               interest_amount, usdc_amount, transaction_hash, payment_date, 
-              status, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+              status, offer_id, created_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
             [
               payment.investorId,
               payment.assetCode,
@@ -326,6 +356,7 @@ export class PaymentService {
               transactionHash,
               paymentDate,
               'completed',
+              payment.offerId || null,
             ]
           );
         }
@@ -469,6 +500,10 @@ export class PaymentService {
 
       logger.info(`Processing payments for ${investors.length} investors with ${annualInterestRate}% annual rate`);
 
+      // Buscar offer_id do token se existir
+      const token = await Token.findByAssetCode(assetCode);
+      const offerId = token?.offer_id || null;
+
       const payments = [];
       for (const investor of investors) {
         const tokenBalance = parseFloat(investor.token_balance);
@@ -486,6 +521,7 @@ export class PaymentService {
           interestRate: annualInterestRate.toString(),
           interestAmount: interestAmount.toString(),
           usdcAmount: interestAmount.toString(),
+          offerId,
         });
       }
 
@@ -647,6 +683,7 @@ export class PaymentService {
         assetCode,
         amount,
         transactionHash: stellarResult.transactionHash,
+        memo: null, // Memo não usado em pagamentos de juros
       });
 
       return {

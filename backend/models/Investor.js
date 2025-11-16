@@ -1,4 +1,5 @@
 import { query } from '../config/database.js';
+import bcrypt from 'bcrypt';
 
 /**
  * Modelo para gerenciar investidores no banco de dados
@@ -160,5 +161,99 @@ export class Investor {
       [id]
     );
     return result.rows[0] || null;
+  }
+
+  /**
+   * Autentica investidor com email e senha
+   * @param {string} email - Email do investidor
+   * @param {string} password - Senha do investidor
+   * @returns {Promise<Object|null>} Investidor autenticado (sem password_hash) ou null
+   */
+  static async authenticate(email, password) {
+    const investor = await this.findByEmail(email);
+    if (!investor || !investor.password_hash) {
+      return null;
+    }
+
+    const isValid = await bcrypt.compare(password, investor.password_hash);
+    if (!isValid) {
+      return null;
+    }
+
+    // Atualizar last_login
+    await query(
+      'UPDATE investors SET last_login = NOW() WHERE id = $1',
+      [investor.id]
+    );
+
+    // Retornar sem password_hash
+    const { password_hash, ...investorWithoutPassword } = investor;
+    return investorWithoutPassword;
+  }
+
+  /**
+   * Atualiza senha do investidor
+   * @param {number} id - ID do investidor
+   * @param {string} newPassword - Nova senha
+   * @returns {Promise<boolean>} True se atualizado com sucesso
+   */
+  static async updatePassword(id, newPassword) {
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const result = await query(
+      'UPDATE investors SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+      [passwordHash, id]
+    );
+    return result.rowCount > 0;
+  }
+
+  /**
+   * Busca portfólio do investidor (tokens de múltiplas ofertas)
+   * @param {number} investorId - ID do investidor
+   * @returns {Promise<Array>} Array com tokens e ofertas relacionadas
+   */
+  static async getPortfolio(investorId) {
+    const result = await query(
+      `SELECT 
+        t.id, t.asset_code, t.total_supply, t.issued_at,
+        o.id as offer_id, o.offer_name, o.description, o.offer_type,
+        o.annual_interest_rate, o.status as offer_status,
+        COALESCE(SUM(td.amount), 0) as total_distributed
+      FROM tokens t
+      LEFT JOIN offers o ON t.offer_id = o.id
+      LEFT JOIN token_distributions td ON t.asset_code = td.asset_code AND td.investor_id = $1
+      WHERE EXISTS (
+        SELECT 1 FROM token_distributions 
+        WHERE investor_id = $1 AND asset_code = t.asset_code
+      )
+      GROUP BY t.id, o.id
+      ORDER BY t.issued_at DESC`,
+      [investorId]
+    );
+    return result.rows;
+  }
+
+  /**
+   * Busca métricas consolidadas do portfólio
+   * @param {number} investorId - ID do investidor
+   * @returns {Promise<Object>} Métricas consolidadas
+   */
+  static async getConsolidatedMetrics(investorId) {
+    const result = await query(
+      `SELECT 
+        COUNT(DISTINCT td.asset_code) as total_offers,
+        COALESCE(SUM(td.amount), 0) as total_invested,
+        COALESCE(SUM(ip.usdc_amount), 0) as total_interest_received,
+        COUNT(DISTINCT ip.id) as total_payments
+      FROM token_distributions td
+      LEFT JOIN interest_payments ip ON td.investor_id = ip.investor_id AND td.asset_code = ip.asset_code
+      WHERE td.investor_id = $1`,
+      [investorId]
+    );
+    return result.rows[0] || {
+      total_offers: 0,
+      total_invested: 0,
+      total_interest_received: 0,
+      total_payments: 0,
+    };
   }
 }

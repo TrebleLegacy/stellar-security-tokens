@@ -2,15 +2,19 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 
 describe('InvestmentController - Structure Tests', () => {
-  test('InvestmentController exports purchaseInvestment function', async () => {
-    try {
-      const controllers = await import('../../../controllers/investmentController.js');
-      
-      assert.ok(typeof controllers.purchaseInvestment === 'function',
-        'purchaseInvestment should be exported');
-    } catch (error) {
-      assert.ok(error.message.includes('import') || error.message.includes('Server'),
-        'Expected import error');
+  test('InvestmentController exports all required functions', async () => {
+    const controllers = await import('../../../controllers/investmentController.js');
+    
+    const requiredFunctions = [
+      'purchaseInvestment',
+      'getInvestmentStatus',
+    ];
+
+    for (const funcName of requiredFunctions) {
+      assert.ok(
+        typeof controllers[funcName] === 'function',
+        `${funcName} should be exported`
+      );
     }
   });
 });
