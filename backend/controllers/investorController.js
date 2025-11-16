@@ -1,7 +1,9 @@
 import { Investor } from '../models/Investor.js';
 import { StellarService } from '../services/stellar.service.js';
 import { PaymentService } from '../services/payment.service.js';
+import { generateToken } from '../middleware/auth.js';
 import { query } from '../config/database.js';
+import bcrypt from 'bcrypt';
 
 export const createInvestor = async (req, res, next) => {
   try {
@@ -52,7 +54,14 @@ export const createInvestor = async (req, res, next) => {
 
 export const registerInvestor = async (req, res, next) => {
   try {
-    const { name, email, document } = req.body;
+    const { name, email, document, password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password is required',
+      });
+    }
 
     const existingEmail = await Investor.findByEmail(email);
     if (existingEmail) {
@@ -72,6 +81,8 @@ export const registerInvestor = async (req, res, next) => {
 
     const stellarAccount = await StellarService.createInvestorAccount();
 
+    // Criar investidor com senha
+    const passwordHash = await bcrypt.hash(password, 10);
     const investor = await Investor.create({
       name,
       email,
@@ -79,6 +90,12 @@ export const registerInvestor = async (req, res, next) => {
       stellarPublicKey: stellarAccount.publicKey,
       kycStatus: 'pending',
     });
+
+    // Atualizar com password_hash
+    await query(
+      'UPDATE investors SET password_hash = $1 WHERE id = $2',
+      [passwordHash, investor.id]
+    );
 
     res.status(201).json({
       success: true,
@@ -94,6 +111,50 @@ export const registerInvestor = async (req, res, next) => {
       stellarAccount: {
         publicKey: stellarAccount.publicKey,
         note: 'Keep your secret key secure. It will not be shown again.',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const loginInvestor = async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email and password are required',
+      });
+    }
+
+    const investor = await Investor.authenticate(email, password);
+    if (!investor) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid email or password',
+      });
+    }
+
+    // Gerar token JWT
+    const token = generateToken({
+      userId: investor.id,
+      email: investor.email,
+      role: 'investor',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        investor: {
+          id: investor.id,
+          email: investor.email,
+          name: investor.name,
+          stellarPublicKey: investor.stellar_public_key,
+          kycStatus: investor.kyc_status,
+        },
       },
     });
   } catch (error) {
@@ -357,6 +418,68 @@ export const updateInvestor = async (req, res, next) => {
     res.json({
       success: true,
       data: updatedInvestor,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvestorPortfolio = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const investorId = parseInt(id, 10);
+
+    const investor = await Investor.findById(investorId);
+    if (!investor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Investor not found',
+      });
+    }
+
+    const portfolio = await Investor.getPortfolio(investorId);
+
+    res.json({
+      success: true,
+      data: {
+        investor: {
+          id: investor.id,
+          name: investor.name,
+          email: investor.email,
+        },
+        portfolio,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getInvestorMetrics = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const investorId = parseInt(id, 10);
+
+    const investor = await Investor.findById(investorId);
+    if (!investor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Investor not found',
+      });
+    }
+
+    const metrics = await Investor.getConsolidatedMetrics(investorId);
+
+    res.json({
+      success: true,
+      data: {
+        investor: {
+          id: investor.id,
+          name: investor.name,
+          email: investor.email,
+        },
+        metrics,
+      },
     });
   } catch (error) {
     next(error);

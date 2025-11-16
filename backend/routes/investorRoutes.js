@@ -37,11 +37,22 @@ const whitelistValidation = [
   validate,
 ];
 
+import { loginInvestor, getInvestorPortfolio, getInvestorMetrics } from '../controllers/investorController.js';
+import { requireInvestor, requireOwnData } from '../middleware/authorize.js';
+import { body } from 'express-validator';
+
 router.post('/', investorValidation, authenticateToken, createInvestor);
 router.post('/register', registerValidation, registerInvestor);
+router.post('/login', [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required'),
+  validate,
+], loginInvestor);
 router.post('/whitelist/:investorId', whitelistValidation, authenticateToken, whitelistInvestor);
 router.get('/', authenticateToken, getInvestors);
 router.get('/:id', authenticateToken, getInvestorById);
+router.get('/:id/portfolio', requireInvestor, requireOwnData, getInvestorPortfolio);
+router.get('/:id/metrics', requireInvestor, requireOwnData, getInvestorMetrics);
 router.get('/:investorId/balance', authenticateToken, getInvestorBalance);
 router.get('/:investorId/payments', authenticateToken, getInvestorPayments);
 router.put('/:id', investorValidation, authenticateToken, updateInvestor);

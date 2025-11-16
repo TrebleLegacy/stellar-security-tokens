@@ -8,8 +8,14 @@ import tokenRoutes from './routes/tokenRoutes.js';
 import investmentRoutes from './routes/investmentRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
+import companyRoutes from './routes/companyRoutes.js';
+import companyUserRoutes from './routes/companyUserRoutes.js';
+import platformAdminRoutes from './routes/platformAdminRoutes.js';
+import offerRoutes from './routes/offerRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { startPaymentScheduler } from './services/paymentScheduler.js';
+import { getPaymentMonitor } from './services/paymentMonitor.service.js';
+import { initDistributionQueue } from './services/distributionQueue.service.js';
 
 dotenv.config();
 
@@ -35,11 +41,15 @@ app.use('/api/investors', investorRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/investments', investmentRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/companies', companyRoutes);
+app.use('/api/company-users', companyUserRoutes);
+app.use('/api/platform-admins', platformAdminRoutes);
+app.use('/api', offerRoutes);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
@@ -59,6 +69,39 @@ app.listen(PORT, () => {
   } else {
     console.log('Automatic payment scheduler is disabled (ENABLE_AUTO_PAYMENTS=false)');
     console.log('You can process payments manually via POST /api/payments/process');
+  }
+
+  // Iniciar monitoramento de pagamentos USDC em tempo real
+  const enablePaymentMonitoring = process.env.ENABLE_PAYMENT_MONITORING !== 'false';
+  if (enablePaymentMonitoring) {
+    try {
+      const paymentMonitor = getPaymentMonitor();
+      await paymentMonitor.start();
+      console.log('Payment monitoring enabled - USDC payments will be processed automatically');
+    } catch (error) {
+      console.error('Failed to start payment monitoring:', error.message);
+      console.warn('Payment monitoring disabled. Investments will require manual verification.');
+    }
+  } else {
+    console.log('Payment monitoring is disabled (ENABLE_PAYMENT_MONITORING=false)');
+  }
+
+  // Inicializar fila de distribuição de tokens (com retry automático)
+  const enableDistributionQueue = process.env.ENABLE_DISTRIBUTION_QUEUE !== 'false';
+  if (enableDistributionQueue) {
+    try {
+      const queue = initDistributionQueue();
+      if (queue) {
+        console.log('Distribution queue enabled - token distributions will be processed with automatic retry');
+      } else {
+        console.warn('Distribution queue disabled - Redis not available. Distributions will be processed synchronously.');
+      }
+    } catch (error) {
+      console.error('Failed to initialize distribution queue:', error.message);
+      console.warn('Distribution queue disabled. Distributions will be processed synchronously.');
+    }
+  } else {
+    console.log('Distribution queue is disabled (ENABLE_DISTRIBUTION_QUEUE=false)');
   }
 });
 

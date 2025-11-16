@@ -6,6 +6,7 @@ import {
   Operation,
   TransactionBuilder,
   BASE_FEE,
+  Memo,
 } from '@stellar/stellar-sdk';
 import dotenv from 'dotenv';
 
@@ -78,10 +79,12 @@ export const createAsset = (code, issuerPublicKey) => {
  * Constrói uma transação Stellar com as operações fornecidas
  * @param {Keypair} sourceKeypair - Keypair da conta origem
  * @param {Operation[]} operations - Array de operações Stellar a incluir na transação
+ * @param {Object} [options] - Opções adicionais
+ * @param {string|Memo} [options.memo] - Memo para a transação (string ou objeto Memo)
  * @returns {Promise<Transaction>} Transação construída e pronta para assinatura
  * @throws {Error} Se houver erro ao carregar a conta ou construir a transação
  */
-export const buildTransaction = async (sourceKeypair, operations) => {
+export const buildTransaction = async (sourceKeypair, operations, options = {}) => {
   const sourceAccount = await stellarServer.loadAccount(sourceKeypair.publicKey());
   
   const transaction = new TransactionBuilder(sourceAccount, {
@@ -90,6 +93,15 @@ export const buildTransaction = async (sourceKeypair, operations) => {
   });
 
   operations.forEach(op => transaction.addOperation(op));
+
+  // Adicionar memo se fornecido
+  if (options.memo) {
+    if (typeof options.memo === 'string') {
+      transaction.addMemo(Memo.text(options.memo));
+    } else if (options.memo instanceof Memo) {
+      transaction.addMemo(options.memo);
+    }
+  }
 
   transaction.setTimeout(30);
   

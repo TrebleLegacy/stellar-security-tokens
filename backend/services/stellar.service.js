@@ -201,6 +201,8 @@ export class StellarService {
    * Emite tokens de segurança e transfere para a conta distribuidora
    * @param {string} code - Código do asset (padrão: 'SIN01')
    * @param {number|string} amount - Quantidade de tokens a emitir
+   * @param {Object} [options] - Opções adicionais
+   * @param {string} [options.homeDomain] - Home domain para stellar.toml
    * @returns {Promise<Object>} Resultado da emissão
    * @returns {boolean} returns.success - Indica sucesso
    * @returns {string} returns.assetCode - Código do asset emitido
@@ -209,9 +211,10 @@ export class StellarService {
    * @returns {string} returns.amount - Quantidade emitida
    * @returns {string} returns.transactionHash - Hash da transação
    * @returns {number} returns.ledger - Número do ledger
+   * @returns {string} [returns.homeDomain] - Home domain configurado
    * @throws {Error} Se houver erro na emissão ou se amount for inválido
    */
-  static async issueSecurityToken(code = 'SIN01', amount) {
+  static async issueSecurityToken(code = 'SIN01', amount, options = {}) {
     try {
       const issuerKeypair = getIssuerKeypair();
       const distributorKeypair = getDistributorKeypair();
@@ -232,15 +235,25 @@ export class StellarService {
           amount: amount.toString(),
         }),
       ];
+
+      // Configurar home domain se fornecido
+      if (options.homeDomain) {
+        operations.unshift(
+          Operation.setOptions({
+            source: issuerKeypair.publicKey(),
+            homeDomain: options.homeDomain,
+          })
+        );
+      }
       
       const transaction = await buildTransaction(issuerKeypair, operations);
       const result = await signAndSubmitTransaction(transaction, issuerKeypair);
-      
+
       if (!result.success) {
         throw new Error(`Failed to issue token: ${result.error}`);
       }
-      
-      return {
+
+      const returnData = {
         success: true,
         assetCode: code,
         issuerPublicKey: issuerKeypair.publicKey(),
@@ -249,6 +262,12 @@ export class StellarService {
         transactionHash: result.hash,
         ledger: result.ledger,
       };
+
+      if (options.homeDomain) {
+        returnData.homeDomain = options.homeDomain;
+      }
+
+      return returnData;
     } catch (error) {
       console.error('Error issuing security token:', error);
       throw new Error(`Security token issuance failed: ${error.message}`);
@@ -411,7 +430,9 @@ export class StellarService {
         }),
       ];
       
-      const transaction = await buildTransaction(distributorKeypair, operations);
+      const transaction = await buildTransaction(distributorKeypair, operations, {
+        memo: options.memo || null,
+      });
       const result = await signAndSubmitTransaction(transaction, distributorKeypair);
       
       if (!result.success) {
@@ -697,7 +718,7 @@ export class StellarService {
    * @returns {number} returns.ledger - Número do ledger
    * @throws {Error} Se houver erro ao buscar pagamentos
    */
-  static async verifyUSDCPayment(investorPublicKey, expectedAmount, treasuryPublicKey = null, windowMinutes = 10) {
+  static async verifyUSDCPayment(investorPublicKey, expectedAmount, treasuryPublicKey = null, windowMinutes = 2) {
     try {
       const treasuryKey = treasuryPublicKey || process.env.TREASURY_PUBLIC_KEY;
       if (!treasuryKey) {
