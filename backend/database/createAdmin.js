@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import prisma from '../config/prisma.js';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 
@@ -22,13 +22,17 @@ async function createAdmin() {
 
   try {
     // Verificar se já existe admin com esse email
-    const existing = await query(
-      'SELECT id, email FROM platform_admins WHERE email = $1',
-      [email]
-    );
+    const existing = await prisma.platformAdmin.findUnique({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
 
-    if (existing.rows.length > 0) {
+    if (existing) {
       console.error(`❌ Admin com email ${email} já existe!`);
+      await prisma.$disconnect();
       process.exit(1);
     }
 
@@ -36,28 +40,42 @@ async function createAdmin() {
     const passwordHash = await bcrypt.hash(password, 10);
 
     // Criar admin
-    const result = await query(
-      `INSERT INTO platform_admins (email, password_hash, name, role, is_active, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW())
-       RETURNING id, email, name, role, is_active, created_at`,
-      [email, passwordHash, name, role]
-    );
-
-    const admin = result.rows[0];
+    const admin = await prisma.platformAdmin.create({
+      data: {
+        email,
+        passwordHash,
+        name,
+        role: role.toLowerCase(),
+        isActive: true,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
     
     console.log('✅ Admin criado com sucesso!');
     console.log(`   ID: ${admin.id}`);
     console.log(`   Email: ${admin.email}`);
     console.log(`   Nome: ${admin.name}`);
     console.log(`   Role: ${admin.role}`);
-    console.log(`   Ativo: ${admin.is_active}`);
+    console.log(`   Ativo: ${admin.isActive}`);
     console.log(`\n📝 Credenciais de login:`);
     console.log(`   Email: ${email}`);
     console.log(`   Password: ${password}`);
     
+    await prisma.$disconnect();
     process.exit(0);
   } catch (error) {
     console.error('❌ Erro ao criar admin:', error.message);
+    if (error.stack) {
+      console.error(error.stack);
+    }
+    await prisma.$disconnect();
     process.exit(1);
   }
 }

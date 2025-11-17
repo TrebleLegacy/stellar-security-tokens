@@ -1,4 +1,4 @@
-import { query } from '../config/database.js';
+import prisma from '../config/prisma.js';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 
@@ -9,18 +9,28 @@ async function checkAndCreateAdmin() {
     console.log('🔍 Verificando admins existentes...\n');
     
     // Verificar admins existentes
-    const existing = await query(
-      'SELECT id, email, name, role, is_active, created_at FROM platform_admins ORDER BY created_at'
-    );
+    const existing = await prisma.platformAdmin.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
 
-    if (existing.rows.length > 0) {
-      console.log(`✅ Encontrados ${existing.rows.length} admin(s):\n`);
-      existing.rows.forEach((admin, index) => {
+    if (existing.length > 0) {
+      console.log(`✅ Encontrados ${existing.length} admin(s):\n`);
+      existing.forEach((admin, index) => {
         console.log(`${index + 1}. Email: ${admin.email}`);
         console.log(`   Nome: ${admin.name}`);
         console.log(`   Role: ${admin.role}`);
-        console.log(`   Ativo: ${admin.is_active ? 'Sim' : 'Não'}`);
-        console.log(`   Criado em: ${admin.created_at}`);
+        console.log(`   Ativo: ${admin.isActive ? 'Sim' : 'Não'}`);
+        console.log(`   Criado em: ${admin.createdAt}`);
         console.log('');
       });
     } else {
@@ -35,14 +45,23 @@ async function checkAndCreateAdmin() {
       
       const passwordHash = await bcrypt.hash(defaultPassword, 10);
       
-      const result = await query(
-        `INSERT INTO platform_admins (email, password_hash, name, role, is_active, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, TRUE, NOW(), NOW())
-         RETURNING id, email, name, role, is_active, created_at`,
-        [defaultEmail, passwordHash, defaultName, defaultRole]
-      );
-
-      const admin = result.rows[0];
+      const admin = await prisma.platformAdmin.create({
+        data: {
+          email: defaultEmail,
+          passwordHash,
+          name: defaultName,
+          role: defaultRole.toLowerCase(),
+          isActive: true,
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+        },
+      });
       
       console.log('✅ Admin padrão criado com sucesso!\n');
       console.log('📋 Credenciais de login:');
@@ -54,12 +73,14 @@ async function checkAndCreateAdmin() {
       console.log(`\n⚠️  IMPORTANTE: Altere a senha após o primeiro login!`);
     }
     
+    await prisma.$disconnect();
     process.exit(0);
   } catch (error) {
     console.error('❌ Erro:', error.message);
     if (error.stack) {
       console.error(error.stack);
     }
+    await prisma.$disconnect();
     process.exit(1);
   }
 }
