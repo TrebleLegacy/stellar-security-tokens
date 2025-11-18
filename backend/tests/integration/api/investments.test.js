@@ -150,7 +150,7 @@ describe('Investments API Integration Tests', () => {
     });
 
     // Deve aceitar offerId opcional
-    assert.ok([202, 400, 404].includes(response.status), 'Deve retornar status válido');
+    assert.ok([202, 400, 404].includes(response.status), `Deve retornar status válido, recebeu: ${response.status}`);
   });
 });
 
