@@ -163,7 +163,7 @@ export class PaymentMonitor {
     const investment = pendingInvestments[0];
 
     // Verificar se já foi processado (idempotência)
-    if (investment.usdc_payment_hash === payment.transaction_hash) {
+    if (investment.usdcPaymentHash === payment.transaction_hash) {
       console.log(`[PaymentMonitor] Investment ${investment.id} already processed for payment ${payment.transaction_hash}`);
       return;
     }
@@ -188,58 +188,58 @@ export class PaymentMonitor {
         console.log(`[PaymentMonitor] Distribution already exists for payment ${payment.transaction_hash}`);
         await Investment.updateStatus(investment.id, {
           status: 'distributed',
-          usdc_payment_hash: payment.transaction_hash,
-          distribution_tx_hash: existingDistribution.transaction_hash,
+          usdcPaymentHash: payment.transaction_hash,
+          distributionTxHash: existingDistribution.transaction_hash,
         });
         return;
       }
 
       // Buscar investidor
-      const investor = await Investor.findById(investment.investor_id);
+      const investor = await Investor.findById(investment.investorId);
       if (!investor || !investor.stellarPublicKey) {
-        throw new Error(`Investor ${investment.investor_id} not found or missing Stellar key`);
+        throw new Error(`Investor ${investment.investorId} not found or missing Stellar key`);
       }
 
       // Verificar KYC
       if (investor.kycStatus !== 'approved') {
-        throw new Error(`Investor ${investment.investor_id} KYC not approved`);
+        throw new Error(`Investor ${investment.investorId} KYC not approved`);
       }
 
       // Gerar memo único
-      const memo = generateInvestmentMemo(investment.id, investment.investor_id, investment.asset_code);
+      const memo = generateInvestmentMemo(investment.id, investment.investorId, investment.assetCode);
 
       // Atualizar investment com hash do pagamento
       await Investment.updateStatus(investment.id, {
         status: 'payment_received',
-        usdc_payment_hash: payment.transaction_hash,
+        usdcPaymentHash: payment.transaction_hash,
       });
 
       // Distribuir tokens
       const stellarResult = await StellarService.distributeTokens(
-        investment.asset_code,
+        investment.assetCode,
         investor.stellarPublicKey,
-        investment.token_amount.toString(),
+        investment.tokenAmount.toString(),
         { memo }
       );
 
       // Criar distribuição (com verificação de idempotência interna)
       const distribution = await Token.createDistribution({
-        investorId: investment.investor_id,
-        assetCode: investment.asset_code,
-        amount: investment.token_amount,
+        investorId: investment.investorId,
+        assetCode: investment.assetCode,
+        amount: investment.tokenAmount,
         transactionHash: stellarResult.transactionHash,
         usdcPaymentHash: payment.transaction_hash,
-        offerId: investment.offer_id,
+        offerId: investment.offerId,
         memo,
       });
 
       // Atualizar investment com hash da distribuição
       await Investment.updateStatus(investment.id, {
         status: 'distributed',
-        distribution_tx_hash: stellarResult.transactionHash,
+        distributionTxHash: stellarResult.transactionHash,
       });
 
-      console.log(`[PaymentMonitor] Successfully processed investment ${investment.id}: distributed ${investment.token_amount} tokens`);
+      console.log(`[PaymentMonitor] Successfully processed investment ${investment.id}: distributed ${investment.tokenAmount} tokens`);
 
       // TODO: Enviar email de confirmação para investidor
       // await EmailService.sendInvestmentConfirmation(investor.email, investment, distribution);

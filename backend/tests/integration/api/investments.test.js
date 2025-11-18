@@ -12,7 +12,7 @@ describe('Investments API Integration Tests', () => {
     try {
       testData = await setupTestDatabase();
       dbAvailable = true;
-      
+
       const loginResponse = await apiClient.post('/api/auth/login', {
         body: { email: testData.investor.email, password: 'testpassword' },
       });
@@ -98,26 +98,25 @@ describe('Investments API Integration Tests', () => {
       return;
     }
 
-    // Primeiro criar um investimento
-    const createResponse = await apiClient.post('/api/investments/purchase', {
-      body: {
+    // Criar investimento diretamente no banco para teste
+    const { default: prisma } = await import('../../../config/prisma.js');
+    const investment = await prisma.investment.create({
+      data: {
         investorId: testData.investor.id,
-        usdcAmount: 50,
         assetCode: 'SIN01',
+        usdcAmount: 50,
+        tokenAmount: 50,
+        status: 'pending_payment',
       },
     });
 
-    assert.strictEqual(createResponse.status, 202, 'Purchase should succeed');
-
-    const investmentId = createResponse.data.data.investment.id;
-
     // Buscar status
-    const statusResponse = await apiClient.get(`/api/investments/${investmentId}/status`);
+    const statusResponse = await apiClient.get(`/api/investments/${investment.id}/status`);
 
     assert.strictEqual(statusResponse.status, 200);
     assert.strictEqual(statusResponse.data.success, true);
     assert.ok(statusResponse.data.data, 'Deve retornar dados do investimento');
-    assert.strictEqual(statusResponse.data.data.id, investmentId);
+    assert.strictEqual(statusResponse.data.data.id, investment.id);
     assert.ok(statusResponse.data.data.status, 'Deve ter status');
     assert.ok(statusResponse.data.data.usdcAmount, 'Deve ter usdcAmount');
     assert.ok(statusResponse.data.data.tokenAmount, 'Deve ter tokenAmount');

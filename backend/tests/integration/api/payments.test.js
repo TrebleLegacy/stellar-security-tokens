@@ -57,7 +57,7 @@ describe('Payments API Integration Tests', () => {
 
     // Adicionar query params manualmente
     const url = new URL('/api/payments/history', 'http://localhost:3000');
-    url.searchParams.set('assetCode', testData.token.asset_code);
+    url.searchParams.set('assetCode', testData.token.assetCode);
     
     const filteredResponse = await fetch(url.toString(), {
       headers: {

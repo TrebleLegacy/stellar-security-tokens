@@ -63,9 +63,26 @@ describe('Investors API Integration Tests', () => {
       assert.ok(true, 'PostgreSQL não disponível - teste pulado');
       return;
     }
+    
+    // Primeiro criar um investidor único
+    const uniqueEmail = `duplicate-test-${Date.now()}@example.com`;
+    const firstInvestor = {
+      name: 'Primeiro Investidor',
+      email: uniqueEmail,
+      document: '11111111111',
+      password: 'senha123',
+    };
+
+    const firstResponse = await apiClient.post('/api/investors/register', {
+      body: firstInvestor,
+    });
+    
+    assert.strictEqual(firstResponse.status, 201, 'Primeiro investidor deve ser criado com sucesso');
+    
+    // Agora tentar criar outro com o mesmo email
     const duplicateInvestor = {
       name: 'Duplicado',
-      email: testData.investor.email,
+      email: uniqueEmail,
       document: '99988877766',
       password: 'senha123',
     };

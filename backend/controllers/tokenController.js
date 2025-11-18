@@ -97,7 +97,7 @@ export const distributeTokens = async (req, res, next) => {
   try {
     const { investorId, assetCode, amount } = req.body;
 
-    const investor = await Investor.findById(investorId);
+    const investor = await Investor.findById(parseInt(investorId, 10));
     if (!investor) {
       return res.status(404).json({
         success: false,

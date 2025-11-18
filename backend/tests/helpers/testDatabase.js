@@ -100,10 +100,11 @@ export const seedTestData = async () => {
     const investorStellarKey = 'G' + 'TEST1234567890123456789012345678901234567890123456789012345'.substring(0, 55);
     const issuerStellarKey = 'G' + 'ISSUER12345678901234567890123456789012345678901234567890123456'.substring(0, 55);
     
-    // Usar email e document únicos baseados em timestamp para evitar conflitos
+    // Usar email e document únicos baseados em timestamp + random para evitar conflitos
     const timestamp = Date.now();
-    const uniqueEmail = `test-${timestamp}@example.com`;
-    const uniqueDocument = `${timestamp % 100000000000}`.padStart(11, '0'); // 11 dígitos
+    const random = Math.floor(Math.random() * 10000);
+    const uniqueEmail = `test-${timestamp}-${random}@example.com`;
+    const uniqueDocument = `${(timestamp + random) % 100000000000}`.padStart(11, '0'); // 11 dígitos
     
     if (isTestEnv) {
       console.log(`[testDatabase] Seeding test data with email: ${uniqueEmail}, document: ${uniqueDocument}`);
@@ -112,17 +113,9 @@ export const seedTestData = async () => {
     // Hash password for test investor
     const passwordHash = await bcrypt.hash('testpassword', 10);
 
-    // Use upsert to handle existing data
-    const investor = await prisma.investor.upsert({
-      where: { email: uniqueEmail },
-      update: {
-        name: 'Test Investor',
-        document: uniqueDocument,
-        stellarPublicKey: investorStellarKey,
-        kycStatus: 'approved',
-        passwordHash,
-      },
-      create: {
+    // Create investor (using unique email and document)
+    const investor = await prisma.investor.create({
+      data: {
         name: 'Test Investor',
         email: uniqueEmail,
         document: uniqueDocument,
@@ -132,6 +125,7 @@ export const seedTestData = async () => {
       },
     });
 
+    // Create or get token 'SIN01'
     const token = await prisma.token.upsert({
       where: { assetCode: 'SIN01' },
       update: {
