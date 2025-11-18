@@ -779,6 +779,154 @@ Authorization: Bearer <token>
 }
 ```
 
+#### `POST /api/payments/process/bullet`
+
+Processa pagamentos bullet (pagamento único na data de vencimento) para todas as ofertas expiradas.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "message": "Bullet payments processed successfully",
+  "data": {
+    "paymentDate": "2024-02-01",
+    "offersProcessed": 2,
+    "paymentsProcessed": 5,
+    "totalAmount": 25000.0,
+    "transactionHash": "abc123...",
+    "emailsSent": 5,
+    "emailsFailed": 0,
+    "duration": "2500ms"
+  }
+}
+```
+
+#### `POST /api/payments/process/quarterly`
+
+Processa pagamentos trimestrais de juros manualmente.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+```json
+{
+  "assetCode": "SIN01"
+}
+```
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "message": "Quarterly interest payments processed successfully",
+  "data": {
+    "paymentDate": "2024-04-01",
+    "paymentsProcessed": 3,
+    "totalAmount": 125.0,
+    "transactionHash": "def456...",
+    "emailsSent": 3,
+    "emailsFailed": 0,
+    "duration": "1800ms"
+  }
+}
+```
+
+#### `POST /api/payments/process/semi-annual`
+
+Processa pagamentos semestrais de juros manualmente.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+```json
+{
+  "assetCode": "SIN01"
+}
+```
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "message": "Semi-annual interest payments processed successfully",
+  "data": {
+    "paymentDate": "2024-07-01",
+    "paymentsProcessed": 2,
+    "totalAmount": 250.0,
+    "transactionHash": "ghi789...",
+    "emailsSent": 2,
+    "emailsFailed": 0,
+    "duration": "2100ms"
+  }
+}
+```
+
+### Empresas
+
+#### `POST /api/companies/offers`
+
+Cria uma nova oferta de tokenização.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request Body:**
+```json
+{
+  "asset_code": "SIN01",
+  "offer_name": "Green Energy Token Series 1",
+  "description": "Sustainable energy investment opportunity",
+  "total_supply": 1000000,
+  "offer_type": "collateral",
+  "payment_type": "monthly",
+  "annual_interest_rate": 10.0,
+  "maturity_date": "2025-12-31",
+  "bullet_payment_amount": 10000.00,
+  "payment_frequency": 1,
+  "min_investment": 100.0,
+  "max_investment": 10000.0,
+  "offer_rules": {
+    "min_investment": 100,
+    "max_investment": 10000
+  },
+  "legal_documents": {}
+}
+```
+
+**Campos de Pagamento:**
+- `payment_type`: "monthly" | "bullet" | "quarterly" | "semi_annual"
+- Para pagamentos periódicos: `annual_interest_rate` é obrigatório
+- Para pagamentos bullet: `maturity_date` e `bullet_payment_amount` são obrigatórios
+
+**Response 201:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "asset_code": "SIN01",
+    "offer_name": "Green Energy Token Series 1",
+    "payment_type": "monthly",
+    "annual_interest_rate": 10.0,
+    "status": "pending_review",
+    "created_at": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
 ---
 
 ## Códigos de Status HTTP
@@ -879,7 +1027,23 @@ curl -X POST http://localhost:3000/api/payments/process \
   -H "Content-Type: application/json" \
   -d '{"assetCode": "SIN01"}'
 
-# 6. Verificar histórico de pagamentos
+# 6. Processar pagamentos bullet (vencimento)
+curl -X POST http://localhost:3000/api/payments/process/bullet \
+  -H "Authorization: Bearer <token>"
+
+# 7. Processar pagamentos trimestrais
+curl -X POST http://localhost:3000/api/payments/process/quarterly \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"assetCode": "SIN01"}'
+
+# 8. Processar pagamentos semestrais
+curl -X POST http://localhost:3000/api/payments/process/semi-annual \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"assetCode": "SIN01"}'
+
+# 9. Verificar histórico de pagamentos
 curl -X GET "http://localhost:3000/api/payments/history?investorId=1" \
   -H "Authorization: Bearer <token>"
 ```
@@ -894,9 +1058,18 @@ curl -X GET "http://localhost:3000/api/payments/history?investorId=1" \
 
 3. **Trustlines**: Investidores precisam estabelecer trustline antes de receber tokens. O processo de whitelist aprova a trustline.
 
-4. **Pagamentos Automáticos**: Pagamentos mensais são agendados automaticamente via cron (dia 1 de cada mês às 00:00 UTC). Use o endpoint manual para testes ou pagamentos antecipados.
+4. **Pagamentos Automáticos**:
+   - Pagamentos mensais: Dia 1 de cada mês às 00:00 UTC
+   - Pagamentos trimestrais: 1º dia de janeiro, abril, julho, outubro
+   - Pagamentos semestrais: 1º dia de janeiro e julho
+   - Pagamentos bullet: Diariamente às 01:00 UTC (verifica vencimentos)
+   Use os endpoints manuais para testes ou pagamentos antecipados.
 
-5. **Juros**: Taxa anual de 10%, calculada proporcionalmente mensalmente (10% / 12 = 0.8333% ao mês).
+5. **Tipos de Pagamento**:
+   - **Mensal**: Juros pagos mensalmente (taxa anual ÷ 12)
+   - **Trimestral**: Juros pagos a cada 3 meses (taxa anual ÷ 4)
+   - **Semestral**: Juros pagos a cada 6 meses (taxa anual ÷ 2)
+   - **Bullet**: Pagamento único na data de vencimento
 
 6. **USDC**: Os pagamentos de juros são feitos em USDC. Certifique-se de que a conta distribuidora tem USDC suficiente.
 
