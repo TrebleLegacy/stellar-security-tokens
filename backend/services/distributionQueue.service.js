@@ -227,12 +227,12 @@ export function initDistributionQueue() {
       }
 
       // Verificar idempotência: se já existe distribuição
-      if (investment.usdc_payment_hash) {
-        const existingDistribution = await Token.findDistributionByUSDC(investment.usdc_payment_hash);
+      if (investment.usdcPaymentHash) {
+        const existingDistribution = await Token.findDistributionByUSDC(investment.usdcPaymentHash);
         if (existingDistribution) {
           await Investment.updateStatus(investmentId, {
             status: 'distributed',
-            distribution_tx_hash: existingDistribution.transaction_hash,
+            distributionTxHash: existingDistribution.transaction_hash,
           });
           return {
             success: true,
@@ -244,21 +244,21 @@ export function initDistributionQueue() {
       }
 
       // Buscar investidor
-      const investor = await Investor.findById(investment.investor_id);
+      const investor = await Investor.findById(investment.investorId);
       if (!investor || !investor.stellarPublicKey) {
-        throw new Error(`Investor ${investment.investor_id} not found or missing Stellar key`);
+        throw new Error(`Investor ${investment.investorId} not found or missing Stellar key`);
       }
 
       // Verificar KYC
       if (investor.kycStatus !== 'approved') {
-        throw new Error(`Investor ${investment.investor_id} KYC not approved`);
+        throw new Error(`Investor ${investment.investorId} KYC not approved`);
       }
 
       // Gerar memo se não fornecido
       const distributionMemo = memo || generateInvestmentMemo(
         investment.id,
-        investment.investor_id,
-        investment.asset_code
+        investment.investorId,
+        investment.assetCode
       );
 
       // Distribuir tokens
@@ -271,12 +271,12 @@ export function initDistributionQueue() {
 
       // Criar distribuição (com verificação de idempotência interna)
       const distribution = await Token.createDistribution({
-        investorId: investment.investor_id,
-        assetCode: investment.asset_code,
-        amount: investment.token_amount,
+        investorId: investment.investorId,
+        assetCode: investment.assetCode,
+        amount: investment.tokenAmount,
         transactionHash: stellarResult.transactionHash,
-        usdcPaymentHash: investment.usdc_payment_hash,
-        offerId: investment.offer_id,
+        usdcPaymentHash: investment.usdcPaymentHash,
+        offerId: investment.offerId,
         memo: distributionMemo,
       });
 

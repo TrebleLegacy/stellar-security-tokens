@@ -38,7 +38,7 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
-    const investor = await Investor.findById(investorId);
+    const investor = await Investor.findById(parseInt(investorId, 10));
     if (!investor) {
       return res.status(404).json({
         success: false,
@@ -159,13 +159,13 @@ async function processInvestmentPaymentWithQueue(investment, usdcPayment, req, r
     }
 
     // Buscar investidor para obter chave pública
-    const investor = await Investor.findById(investment.investor_id);
+    const investor = await Investor.findById(investment.investorId);
     if (!investor || !investor.stellarPublicKey) {
-      throw new Error(`Investor ${investment.investor_id} not found or missing Stellar key`);
+      throw new Error(`Investor ${investment.investorId} not found or missing Stellar key`);
     }
 
     // Gerar memo único
-    const memo = generateInvestmentMemo(investment.id, investment.investor_id, investment.asset_code);
+    const memo = generateInvestmentMemo(investment.id, investment.investorId, investment.assetCode);
 
     // Atualizar investment com hash do pagamento
     await Investment.updateStatus(investment.id, {
@@ -177,8 +177,8 @@ async function processInvestmentPaymentWithQueue(investment, usdcPayment, req, r
     const job = await addDistributionJob({
       investmentId: investment.id,
       investorPublicKey: investor.stellarPublicKey,
-      assetCode: investment.asset_code,
-      amount: investment.token_amount.toString(),
+      assetCode: investment.assetCode,
+      amount: investment.tokenAmount.toString(),
       memo,
     });
 
@@ -189,9 +189,9 @@ async function processInvestmentPaymentWithQueue(investment, usdcPayment, req, r
         investment: {
           id: investment.id,
           status: 'payment_received',
-          usdcAmount: parseFloat(investment.usdc_amount),
-          tokenAmount: parseFloat(investment.token_amount),
-          assetCode: investment.asset_code,
+          usdcAmount: parseFloat(investment.usdcAmount.toString()),
+          tokenAmount: parseFloat(investment.tokenAmount.toString()),
+          assetCode: investment.assetCode,
         },
         queue: {
           jobId: job.id,
@@ -261,7 +261,7 @@ async function processInvestmentPayment(investment, usdcPayment, req, res, next)
     }
 
     // Gerar memo único
-    const memo = generateInvestmentMemo(investment.id, investment.investor_id, investment.asset_code);
+    const memo = generateInvestmentMemo(investment.id, investment.investorId, investment.assetCode);
 
     // Atualizar investment com hash do pagamento
     await Investment.updateStatus(investment.id, {
@@ -271,20 +271,20 @@ async function processInvestmentPayment(investment, usdcPayment, req, res, next)
 
     // Distribuir tokens com memo
     const stellarResult = await StellarService.distributeTokens(
-      investment.asset_code,
-      (await Investor.findById(investment.investor_id)).stellarPublicKey,
-      investment.token_amount.toString(),
+      investment.assetCode,
+      (await Investor.findById(investment.investorId)).stellarPublicKey,
+      investment.tokenAmount.toString(),
       { memo }
     );
 
     // Criar distribuição (com verificação de idempotência interna)
     const distribution = await Token.createDistribution({
-      investorId: investment.investor_id,
-      assetCode: investment.asset_code,
-      amount: investment.token_amount,
+      investorId: investment.investorId,
+      assetCode: investment.assetCode,
+      amount: investment.tokenAmount,
       transactionHash: stellarResult.transactionHash,
       usdcPaymentHash: usdcPayment.transactionHash,
-      offerId: investment.offer_id,
+      offerId: investment.offerId,
       memo,
     });
 
@@ -301,9 +301,9 @@ async function processInvestmentPayment(investment, usdcPayment, req, res, next)
         investment: {
           id: investment.id,
           status: 'distributed',
-          usdcAmount: parseFloat(investment.usdc_amount),
-          tokenAmount: parseFloat(investment.token_amount),
-          assetCode: investment.asset_code,
+          usdcAmount: parseFloat(investment.usdcAmount.toString()),
+          tokenAmount: parseFloat(investment.tokenAmount.toString()),
+          assetCode: investment.assetCode,
         },
         distribution: {
           id: distribution.id,
@@ -356,13 +356,14 @@ export const getInvestmentStatus = async (req, res, next) => {
       });
     }
 
+
     res.json({
       success: true,
       data: {
         id: investment.id,
         status: investment.status,
-        usdcAmount: investment.usdcAmount ? parseFloat(investment.usdcAmount.toString()) : null,
-        tokenAmount: investment.tokenAmount ? parseFloat(investment.tokenAmount.toString()) : null,
+        usdcAmount: investment.usdcAmount !== null && investment.usdcAmount !== undefined ? parseFloat(investment.usdcAmount.toString()) : null,
+        tokenAmount: investment.tokenAmount !== null && investment.tokenAmount !== undefined ? parseFloat(investment.tokenAmount.toString()) : null,
         assetCode: investment.assetCode,
         usdcPaymentHash: investment.usdcPaymentHash,
         distributionTxHash: investment.distributionTxHash,

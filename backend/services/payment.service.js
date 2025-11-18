@@ -960,15 +960,15 @@ export class PaymentService {
           i.id,
           i.name,
           i.email,
-          i.stellarPublicKey,
-          i.kyc_status::text as kycStatus,
+          i.stellar_public_key as "stellarPublicKey",
+          i.kyc_status::text as "kycStatus",
           COALESCE(SUM(td.amount), 0) as token_balance
         FROM investors i
         LEFT JOIN token_distributions td ON td.investor_id = i.id
         LEFT JOIN tokens t ON t.asset_code = td.asset_code
         WHERE t.offer_id = ${offerId}
           AND i.kyc_status = 'approved'
-        GROUP BY i.id, i.name, i.email, i.stellarPublicKey, i.kycStatus
+        GROUP BY i.id, i.name, i.email, i.stellar_public_key, i.kyc_status
         HAVING COALESCE(SUM(td.amount), 0) > 0
         ORDER BY i.id
       `;

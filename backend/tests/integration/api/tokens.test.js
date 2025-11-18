@@ -54,11 +54,11 @@ describe('Tokens API Integration Tests', () => {
       return;
     }
 
-    const response = await apiClient.get(`/api/tokens/${testData.token.asset_code}`);
+    const response = await apiClient.get(`/api/tokens/${testData.token.assetCode}`);
 
     assert.strictEqual(response.status, 200);
     assert.strictEqual(response.data.success, true);
-    assert.strictEqual(response.data.data.asset_code, testData.token.asset_code);
+    assert.strictEqual(response.data.data.assetCode, testData.token.assetCode);
   });
 
   test('GET /api/tokens/:assetCode - retorna 404 para token inexistente', async () => {

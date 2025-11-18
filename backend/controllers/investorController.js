@@ -167,7 +167,7 @@ export const whitelistInvestor = async (req, res, next) => {
     const { investorId } = req.params;
     const { assetCode = 'SIN01' } = req.body;
 
-    const investor = await Investor.findById(investorId);
+    const investor = await Investor.findById(parseInt(investorId, 10));
     if (!investor) {
       return res.status(404).json({
         success: false,
@@ -232,7 +232,7 @@ export const getInvestorById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const investor = await Investor.findById(id);
+    const investor = await Investor.findById(parseInt(id, 10));
 
     if (!investor) {
       return res.status(404).json({
@@ -250,7 +250,6 @@ export const getInvestorById = async (req, res, next) => {
         document: investor.document,
         stellarPublicKey: investor.stellarPublicKey,
         kycStatus: investor.kycStatus,
-        passwordHash: investor.passwordHash,
         lastLogin: investor.lastLogin,
         createdAt: investor.createdAt,
         updatedAt: investor.updatedAt,
@@ -266,7 +265,7 @@ export const getInvestorBalance = async (req, res, next) => {
     const { investorId } = req.params;
     const { assetCode = 'SIN01' } = req.query;
 
-    const investor = await Investor.findById(investorId);
+    const investor = await Investor.findById(parseInt(investorId, 10));
     if (!investor) {
       return res.status(404).json({
         success: false,
@@ -353,7 +352,7 @@ export const getInvestorPayments = async (req, res, next) => {
     const { investorId } = req.params;
     const { assetCode, limit = 100, offset = 0 } = req.query;
 
-    const investor = await Investor.findById(investorId);
+    const investor = await Investor.findById(parseInt(investorId, 10));
     if (!investor) {
       return res.status(404).json({
         success: false,
@@ -411,7 +410,7 @@ export const updateInvestor = async (req, res, next) => {
     const { id } = req.params;
     const updateData = req.body;
 
-    const investor = await Investor.findById(id);
+    const investor = await Investor.findById(parseInt(id, 10));
     if (!investor) {
       return res.status(404).json({
         success: false,
