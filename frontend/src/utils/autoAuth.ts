@@ -67,7 +67,6 @@ export async function autoAuthWithMock(userType: UserType): Promise<{ token: str
           legal_representative: companyDebugData.legal_representative,
           address: companyDebugData.address,
           phone: companyDebugData.phone.replace(/\D/g, ''),
-          stellarPublicKey: companyDebugData.stellarPublicKey,
         });
         
         if (!companyResponse.success || !companyResponse.data) {

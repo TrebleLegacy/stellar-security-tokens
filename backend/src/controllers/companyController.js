@@ -1,5 +1,6 @@
 import { Company } from '../models/Company.js';
 import { generateToken } from '../middleware/auth.js';
+import { StellarService } from '../services/stellar.service.js';
 
 /**
  * Controller para gerenciar empresas
@@ -18,14 +19,13 @@ export class CompanyController {
         legal_representative,
         address,
         phone,
-        stellarPublicKey,
       } = req.body;
 
       // Validações básicas
-      if (!name || !cnpj || !email || !legal_representative || !stellarPublicKey) {
+      if (!name || !cnpj || !email || !legal_representative) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: name, cnpj, email, legal_representative, stellarPublicKey',
+          error: 'Missing required fields: name, cnpj, email, legal_representative',
         });
       }
 
@@ -46,6 +46,9 @@ export class CompanyController {
         });
       }
 
+      // Criar conta Stellar automaticamente
+      const stellarAccount = await StellarService.createInvestorAccount();
+
       const company = await Company.create({
         name,
         cnpj,
@@ -53,7 +56,7 @@ export class CompanyController {
         legal_representative,
         address,
         phone,
-        stellarPublicKey,
+        stellarPublicKey: stellarAccount.publicKey,
         status: 'pending',
         kyc_status: 'pending',
       });
