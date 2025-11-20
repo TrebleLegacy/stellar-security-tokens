@@ -102,6 +102,7 @@ export function getCompanyDebugData() {
     legal_representative: generateValidName('person'),
     address: generateValidAddress(),
     phone: generateValidPhone(),
+    stellarPublicKey: 'GDWA5PIGSWYILCM4TW3OJX7UE644ADKY4SJBX6VZXGVXYA23TWDSC2NB', // Issuer public key for testing
   };
 }
 
