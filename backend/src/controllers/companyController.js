@@ -18,13 +18,14 @@ export class CompanyController {
         legal_representative,
         address,
         phone,
+        stellarPublicKey,
       } = req.body;
 
       // Validações básicas
-      if (!name || !cnpj || !email || !legal_representative) {
+      if (!name || !cnpj || !email || !legal_representative || !stellarPublicKey) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: name, cnpj, email, legal_representative',
+          error: 'Missing required fields: name, cnpj, email, legal_representative, stellarPublicKey',
         });
       }
 
@@ -52,6 +53,7 @@ export class CompanyController {
         legal_representative,
         address,
         phone,
+        stellarPublicKey,
         status: 'pending',
         kyc_status: 'pending',
       });

@@ -90,12 +90,16 @@ export class DevController {
       const MOCK_USER_NAME = 'Debug Company User';
 
       // Buscar ou criar company user
+      console.log('Looking for company user with email:', MOCK_EMAIL);
       let companyUser = await CompanyUser.findByEmail(MOCK_EMAIL);
-      
+      let company = null;
+
       if (!companyUser) {
         // Buscar empresa existente por CNPJ ou criar nova
-        let company = await Company.findByCnpj(MOCK_CNPJ);
-        
+        console.log('Looking for company with CNPJ:', MOCK_CNPJ);
+        company = await Company.findByCnpj(MOCK_CNPJ);
+        console.log('Found company:', company?.id);
+
         if (!company) {
           // Criar empresa
           company = await Company.create({
@@ -105,28 +109,41 @@ export class DevController {
             legal_representative: MOCK_USER_NAME,
             address: 'Debug Address',
             phone: '11999999999',
+            stellarPublicKey: 'GDWA5PIGSWYILCM4TW3OJX7UE644ADKY4SJBX6VZXGVXYA23TWDSC2NB',
             status: 'approved',
             kyc_status: 'pending',
           });
         } else if (company.status !== 'approved') {
           // Aprovar empresa se não estiver aprovada
           await Company.updateStatus(company.id, 'approved');
-          company = await Company.findById(company.id);
+          // Recarregar empresa após atualização
+          company = await Company.findByCnpj(MOCK_CNPJ);
         }
 
         // Criar company user
+        console.log('Creating company user with company_id:', company.id);
         companyUser = await CompanyUser.create({
           company_id: company.id,
           email: MOCK_EMAIL,
           password: MOCK_PASSWORD,
           name: MOCK_USER_NAME,
+          stellarPublicKey: 'GB6NDOEPPL3KA6F6SUDS52TYEEJHVODRV7MC2PAQQCOSIBRRF2U43QTM',
           role: 'admin',
         });
+        console.log('Company user created:', companyUser.id);
+      } else {
+        // Buscar dados da empresa do company user existente
+        console.log('Found existing company user:', companyUser.id);
+        company = await Company.findById(companyUser.companyId);
+        if (!company) {
+          throw new Error('Company not found for existing company user');
+        }
       }
 
       // Buscar dados completos da empresa
-      const company = await Company.findById(companyUser.company_id);
-      if (!company) {
+      console.log('Company user companyId:', companyUser.companyId);
+      const companyData = await Company.findById(companyUser.companyId);
+      if (!companyData) {
         throw new Error('Company not found');
       }
 
