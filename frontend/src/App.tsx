@@ -10,6 +10,10 @@ import { Landing } from './pages/Landing';
 // Dev Login (unified)
 import { DevLogin } from './pages/DevLogin';
 
+// Passkey Authentication
+import { PasskeyRegister } from './components/PasskeyRegister';
+import { PasskeyLogin } from './components/PasskeyLogin';
+
 // Investor Portal
 import { InvestorRegister } from './pages/investor/Register';
 import { InvestorDashboard } from './pages/investor/Dashboard';
@@ -64,6 +68,24 @@ function App() {
             element={
               <PublicRoute>
                 <DevLogin />
+              </PublicRoute>
+            }
+          />
+
+          {/* Passkey Authentication Routes */}
+          <Route
+            path="/passkey/register"
+            element={
+              <PublicRoute>
+                <PasskeyRegister />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/passkey/login"
+            element={
+              <PublicRoute>
+                <PasskeyLogin />
               </PublicRoute>
             }
           />

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import session from 'express-session';
 import investorRoutes from './routes/investorRoutes.js';
 import tokenRoutes from './routes/tokenRoutes.js';
 import investmentRoutes from './routes/investmentRoutes.js';
@@ -13,6 +14,7 @@ import companyUserRoutes from './routes/companyUserRoutes.js';
 import platformAdminRoutes from './routes/platformAdminRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
 import webauthnRoutes from './routes/webauthnRoutes.js';
+import passkeyRoutes from './routes/passkeyRoutes.js';
 import devRoutes from './routes/devRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { startPaymentScheduler } from './services/paymentScheduler.js';
@@ -25,10 +27,26 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: process.env.ORIGIN || 'http://localhost',
+  credentials: true,
+}));
 app.use(morgan('combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Configurar sessão para WebAuthn
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-change-in-production',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    secure: false, // Permitir cookies em HTTP para desenvolvimento
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 24 * 60 * 60 * 1000, // 24 horas
+  },
+}));
 
 app.get('/health', (req, res) => {
   res.json({
@@ -47,6 +65,7 @@ app.use('/api/companies', companyRoutes);
 app.use('/api/company-users', companyUserRoutes);
 app.use('/api/platform-admins', platformAdminRoutes);
 app.use('/api/webauthn', webauthnRoutes);
+app.use('/api/passkey', passkeyRoutes);
 app.use('/api/dev', devRoutes);
 app.use('/api', offerRoutes);
 

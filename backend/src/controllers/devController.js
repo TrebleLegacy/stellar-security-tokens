@@ -101,6 +101,9 @@ export class DevController {
         console.log('Found company:', company?.id);
 
         if (!company) {
+          // Criar conta Stellar para a empresa
+          const companyAccount = await StellarService.createInvestorAccount();
+          
           // Criar empresa
           company = await Company.create({
             name: MOCK_COMPANY_NAME,
@@ -109,7 +112,7 @@ export class DevController {
             legal_representative: MOCK_USER_NAME,
             address: 'Debug Address',
             phone: '11999999999',
-            stellarPublicKey: 'GDWA5PIGSWYILCM4TW3OJX7UE644ADKY4SJBX6VZXGVXYA23TWDSC2NB',
+            stellarPublicKey: companyAccount.publicKey,
             status: 'approved',
             kyc_status: 'pending',
           });
@@ -120,6 +123,9 @@ export class DevController {
           company = await Company.findByCnpj(MOCK_CNPJ);
         }
 
+        // Criar conta Stellar para o company user
+        const userAccount = await StellarService.createInvestorAccount();
+
         // Criar company user
         console.log('Creating company user with company_id:', company.id);
         companyUser = await CompanyUser.create({
@@ -127,7 +133,7 @@ export class DevController {
           email: MOCK_EMAIL,
           password: MOCK_PASSWORD,
           name: MOCK_USER_NAME,
-          stellarPublicKey: 'GB6NDOEPPL3KA6F6SUDS52TYEEJHVODRV7MC2PAQQCOSIBRRF2U43QTM',
+          stellarPublicKey: userAccount.publicKey,
           role: 'admin',
         });
         console.log('Company user created:', companyUser.id);

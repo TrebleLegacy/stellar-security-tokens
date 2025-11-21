@@ -82,7 +82,11 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       # Dev Routes (habilitar rotas de desenvolvimento)
-      ENABLE_DEV_ROUTES: ${ENABLE_DEV_ROUTES:-false}
+      ENABLE_DEV_ROUTES: ${ENABLE_DEV_ROUTES:-true}
+      # Passkey Configuration
+      RP_ID: ${RP_ID:-localhost}
+      ORIGIN: ${ORIGIN:-http://localhost}
+      SESSION_SECRET: ${SESSION_SECRET:-change-this-secret-in-production}
     ports:
       - "3000:3000"
     depends_on:

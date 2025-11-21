@@ -402,3 +402,39 @@ model PlatformAdminWebauthnCredential {
   @@index([credentialId])
   @@map("platform_admin_webauthn_credentials")
 }
+
+model PasskeyUser {
+  id                String   @id @default(uuid())
+  email             String   @unique @db.VarChar(255)
+  name              String   @db.VarChar(255)
+  stellarPublicKey  String   @unique @map("stellar_public_key") @db.VarChar(56)
+  currentChallenge  String?  @map("current_challenge") @db.Text
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamp
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamp
+
+  // Relations
+  credentials PasskeyCredential[]
+
+  @@index([email])
+  @@index([stellarPublicKey])
+  @@map("passkey_users")
+}
+
+model PasskeyCredential {
+  id                    Int       @id @default(autoincrement())
+  passkeyUserId         String    @map("passkey_user_id")
+  credentialId          String    @unique @map("credential_id") @db.Text
+  credentialPublicKey   Bytes     @map("credential_public_key")
+  counter               BigInt    @default(0)
+  deviceName            String?   @map("device_name") @db.VarChar(255)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamp
+  lastUsedAt            DateTime? @map("last_used_at") @db.Timestamp
+
+  // Relations
+  passkeyUser PasskeyUser @relation(fields: [passkeyUserId], references: [id], onDelete: Cascade)
+
+  @@unique([passkeyUserId, credentialId])
+  @@index([passkeyUserId])
+  @@index([credentialId])
+  @@map("passkey_credentials")
+}

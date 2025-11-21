@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { LoginResponse } from '@/types';
@@ -15,8 +15,25 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useLocalStorage<string | null>('token', null);
+  // Token é uma string simples, não precisa de JSON.parse/stringify
+  const [token, setTokenState] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('token');
+    } catch {
+      return null;
+    }
+  });
+  
   const [user, setUser] = useLocalStorage<LoginResponse | null>('user', null);
+
+  const setToken = (value: string | null) => {
+    setTokenState(value);
+    if (value) {
+      localStorage.setItem('token', value);
+    } else {
+      localStorage.removeItem('token');
+    }
+  };
 
   const login = (response: LoginResponse) => {
     setToken(response.token);
@@ -26,8 +43,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setToken(null);
     setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
   };
 
   const isAuthenticated = !!token && !!user;
