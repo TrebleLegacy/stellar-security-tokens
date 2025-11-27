@@ -6,12 +6,19 @@ import { mockStellarAccount, mockStellarTransaction, mockKeypair } from './testD
 
 export const createStellarMock = () => {
   const mockLoadAccount = async (publicKey) => {
+    if (!publicKey) {
+      throw new Error('Public key is required');
+    }
     if (publicKey.includes('NOTFOUND')) {
       const error = new Error('Account not found');
       error.status = 404;
       throw error;
     }
-    return mockStellarAccount;
+    return {
+      ...mockStellarAccount,
+      accountId: () => publicKey,
+      incrementSequenceNumber: () => { }, // Ensure this exists too
+    };
   };
 
   const mockSubmitTransaction = async (transaction) => {
@@ -33,15 +40,34 @@ export const createStellarMock = () => {
     return mockStellarTransaction;
   };
 
+  // Mock para streaming de pagamentos
+  const mockPayments = () => {
+    return {
+      forAccount: (accountId) => ({
+        cursor: (cursor) => ({
+          stream: (options) => {
+            // Armazena o callback onmessage para ser chamado manualmente nos testes
+            global.mockStreamCallback = options.onmessage;
+
+            // Retorna função para fechar o stream
+            return () => { };
+          },
+        }),
+      }),
+    };
+  };
+
   const mockServer = {
     loadAccount: mockLoadAccount,
     submitTransaction: mockSubmitTransaction,
+    payments: mockPayments,
   };
 
   return {
     mockServer,
     mockLoadAccount,
     mockSubmitTransaction,
+    mockPayments,
   };
 };
 

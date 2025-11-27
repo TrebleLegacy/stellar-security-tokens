@@ -183,13 +183,13 @@ export class PaymentMonitor {
 
       // Verificar idempotência: se já existe distribuição para este pagamento
       const existingDistribution = await Token.findDistributionByUSDC(payment.transaction_hash);
-      
+
       if (existingDistribution) {
         console.log(`[PaymentMonitor] Distribution already exists for payment ${payment.transaction_hash}`);
         await Investment.updateStatus(investment.id, {
           status: 'distributed',
-          usdcPaymentHash: payment.transaction_hash,
-          distributionTxHash: existingDistribution.transaction_hash,
+          usdc_payment_hash: payment.transaction_hash,
+          distribution_tx_hash: existingDistribution.transaction_hash,
         });
         return;
       }
@@ -211,7 +211,7 @@ export class PaymentMonitor {
       // Atualizar investment com hash do pagamento
       await Investment.updateStatus(investment.id, {
         status: 'payment_received',
-        usdcPaymentHash: payment.transaction_hash,
+        usdc_payment_hash: payment.transaction_hash,
       });
 
       // Distribuir tokens
@@ -236,7 +236,7 @@ export class PaymentMonitor {
       // Atualizar investment com hash da distribuição
       await Investment.updateStatus(investment.id, {
         status: 'distributed',
-        distributionTxHash: stellarResult.transactionHash,
+        distribution_tx_hash: stellarResult.transactionHash,
       });
 
       console.log(`[PaymentMonitor] Successfully processed investment ${investment.id}: distributed ${investment.tokenAmount} tokens`);
@@ -246,7 +246,7 @@ export class PaymentMonitor {
 
     } catch (error) {
       console.error(`[PaymentMonitor] Error processing investment ${investment.id}:`, error);
-      
+
       // Marcar investment como failed
       await Investment.updateStatus(investment.id, {
         status: 'failed',
@@ -265,7 +265,7 @@ export class PaymentMonitor {
   stop() {
     console.log('[PaymentMonitor] Stopping...');
     this.isRunning = false;
-    
+
     if (this.stream) {
       try {
         this.stream();
