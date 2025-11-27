@@ -35,7 +35,7 @@ export class StellarService {
   static async createIssuerAccount() {
     try {
       const issuerKeypair = getIssuerKeypair();
-      
+
       try {
         const account = await stellarServer.loadAccount(issuerKeypair.publicKey());
         console.log('Issuer account already exists:', issuerKeypair.publicKey());
@@ -52,7 +52,7 @@ export class StellarService {
       }
 
       const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(issuerKeypair.publicKey())}`;
-      
+
       try {
         const response = await fetch(friendbotUrl);
         if (!response.ok) {
@@ -66,7 +66,7 @@ export class StellarService {
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       const account = await stellarServer.loadAccount(issuerKeypair.publicKey());
-      
+
       const operations = [
         Operation.setOptions({
           source: issuerKeypair.publicKey(),
@@ -112,7 +112,7 @@ export class StellarService {
   static async createDistributionAccount() {
     try {
       const distributorKeypair = getDistributorKeypair();
-      
+
       try {
         const account = await stellarServer.loadAccount(distributorKeypair.publicKey());
         console.log('Distribution account already exists:', distributorKeypair.publicKey());
@@ -129,7 +129,7 @@ export class StellarService {
       }
 
       const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(distributorKeypair.publicKey())}`;
-      
+
       try {
         const response = await fetch(friendbotUrl);
         if (!response.ok) {
@@ -227,16 +227,16 @@ export class StellarService {
     try {
       const issuerKeypair = getIssuerKeypair();
       const distributorKeypair = getDistributorKeypair();
-      
+
       if (!amount || parseFloat(amount) <= 0) {
         throw new Error('Amount must be a positive number');
       }
 
       const issuerAccount = await stellarServer.loadAccount(issuerKeypair.publicKey());
       const distributorAccount = await stellarServer.loadAccount(distributorKeypair.publicKey());
-      
+
       const asset = createAsset(code, issuerKeypair.publicKey());
-      
+
       const operations = [
         Operation.payment({
           destination: distributorKeypair.publicKey(),
@@ -254,7 +254,7 @@ export class StellarService {
           })
         );
       }
-      
+
       const transaction = await buildTransaction(issuerKeypair, operations);
       const result = await signAndSubmitTransaction(transaction, issuerKeypair);
 
@@ -300,7 +300,7 @@ export class StellarService {
   static async whitelistInvestor(investorPublicKey, assetCode = 'SIN01') {
     try {
       const issuerKeypair = getIssuerKeypair();
-      
+
       if (!investorPublicKey || investorPublicKey.length !== 56) {
         throw new Error('Invalid investor public key');
       }
@@ -353,7 +353,7 @@ export class StellarService {
       }
 
       const asset = createAsset(assetCode, issuerKeypair.publicKey());
-      
+
       const operations = [
         Operation.setTrustLineFlags({
           trustor: investorPublicKey,
@@ -410,7 +410,7 @@ export class StellarService {
     try {
       const issuerKeypair = getIssuerKeypair();
       const distributorKeypair = getDistributorKeypair();
-      
+
       if (!investorPublicKey || investorPublicKey.length !== 56) {
         throw new Error('Invalid investor public key');
       }
@@ -429,7 +429,7 @@ export class StellarService {
       }
 
       const asset = createAsset(assetCode, issuerKeypair.publicKey());
-      
+
       const operations = [
         Operation.payment({
           destination: investorPublicKey,
@@ -438,12 +438,12 @@ export class StellarService {
           source: distributorKeypair.publicKey(),
         }),
       ];
-      
+
       const transaction = await buildTransaction(distributorKeypair, operations, {
         memo: options.memo || null,
       });
       const result = await signAndSubmitTransaction(transaction, distributorKeypair);
-      
+
       if (!result.success) {
         // Usar mensagem amigável se disponível
         if (result.userFriendlyError) {
@@ -461,7 +461,7 @@ export class StellarService {
         }
         throw new Error(`Failed to distribute tokens: ${result.error}`);
       }
-      
+
       return {
         success: true,
         assetCode,
@@ -472,7 +472,7 @@ export class StellarService {
       };
     } catch (error) {
       console.error('Error distributing tokens:', error);
-      
+
       if (error.response) {
         const errorResult = error.response.data?.extras?.result_codes;
         if (errorResult) {
@@ -485,7 +485,7 @@ export class StellarService {
           throw new Error(`Token distribution failed: ${JSON.stringify(errorResult)}`);
         }
       }
-      
+
       throw error;
     }
   }
@@ -507,7 +507,7 @@ export class StellarService {
   static async freezeAccount(investorPublicKey, assetCode = 'SIN01') {
     try {
       const issuerKeypair = getIssuerKeypair();
-      
+
       if (!investorPublicKey || investorPublicKey.length !== 56) {
         throw new Error('Invalid investor public key');
       }
@@ -522,7 +522,7 @@ export class StellarService {
       }
 
       const asset = createAsset(assetCode, issuerKeypair.publicKey());
-      
+
       const operations = [
         Operation.setTrustLineFlags({
           trustor: investorPublicKey,
@@ -576,7 +576,7 @@ export class StellarService {
   static async clawbackTokens(investorPublicKey, amount, assetCode = 'SIN01') {
     try {
       const issuerKeypair = getIssuerKeypair();
-      
+
       if (!investorPublicKey || investorPublicKey.length !== 56) {
         throw new Error('Invalid investor public key');
       }
@@ -590,7 +590,7 @@ export class StellarService {
         const balance = account.balances.find(
           (bal) => bal.asset_code === assetCode && bal.asset_issuer === issuerKeypair.publicKey()
         );
-        
+
         if (!balance || parseFloat(balance.balance) < parseFloat(amount)) {
           throw new Error(`Insufficient balance. Available: ${balance ? balance.balance : '0'}, Requested: ${amount}`);
         }
@@ -602,7 +602,7 @@ export class StellarService {
       }
 
       const asset = createAsset(assetCode, issuerKeypair.publicKey());
-      
+
       const operations = [
         Operation.clawback({
           asset: asset,
@@ -660,13 +660,13 @@ export class StellarService {
   static async getTokenBalance(assetCode, publicKey) {
     try {
       const issuerKeypair = getIssuerKeypair();
-      
+
       const account = await stellarServer.loadAccount(publicKey);
-      
+
       const balance = account.balances.find(
         (bal) => bal.asset_code === assetCode && bal.asset_issuer === issuerKeypair.publicKey()
       );
-      
+
       return {
         assetCode,
         publicKey,
