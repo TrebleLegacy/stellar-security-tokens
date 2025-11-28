@@ -11,51 +11,16 @@ import bcrypt from 'bcrypt';
 // All investors must now use passkey registration flow via registerInvestorWithPasskey
 
 
+/**
+ * @deprecated Password authentication removed. Use passkey login at POST /api/auth/passkey-login
+ */
 export const loginInvestor = async (req, res, next) => {
-  try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email and password are required',
-      });
-    }
-
-    const investor = await Investor.authenticate(email, password);
-    if (!investor) {
-      return res.status(401).json({
-        success: false,
-        error: 'Invalid email or password',
-      });
-    }
-
-    // Gerar token JWT
-    const token = generateToken({
-      userId: investor.id,
-      email: investor.email,
-      role: 'investor',
-    });
-
-    res.json({
-      success: true,
-      data: {
-        token,
-        investor: {
-          id: investor.id,
-          email: investor.email,
-          name: investor.name,
-          document: investor.document,
-          stellarPublicKey: investor.stellarPublicKey,
-          kycStatus: investor.kycStatus,
-          created_at: investor.created_at,
-          updated_at: investor.updated_at,
-        },
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+  return res.status(410).json({
+    success: false,
+    error: 'Password authentication is no longer supported. Please use passkey login.',
+    migrateUrl: '/api/auth/passkey-login',
+    message: 'This endpoint has been deprecated. Investors must authenticate using WebAuthn passkeys.',
+  });
 };
 
 export const whitelistInvestor = async (req, res, next) => {
@@ -417,9 +382,9 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
       });
     }
 
-    // Check for existing email
-    const existingEmail = await Investor.findByEmail(email);
-    if (existingEmail) {
+    // Check for existing investor
+    const existingInvestor = await Investor.findByEmail(email);
+    if (existingInvestor) {
       return res.status(409).json({
         success: false,
         error: 'Investor with this email already exists',
@@ -435,20 +400,38 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
       });
     }
 
+    // Check for existing temp registration
+    const existingTemp = await prisma.tempRegistration.findFirst({
+      where: {
+        OR: [
+          { email },
+          { document }
+        ]
+      }
+    });
+
+    if (existingTemp) {
+      return res.status(409).json({
+        success: false,
+        error: 'Registration already in progress for this email or document',
+      });
+    }
+
     // Generate verification token
     const verificationToken = EmailService.generateVerificationToken();
     const verificationExpiry = EmailService.getVerificationExpiry();
 
-    // Create investor without Stellar account (will be created after email verification)
-    const investor = await prisma.investor.create({
+    // Create temp registration (expires in 24h)
+    const tempReg = await prisma.tempRegistration.create({
       data: {
-        name,
         email,
+        name,
         document,
-        kycStatus: 'pending',
+        userType: 'investor',
         emailVerified: false,
-        emailVerificationToken: verificationToken,
-        emailVerificationExpiry: verificationExpiry,
+        verificationToken,
+        verificationExpiry,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
       },
     });
 
@@ -459,9 +442,8 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
       success: true,
       message: 'Registration initiated. Please check your email to verify your account.',
       data: {
-        id: investor.id,
-        name: investor.name,
-        email: investor.email,
+        tempId: tempReg.id,
+        email: tempReg.email,
         emailVerified: false,
         nextStep: 'verify_email',
       },
@@ -485,55 +467,46 @@ export const verifyEmail = async (req, res, next) => {
       });
     }
 
-    // Find investor by verification token
-    const investor = await prisma.investor.findFirst({
+    // Find temp registration by token
+    const tempReg = await prisma.tempRegistration.findFirst({
       where: {
-        emailVerificationToken: token,
+        verificationToken: token,
+        userType: 'investor',
       },
     });
 
-    if (!investor) {
+    if (!tempReg) {
       return res.status(404).json({
         success: false,
         error: 'Invalid verification token',
       });
     }
 
-    // Check if token is expired
-    if (investor.emailVerificationExpiry && new Date() > investor.emailVerificationExpiry) {
+    // Check expiry
+    if (tempReg.verificationExpiry && tempReg.verificationExpiry < new Date()) {
       return res.status(400).json({
         success: false,
-        error: 'Verification token has expired. Please request a new one.',
+        error: 'Verification token has expired',
       });
     }
 
-    // Check if already verified
-    if (investor.emailVerified) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email is already verified',
-      });
-    }
-
-    // Mark email as verified
-    const updatedInvestor = await prisma.investor.update({
-      where: { id: investor.id },
+    // Mark as verified
+    const updated = await prisma.tempRegistration.update({
+      where: { id: tempReg.id },
       data: {
         emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationExpiry: null,
+        verificationToken: null, // Clear token after use
       },
     });
 
     res.json({
       success: true,
-      message: 'Email verified successfully. You can now create your passkey wallet.',
+      message: 'Email verified successfully',
       data: {
-        id: updatedInvestor.id,
-        name: updatedInvestor.name,
-        email: updatedInvestor.email,
+        tempId: updated.id,
+        email: updated.email,
         emailVerified: true,
-        nextStep: 'create_passkey',
+        nextStep: 'create_wallet',
       },
     });
   } catch (error) {
@@ -604,12 +577,31 @@ export const resendVerificationEmail = async (req, res, next) => {
  */
 export const createSmartWallet = async (req, res, next) => {
   try {
-    const { investorId, credentialId, publicKey } = req.body;
+    const { tempId, credentialId, publicKey } = req.body;
 
-    if (!investorId || !credentialId || !publicKey) {
+    if (!tempId || !credentialId || !publicKey) {
       return res.status(400).json({
         success: false,
-        error: 'investorId, credentialId, and publicKey are required',
+        error: 'tempId, credentialId, and publicKey are required',
+      });
+    }
+
+    // Get temp registration
+    const tempReg = await prisma.tempRegistration.findUnique({
+      where: { id: parseInt(tempId, 10) },
+    });
+
+    if (!tempReg) {
+      return res.status(404).json({
+        success: false,
+        error: 'Registration not found or expired',
+      });
+    }
+
+    if (!tempReg.emailVerified) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email must be verified before creating wallet',
       });
     }
 
@@ -618,34 +610,59 @@ export const createSmartWallet = async (req, res, next) => {
       ? publicKey
       : Buffer.from(publicKey, 'base64');
 
-    // Create smart wallet using PasskeyWalletService
-    const result = await PasskeyWalletService.createSmartWallet(
-      UserType.INVESTOR,
-      parseInt(investorId, 10),
-      credentialId,
-      publicKeyBuffer
-    );
+    // Create smart wallet contract
+    const server = PasskeyWalletService.getServer();
+    const walletResult = await server.createWallet(credentialId, publicKeyBuffer);
 
-    // Send welcome email
-    const investor = await prisma.investor.findUnique({
-      where: { id: parseInt(investorId, 10) },
+    if (!walletResult || !walletResult.contractId) {
+      throw new Error('Failed to deploy smart wallet contract');
+    }
+
+    // Create investor with ALL required passkey fields
+    const investor = await prisma.investor.create({
+      data: {
+        name: tempReg.name,
+        email: tempReg.email,
+        document: tempReg.document,
+        stellarContractId: walletResult.contractId,
+        passkeyCredentialId: credentialId,
+        passkeyPublicKey: publicKeyBuffer,
+        kycStatus: 'pending',
+        emailVerified: true,
+      },
     });
 
-    if (investor) {
-      await EmailService.sendWelcomeEmail(
-        investor.email,
-        investor.name,
-        result.contractId
-      );
-    }
+    // Delete temp registration (cleanup)
+    await prisma.tempRegistration.delete({
+      where: { id: tempReg.id },
+    });
+
+    // Send welcome email
+    await EmailService.sendWelcomeEmail(
+      investor.email,
+      investor.name,
+      investor.stellarContractId
+    );
+
+    // Generate JWT token for immediate login
+    const token = generateToken({
+      userId: investor.id,
+      email: investor.email,
+      userType: 'investor',
+    });
 
     res.status(201).json({
       success: true,
       message: 'Smart wallet created successfully',
       data: {
-        contractId: result.contractId,
-        transactionHash: result.transactionHash,
-        investor: result.user,
+        token,
+        investor: {
+          id: investor.id,
+          name: investor.name,
+          email: investor.email,
+          stellarContractId: investor.stellarContractId,
+          kycStatus: investor.kycStatus,
+        },
         nextStep: 'complete_kyc',
       },
     });
