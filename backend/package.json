@@ -19,7 +19,7 @@
     "test": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/stellar_tokens_test npm run test:unit && npm run test:integration",
     "test:unit": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/stellar_tokens_test find tests/unit/ -name '*.test.js' ! -name '*integration*' -exec node --import tsx --test {} \\;",
     "test:unit:all": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/stellar_tokens_test node --import tsx --test tests/unit/**/*.test.js",
-    "test:integration": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/stellar_tokens_test node --import tsx --test tests/integration/**/*.test.js",
+    "test:integration": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/stellar_tokens_test node --import tsx --test --test-concurrency=1 tests/integration/**/*.test.js",
     "test:watch": "node --watch --test",
     "test:email": "node ../scripts/test-email.js",
     "docker:up": "docker-compose up -d",
