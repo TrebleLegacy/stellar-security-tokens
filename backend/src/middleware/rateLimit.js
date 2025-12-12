@@ -19,6 +19,11 @@ async function getRedisClient() {
         return redisAvailable ? redisClient : null;
     }
 
+    // Skip Redis connection in test environment to prevent hanging processes
+    if (process.env.NODE_ENV === 'test') {
+        return null;
+    }
+
     try {
         const url = REDIS_PASSWORD
             ? `redis://:${REDIS_PASSWORD}@${REDIS_HOST}:${REDIS_PORT}`

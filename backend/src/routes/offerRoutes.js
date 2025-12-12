@@ -39,6 +39,60 @@ const upload = multer({
   }
 });
 
+/**
+ * @swagger
+ * /api/companies/offers:
+ *   post:
+ *     summary: Criar nova oferta
+ *     description: Cria uma nova oferta de security token (requer autenticação de empresa)
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset_code
+ *               - offer_name
+ *               - description
+ *               - total_supply
+ *               - offer_type
+ *             properties:
+ *               asset_code:
+ *                 type: string
+ *                 example: SIN01
+ *               offer_name:
+ *                 type: string
+ *                 example: Oferta Imobiliária ABC
+ *               description:
+ *                 type: string
+ *               total_supply:
+ *                 type: number
+ *               annual_interest_rate:
+ *                 type: number
+ *               offer_type:
+ *                 type: string
+ *                 enum: [collateral, sale]
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       201:
+ *         description: Oferta criada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Offer'
+ *       400:
+ *         description: Dados inválidos
+ *       401:
+ *         description: Não autorizado
+ */
 // Rotas para company_users
 router.post('/companies/offers',
   requireCompanyUser,
@@ -46,19 +100,233 @@ router.post('/companies/offers',
   createOfferValidation,
   OfferController.createOffer
 );
+
+/**
+ * @swagger
+ * /api/companies/offers:
+ *   get:
+ *     summary: Listar ofertas da empresa
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de ofertas da empresa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Offer'
+ */
 router.get('/companies/offers', requireCompanyUser, OfferController.getCompanyOffers);
+
+/**
+ * @swagger
+ * /api/companies/offers/{id}:
+ *   get:
+ *     summary: Detalhes da oferta (empresa)
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalhes da oferta
+ *   put:
+ *     summary: Atualizar oferta
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Oferta atualizada
+ */
 router.get('/companies/offers/:id', requireCompanyUser, OfferController.getOfferDetails);
 router.put('/companies/offers/:id', requireCompanyUser, OfferController.updateOffer);
 
+/**
+ * @swagger
+ * /api/offers/active:
+ *   get:
+ *     summary: Listar ofertas ativas (público)
+ *     description: Retorna ofertas ativas disponíveis para investimento
+ *     tags: [Offers]
+ *     responses:
+ *       200:
+ *         description: Lista de ofertas ativas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Offer'
+ */
 // Rotas públicas (para investidores)
 router.get('/offers/active', optionalAuth, OfferController.getActiveOffers);
+
+/**
+ * @swagger
+ * /api/offers/{id}:
+ *   get:
+ *     summary: Detalhes da oferta (público)
+ *     tags: [Offers]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalhes públicos da oferta
+ *       404:
+ *         description: Oferta não encontrada
+ */
 router.get('/offers/:id', optionalAuth, OfferController.getPublicOfferDetails);
 
+/**
+ * @swagger
+ * /api/admin/offers:
+ *   get:
+ *     summary: "[Admin] Listar todas as ofertas"
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de todas as ofertas
+ */
 // Rotas para platform_admins
 router.get('/admin/offers', requirePlatformAdmin, OfferController.getAllOffers);
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/review:
+ *   put:
+ *     summary: "[Admin] Revisar oferta"
+ *     description: Aprovar, rejeitar ou colocar em revisão
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [approved, rejected, under_review]
+ *               rejection_reason:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Status da oferta atualizado
+ */
 router.put('/admin/offers/:id/review', requirePlatformAdmin, reviewValidation, OfferController.reviewOffer);
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/due-diligence:
+ *   post:
+ *     summary: "[Admin] Adicionar notas de due diligence"
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - notes
+ *             properties:
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Notas adicionadas
+ */
 router.post('/admin/offers/:id/due-diligence', requirePlatformAdmin, dueDiligenceValidation, OfferController.addDueDiligenceNotes);
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/issue:
+ *   post:
+ *     summary: "[Admin] Emitir token da oferta"
+ *     description: Cria o token no Stellar blockchain
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Token emitido
+ */
 router.post('/admin/offers/:id/issue', requirePlatformAdmin, OfferController.issueTokenFromOffer);
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/activate:
+ *   post:
+ *     summary: "[Admin] Ativar oferta"
+ *     description: Torna a oferta disponível para investidores
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Oferta ativada
+ */
 router.post('/admin/offers/:id/activate', requirePlatformAdmin, OfferController.activateOffer);
 
 export default router;

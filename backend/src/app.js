@@ -13,6 +13,7 @@ import companyUserRoutes from './routes/companyUserRoutes.js';
 import platformAdminRoutes from './routes/platformAdminRoutes.js';
 import offerRoutes from './routes/offerRoutes.js';
 import webauthnRoutes from './routes/webauthnRoutes.js';
+import { swaggerUi, swaggerSpec } from './config/swagger.js';
 
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { globalLimiter, authLimiter, apiLimiter, strictLimiter } from './middleware/rateLimit.js';
@@ -36,6 +37,43 @@ app.use(express.urlencoded({ extended: true }));
 // Apply global rate limiting to all routes (100 req/min per IP)
 app.use(globalLimiter);
 
+// Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'Stellar Security Tokens API Docs',
+}));
+
+// Serve Swagger spec as JSON
+app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+});
+
+/**
+ * @swagger
+ * /health:
+ *   get:
+ *     summary: Health check endpoint
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: API is running
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: API is running
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ */
 app.get('/health', (req, res) => {
     res.json({
         success: true,
