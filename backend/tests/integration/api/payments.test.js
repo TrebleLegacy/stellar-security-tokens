@@ -1,16 +1,43 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
+import supertest from 'supertest';
+import app from '../../../src/app.js';
+import { setupTestDatabase, teardownTestDatabase } from '../../helpers/testDatabase.js';
+import { getInvestorToken } from '../../helpers/authHelper.js';
+
+const request = supertest(app);
 
 describe('Payments API Integration Tests', () => {
-  test.skip('GET /api/payments/history - needs auth refactor', async () => {
-    // Valid test but needs mock JWT token
-    assert.ok(true);
+  let investor;
+  let token;
+  let authToken;
+
+  before(async () => {
+    const data = await setupTestDatabase();
+    investor = data.investor;
+    token = data.token;
+    authToken = getInvestorToken(investor);
   });
 
-  test.skip('GET /api/payments/statistics - needs auth refactor', async () => {
-    // Valid test but needs mock JWT token
-    assert.ok(true);
+  after(async () => {
+    await teardownTestDatabase();
   });
 
-  // TODO: Refactor with mocked JWT token
+  test('GET /api/payments/history - should return empty list initially', async () => {
+    const res = await request
+      .get(`/api/investors/${investor.id}/payments`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+
+    assert.strictEqual(res.body.success, true);
+    assert.ok(Array.isArray(res.body.data.payments));
+    assert.strictEqual(res.body.data.payments.length, 0);
+  });
+
+  test('GET /api/payments/history - should fail without auth', async () => {
+    await request
+      .get(`/api/investors/${investor.id}/payments`)
+      .expect(401);
+  });
 });
+

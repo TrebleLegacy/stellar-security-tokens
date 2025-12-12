@@ -1,6 +1,6 @@
-import pinataSDK from '@pinata/sdk';
+import { PinataSDK } from 'pinata-web3';
 import dotenv from 'dotenv';
-import { Readable } from 'stream';
+import { Blob } from 'buffer';
 
 dotenv.config();
 
@@ -10,14 +10,18 @@ dotenv.config();
  */
 export class IpfsService {
   constructor() {
-    const apiKey = process.env.PINATA_API_KEY;
-    const secretKey = process.env.PINATA_SECRET_API_KEY;
+    const pinataJwt = process.env.PINATA_JWT;
+    const pinataGateway = process.env.PINATA_GATEWAY || 'gateway.pinata.cloud';
 
-    if (apiKey && secretKey) {
-      this.pinata = new pinataSDK(apiKey, secretKey);
+    if (pinataJwt) {
+      this.pinata = new PinataSDK({
+        pinataJwt: pinataJwt,
+        pinataGateway: pinataGateway,
+      });
       this.isEnabled = true;
     } else {
-      console.warn('Pinata API keys not found. IPFS service running in mock mode.');
+      console.warn('PINATA_JWT not found in environment variables. IPFS service running in mock mode.');
+      console.warn('Please migrate from PINATA_API_KEY/SECRET to PINATA_JWT for the new SDK.');
       this.isEnabled = false;
     }
   }
@@ -41,28 +45,31 @@ export class IpfsService {
     }
 
     try {
-      // Create readable stream from buffer
-      const stream = Readable.from(fileBuffer);
-      stream.path = fileName; // Pinata needs a path/name
+      // Convert Buffer to Blob/File for pinata-web3
+      const blob = new Blob([fileBuffer]);
+      // Iterate to add file object property if needed or just pass blob
+      // pinata-web3 upload.file accepts File or Blob
 
-      const options = {
-        pinataMetadata: {
-          name: fileName,
-          keyvalues: {
-            ...metadata,
-            uploadedAt: new Date().toISOString(),
-          },
-        },
-        pinataOptions: {
-          cidVersion: 0,
-        },
-      };
+      // Construct metadata keyvalues ensuring strings
+      const keyValues = {};
+      for (const [key, value] of Object.entries(metadata)) {
+        keyValues[key] = String(value);
+      }
+      keyValues.uploadedAt = new Date().toISOString();
 
-      const result = await this.pinata.pinFileToIPFS(stream, options);
+      // For Node.js we can create a File-like object or just pass blob with name
+      // The SDK signature: upload.file(file: File | Blob)
+      // We attach the name via a File object construction or hacked blob if File is not global
+      const file = new File([blob], fileName, { type: 'application/octet-stream' });
+
+      const upload = await this.pinata.upload.file(file).addMetadata({
+        name: fileName,
+        keyValues: keyValues,
+      });
 
       return {
-        ipfsHash: result.IpfsHash,
-        url: this.getGatewayUrl(result.IpfsHash),
+        ipfsHash: upload.IpfsHash,
+        url: this.getGatewayUrl(upload.IpfsHash),
       };
     } catch (error) {
       console.error('IPFS upload failed:', error);
@@ -76,7 +83,9 @@ export class IpfsService {
    * @returns {string}
    */
   getGatewayUrl(hash) {
-    return `https://gateway.pinata.cloud/ipfs/${hash}`;
+    // Determine gateway domain from env or default
+    const gateway = process.env.PINATA_GATEWAY || 'gateway.pinata.cloud';
+    return `https://${gateway}/ipfs/${hash}`;
   }
 
   /**
@@ -87,7 +96,7 @@ export class IpfsService {
     if (!this.isEnabled) return true;
     try {
       const result = await this.pinata.testAuthentication();
-      return result.authenticated;
+      return result.message === 'Congratulations! You are communicating with the Pinata API!';
     } catch (error) {
       return false;
     }

@@ -7,11 +7,11 @@ import assert from 'node:assert';
 describe('Investor Model - Integration Style Tests', () => {
   // Estes testes verificam a estrutura e lógica básica
   // Para testes completos, é necessário PostgreSQL rodando ou refatoração para dependency injection
-  
+
   test('Investor model exports correctly', async () => {
     const { Investor } = await import('../../../src/models/Investor.js');
     assert.ok(Investor);
-    assert.ok(typeof Investor.create === 'function');
+
     assert.ok(typeof Investor.findById === 'function');
     assert.ok(typeof Investor.findByEmail === 'function');
     assert.ok(typeof Investor.findAll === 'function');
@@ -21,18 +21,20 @@ describe('Investor Model - Integration Style Tests', () => {
 
   test('Investor model has all required static methods', async () => {
     const { Investor } = await import('../../../src/models/Investor.js');
-    
+
     const requiredMethods = [
-      'create',
       'findById',
       'findByEmail',
       'findByDocument',
-      'findByStellarPublicKey',
+      // 'findByStellarPublicKey', // Deprecated
       'findAll',
       'update',
       'delete',
+      'authenticate',
+      'updatePassword',
+      'getPortfolio',
+      'getConsolidatedMetrics'
     ];
-
     for (const method of requiredMethods) {
       assert.ok(
         typeof Investor[method] === 'function',

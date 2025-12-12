@@ -1,11 +1,33 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
+import supertest from 'supertest';
+import app from '../../../src/app.js';
+import { setupTestDatabase, teardownTestDatabase } from '../../helpers/testDatabase.js';
+import { getInvestorToken } from '../../helpers/authHelper.js';
+
+const request = supertest(app);
 
 describe('Investments API Integration Tests', () => {
-  test.skip('Investment API endpoints - needs auth refactor', async () => {
-    // Valid tests but need mock JWT token
-    assert.ok(true);
+  let investor;
+  let authToken;
+
+  before(async () => {
+    const data = await setupTestDatabase();
+    investor = data.investor;
+    authToken = getInvestorToken(investor);
   });
 
-  // TODO: Refactor with mocked JWT token
+  after(async () => {
+    await teardownTestDatabase();
+  });
+
+  test('GET /api/investors/:id/portfolio - should return portfolio data', async () => {
+    const res = await request
+      .get(`/api/investors/${investor.id}/portfolio`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+
+    assert.strictEqual(res.body.success, true);
+    assert.ok(res.body.data.portfolio);
+  });
 });

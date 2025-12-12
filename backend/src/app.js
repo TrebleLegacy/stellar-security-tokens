@@ -50,6 +50,21 @@ app.get('/api-docs.json', (req, res) => {
     res.send(swaggerSpec);
 });
 
+// Serve stellar.toml for domain verification
+app.get('/.well-known/stellar.toml', (req, res) => {
+    res.setHeader('Content-Type', 'text/plain');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    const issuerKey = process.env.STELLAR_ISSUER_PUBLIC_KEY || '';
+    const tomlContent = `ACCOUNTS=[
+"${issuerKey}"
+]
+
+VERSION="2.0.0"
+`;
+    res.send(tomlContent);
+});
+
 /**
  * @swagger
  * /health:

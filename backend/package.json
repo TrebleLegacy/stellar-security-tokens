@@ -26,7 +26,10 @@
     "docker:down": "docker-compose down",
     "docker:dev": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up",
     "docker:dev:build": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml up --build",
-    "docker:dev:down": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml down"
+    "docker:dev:down": "docker-compose -f docker-compose.yml -f docker-compose.dev.yml down",
+    "lint": "eslint src tests",
+    "lint:fix": "eslint src tests --fix",
+    "format": "prettier --write \"src/**/*.{js,json}\" \"tests/**/*.{js,json}\""
   },
   "keywords": [
     "stellar",
@@ -37,7 +40,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "@pinata/sdk": "^2.1.0",
     "@prisma/client": "^6.19.0",
     "@simplewebauthn/browser": "^13.2.2",
     "@simplewebauthn/server": "^13.2.2",
@@ -60,6 +62,7 @@
     "nodemailer": "^7.0.10",
     "passkey-kit": "^0.11.3",
     "pg": "^8.11.3",
+    "pinata-web3": "^0.5.4",
     "prisma": "^6.19.0",
     "rate-limit-redis": "^4.3.1",
     "redis": "^5.10.0",
@@ -69,7 +72,10 @@
   },
   "devDependencies": {
     "dotenv-cli": "^11.0.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
     "nodemon": "^3.0.2",
+    "prettier": "^3.2.5",
     "supertest": "^7.1.4"
   },
   "engines": {
