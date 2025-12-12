@@ -7,66 +7,9 @@ import { generateToken } from '../middleware/auth.js';
 import prisma from '../config/prisma.js';
 import bcrypt from 'bcrypt';
 
-// REMOVED: createInvestor and registerInvestor (traditional flow deprecated)
-// All investors must now use passkey registration flow via registerInvestorWithPasskey
 
 
-/**
- * @deprecated Password authentication removed. Use passkey login at POST /api/auth/passkey-login
- */
-export const loginInvestor = async (req, res, next) => {
-  return res.status(410).json({
-    success: false,
-    error: 'Password authentication is no longer supported. Please use passkey login.',
-    migrateUrl: '/api/auth/passkey-login',
-    message: 'This endpoint has been deprecated. Investors must authenticate using WebAuthn passkeys.',
-  });
-};
 
-export const whitelistInvestor = async (req, res, next) => {
-  try {
-    const { investorId } = req.params;
-    const { assetCode = 'SIN01' } = req.body;
-
-    const investor = await Investor.findById(parseInt(investorId, 10));
-    if (!investor) {
-      return res.status(404).json({
-        success: false,
-        error: 'Investor not found',
-      });
-    }
-
-    if (!investor.stellarPublicKey) {
-      return res.status(400).json({
-        success: false,
-        error: 'Investor does not have a Stellar public key',
-      });
-    }
-
-    const result = await StellarService.whitelistInvestor(
-      investor.stellarPublicKey,
-      assetCode
-    );
-
-    const updatedInvestor = await Investor.update(investorId, {
-      kycStatus: 'approved',
-    });
-
-    res.json({
-      success: true,
-      message: 'Investor whitelisted successfully',
-      data: {
-        investor: updatedInvestor,
-        stellarTransaction: {
-          transactionHash: result.transactionHash,
-          ledger: result.ledger,
-        },
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 export const getInvestors = async (req, res, next) => {
   try {
@@ -428,6 +371,7 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
       throw new Error('Failed to deploy smart wallet contract');
     }
 
+
     // Generate verification token
     const verificationToken = EmailService.generateVerificationToken();
     const verificationExpiry = EmailService.getVerificationExpiry();
@@ -617,18 +561,7 @@ export const resendVerificationEmail = async (req, res, next) => {
   }
 };
 
-/**
- * @deprecated Wallet creation now happens during registration
- * This endpoint is no longer needed - passkey is created on frontend first,
- * then registration happens in single step
- */
-export const createSmartWallet = async (req, res, next) => {
-  return res.status(410).json({
-    success: false,
-    error: 'Wallet creation now happens during registration. Use POST /api/investors/register with passkey credentials.',
-    message: 'This endpoint has been deprecated. Frontend should create WebAuthn passkey first, then call /register with credentialId and publicKey.',
-  });
-};
+
 
 /**
  * Get wallet creation status for an investor

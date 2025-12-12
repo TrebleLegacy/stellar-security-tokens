@@ -358,59 +358,7 @@ export class PasskeyWalletService {
     return result;
   }
 
-  // ============================================================================
-  // INVESTOR-SPECIFIC METHODS (for backwards compatibility)
-  // ============================================================================
 
-  /**
-   * Create a new smart wallet for an investor
-   * @deprecated Use createSmartWallet(UserType.INVESTOR, ...) instead
-   */
-  static async createInvestorWallet(investorId, credentialId, publicKey) {
-    return this.createSmartWallet(UserType.INVESTOR, investorId, credentialId, publicKey);
-  }
 
-  /**
-   * Get investor by passkey credential ID
-   * @deprecated Use getUserByCredentialId(UserType.INVESTOR, ...) instead
-   */
-  static async getInvestorByCredentialId(credentialId) {
-    return this.getUserByCredentialId(UserType.INVESTOR, credentialId);
-  }
-
-  /**
-   * Get wallet status for an investor
-   * @deprecated Use getWalletStatus(UserType.INVESTOR, ...) instead
-   */
-  static async getInvestorWalletStatus(investorId) {
-    return this.getWalletStatus(UserType.INVESTOR, investorId);
-  }
-
-  // ============================================================================
-  // COMPANY USER-SPECIFIC METHODS
-  // ============================================================================
-
-  /**
-   * Create a new smart wallet for a company user
-   */
-  static async createCompanyUserWallet(companyUserId, credentialId, publicKey) {
-    return this.createSmartWallet(UserType.COMPANY_USER, companyUserId, credentialId, publicKey);
-  }
-
-  /**
-   * Get company user by passkey credential ID
-   */
-  static async getCompanyUserByCredentialId(credentialId) {
-    return this.getUserByCredentialId(UserType.COMPANY_USER, credentialId);
-  }
-
-  /**
-   * Get wallet status for a company user
-   */
-  static async getCompanyUserWalletStatus(companyUserId) {
-    return this.getWalletStatus(UserType.COMPANY_USER, companyUserId);
-  }
 }
-
-export default PasskeyWalletService;
 

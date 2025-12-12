@@ -3,8 +3,6 @@ import { body, param } from 'express-validator';
 import { validate } from '../middleware/validator.js';
 import { authenticateToken } from '../middleware/auth.js';
 import {
-  // REMOVED: createInvestor, registerInvestor (traditional flow deprecated)
-  whitelistInvestor,
   getInvestors,
   getInvestorById,
   getInvestorBalance,
@@ -14,22 +12,16 @@ import {
   registerInvestorWithPasskey,
   verifyEmail,
   resendVerificationEmail,
-  createSmartWallet,
-  getWalletStatus,
   getPasskeyConfig,
-  loginInvestor,
   getInvestorPortfolio,
   getInvestorMetrics,
+  getWalletStatus,
 } from '../controllers/investorController.js';
 import { requireInvestor, requireOwnData } from '../middleware/authorize.js';
 
 const router = express.Router();
 
-const whitelistValidation = [
-  param('investorId').isInt({ min: 1 }).withMessage('Valid investor ID is required'),
-  body('assetCode').optional().isString().isLength({ min: 1, max: 12 }).withMessage('Asset code must be 1-12 characters'),
-  validate,
-];
+
 
 // ============================================================================
 // PASSKEY-ONLY REGISTRATION FLOW
@@ -134,43 +126,7 @@ router.post('/resend-verification', [
   validate,
 ], resendVerificationEmail);
 
-/**
- * @swagger
- * /api/investors/create-wallet:
- *   post:
- *     summary: Criar smart wallet
- *     description: Cria carteira Stellar associada à passkey do investidor
- *     tags: [Investors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - investorId
- *               - credentialId
- *               - publicKey
- *             properties:
- *               investorId:
- *                 type: integer
- *               credentialId:
- *                 type: string
- *               publicKey:
- *                 type: string
- *     responses:
- *       200:
- *         description: Wallet criada com sucesso
- *       400:
- *         description: Dados inválidos
- */
-// Step 3: Create smart wallet after passkey registration on frontend
-router.post('/create-wallet', [
-  body('investorId').isInt({ min: 1 }).withMessage('Valid investor ID is required'),
-  body('credentialId').notEmpty().withMessage('Credential ID is required'),
-  body('publicKey').notEmpty().withMessage('Public key is required'),
-  validate,
-], createSmartWallet);
+
 
 /**
  * @swagger
@@ -190,59 +146,13 @@ router.get('/passkey/config', getPasskeyConfig);
 // AUTHENTICATION & DATA ACCESS
 // ============================================================================
 
-/**
- * @swagger
- * /api/investors/login:
- *   post:
- *     summary: Login de investidor
- *     description: Autenticação passkey-based
- *     tags: [Investors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: Login iniciado, continue com WebAuthn
- */
-// Login (passkey-based, handled by frontend WebAuthn)
-router.post('/login', [
-  body('email').isEmail().withMessage('Valid email is required'),
-  // Note: Password removed - passkey authentication handled client-side
-  validate,
-], loginInvestor);
+
 
 // ============================================================================
 // INVESTOR MANAGEMENT (requires authentication)
 // ============================================================================
 
-/**
- * @swagger
- * /api/investors/whitelist/{investorId}:
- *   post:
- *     summary: Adicionar investidor à whitelist
- *     tags: [Investors]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: investorId
- *         required: true
- *         schema:
- *           type: integer
- *     responses:
- *       200:
- *         description: Investidor adicionado à whitelist
- */
-router.post('/whitelist/:investorId', whitelistValidation, authenticateToken, whitelistInvestor);
+
 
 /**
  * @swagger

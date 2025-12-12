@@ -106,38 +106,6 @@ router.post('/passkey-login', [
   }
 });
 
-/**
- * @swagger
- * /api/auth/login:
- *   post:
- *     summary: Login tradicional (DEPRECATED)
- *     description: Esta rota foi descontinuada. Use passkey-login.
- *     tags: [Auth]
- *     deprecated: true
- *     responses:
- *       410:
- *         description: Método de autenticação não suportado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: false
- *                 error:
- *                   type: string
- *                 migrateUrl:
- *                   type: string
- *                   example: /api/auth/passkey-login
- */
-router.post('/login', async (req, res) => {
-  return res.status(410).json({
-    success: false,
-    error: 'Password authentication is no longer supported.',
-    migrateUrl: '/api/auth/passkey-login',
-    message: 'Please use passkey authentication.',
-  });
-});
+
 
 export default router;

@@ -21,15 +21,25 @@ const createTransporter = () => {
   };
 
   if (!smtpConfig.auth.user || !smtpConfig.auth.pass) {
-    console.log('ℹ️  Email service: Not configured (SMTP credentials not set)');
-    console.log('   Email notifications will be skipped. System will continue to work normally.');
-    console.log('   To enable emails, configure SMTP_USER and SMTP_PASSWORD in .env');
-    console.log('   See EMAIL_SETUP.md for instructions.');
-    return null;
+    console.log('ℹ️  Email service: Dev Mode (logging to console)');
+    // Return mock transporter for Dev Mode
+    return {
+      sendMail: async (options) => {
+        console.log('\n📧 [DEV MODE] Sending Email:');
+        console.log(`   To: ${options.to}`);
+        console.log(`   Subject: ${options.subject}`);
+        console.log(`   From: ${options.from}`);
+        console.log('   --- Text Content ---');
+        console.log(options.text);
+        console.log('   --------------------\n');
+        return { messageId: `dev-mock-${Date.now()}` };
+      },
+      verify: async () => true
+    };
   }
 
   const transporter = nodemailer.createTransport(smtpConfig);
-  
+
   // Verificar conexão ao inicializar (assíncrono, não bloqueia)
   transporter.verify().then(() => {
     console.log('✅ Email service configured successfully');
@@ -132,7 +142,7 @@ export class EmailService {
 
       const info = await transporter.sendMail(mailOptions);
       console.log(`Email sent successfully to ${investorEmail}:`, info.messageId);
-      
+
       return {
         success: true,
         messageId: info.messageId,

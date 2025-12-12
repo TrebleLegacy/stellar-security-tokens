@@ -1,18 +1,51 @@
-import { test, describe } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
+import supertest from 'supertest';
+import app from '../../../src/app.js';
+import { setupTestDatabase, teardownTestDatabase } from '../../helpers/testDatabase.js';
+import { getInvestorToken } from '../../helpers/authHelper.js';
+
+const request = supertest(app);
 
 describe('Tokens API Integration Tests', () => {
-  test.skip('GET /api/tokens - lista tokens (needs auth refactor)', async () => {
-    // Valid test but needs mock JWT token instead of password login
-    assert.ok(true);
+  let investor;
+  let authToken;
+  let createdToken;
+
+  before(async () => {
+    const data = await setupTestDatabase();
+    investor = data.investor;
+    createdToken = data.token;
+    authToken = getInvestorToken(investor);
   });
 
-  test.skip('GET /api/tokens/:assetCode - retorna token específico (needs auth refactor)', async () => {
-    // Valid test but needs mock JWT token
-    assert.ok(true);
+  after(async () => {
+    await teardownTestDatabase();
   });
 
-  // TODO: Refactor with mocked JWT token
-  // const token = generateToken({ userId: 1, userType: 'investor' });
-  // apiClient.setAuthToken(token);
+  test('GET /api/tokens - should list available tokens', async () => {
+    const res = await request
+      .get('/api/tokens')
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+
+    assert.strictEqual(res.body.success, true);
+    assert.ok(process.env.ASSET_CODE || 'SIN01');
+    // We expect at least the seeded token
+    assert.ok(res.body.data.length >= 1);
+    const found = res.body.data.find(t => t.assetCode === createdToken.assetCode);
+    assert.ok(found, 'Seeded token should be in response');
+  });
+
+  test('GET /api/tokens/:assetCode - should return specific token details', async () => {
+    const res = await request
+      .get(`/api/tokens/${createdToken.assetCode}`)
+      .set('Authorization', `Bearer ${authToken}`)
+      .expect(200);
+
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.data.assetCode, createdToken.assetCode);
+    assert.strictEqual(res.body.data.description, createdToken.description);
+  });
 });
+

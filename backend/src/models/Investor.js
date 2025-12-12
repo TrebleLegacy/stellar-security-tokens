@@ -5,19 +5,6 @@ import bcrypt from 'bcrypt';
  * Modelo para gerenciar investidores no banco de dados usando Prisma
  */
 export class Investor {
-  /**
-   * DEPRECATED: Use PasskeyWalletService.createSmartWallet and direct Prisma calls instead.
-   * Traditional investor creation is no longer supported.
-   * 
-   * For passkey-based registration:
-   * 1. Create investor record with email, name, document (no stellarPublicKey)
-   * 2. Send email verification
-   * 3. After verification, create passkey and smart wallet via PasskeyWalletService
-   * 4. Update investor with stellarContractId, passkeyCredentialId, passkeyPublicKey
-   */
-  static async create() {
-    throw new Error('Investor.create() is deprecated. Use passkey registration flow instead.');
-  }
 
 
   /**
@@ -53,16 +40,6 @@ export class Investor {
     });
   }
 
-  /**
-   * DEPRECATED: Use findByStellarContractId instead for smart wallet lookups
-   * @param {string} stellarPublicKey - Legacy Stellar public key
-   * @returns {Promise<Object|null>} Investor found or null
-   */
-  static async findByStellarPublicKey(stellarPublicKey) {
-    return await prisma.investor.findFirst({
-      where: { stellarPublicKey },
-    });
-  }
 
   /**
    * Busca investidor por contract ID (smart wallet address)

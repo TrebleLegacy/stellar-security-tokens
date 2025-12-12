@@ -8,6 +8,9 @@ CREATE TYPE "CompanyStatus" AS ENUM ('pending', 'approved', 'suspended', 'reject
 CREATE TYPE "OfferStatus" AS ENUM ('pending_review', 'under_review', 'approved', 'rejected', 'active', 'closed');
 
 -- CreateEnum
+CREATE TYPE "PaymentType" AS ENUM ('monthly', 'bullet', 'quarterly', 'semi_annual');
+
+-- CreateEnum
 CREATE TYPE "OfferType" AS ENUM ('collateral', 'sale');
 
 -- CreateEnum
@@ -37,6 +40,12 @@ CREATE TABLE "investors" (
     "last_login" TIMESTAMP,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "stellar_contract_id" VARCHAR(56) NOT NULL,
+    "passkey_credential_id" TEXT NOT NULL,
+    "passkey_public_key" BYTEA NOT NULL,
+    "email_verified" BOOLEAN NOT NULL DEFAULT false,
+    "email_verification_token" VARCHAR(64),
+    "email_verification_expiry" TIMESTAMP,
 
     CONSTRAINT "investors_pkey" PRIMARY KEY ("id")
 );
@@ -93,6 +102,8 @@ CREATE TABLE "interest_payments" (
     "status" "PaymentStatus" NOT NULL DEFAULT 'pending',
     "error_message" TEXT,
     "offer_id" INTEGER,
+    "payment_type" "PaymentType" NOT NULL DEFAULT 'monthly',
+    "is_bullet_payment" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "interest_payments_pkey" PRIMARY KEY ("id")
@@ -122,12 +133,18 @@ CREATE TABLE "company_users" (
     "id" SERIAL NOT NULL,
     "company_id" INTEGER NOT NULL,
     "email" VARCHAR(255) NOT NULL,
-    "password_hash" VARCHAR(255) NOT NULL,
+    "password_hash" VARCHAR(255),
     "name" VARCHAR(255) NOT NULL,
     "role" "CompanyUserRole" NOT NULL DEFAULT 'user',
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "stellar_public_key" VARCHAR(56),
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "stellar_contract_id" VARCHAR(56),
+    "passkey_credential_id" TEXT,
+    "passkey_public_key" BYTEA,
+    "email_verified" BOOLEAN NOT NULL DEFAULT false,
+    "email_verification_token" VARCHAR(64),
+    "email_verification_expiry" TIMESTAMP,
 
     CONSTRAINT "company_users_pkey" PRIMARY KEY ("id")
 );
@@ -155,6 +172,10 @@ CREATE TABLE "offers" (
     "asset_code" VARCHAR(12) NOT NULL,
     "offer_name" VARCHAR(255) NOT NULL,
     "description" TEXT NOT NULL,
+    "collateral_type" TEXT DEFAULT 'real_estate',
+    "collateral_description" TEXT,
+    "collateral_value" DECIMAL(20,2),
+    "collateral_ltv" DECIMAL(5,2),
     "total_supply" DECIMAL(20,7) NOT NULL,
     "annual_interest_rate" DECIMAL(10,7),
     "offer_type" "OfferType" NOT NULL,
@@ -165,6 +186,10 @@ CREATE TABLE "offers" (
     "reviewed_at" TIMESTAMP,
     "legal_documents" JSONB NOT NULL DEFAULT '{}',
     "due_diligence_notes" TEXT,
+    "payment_type" "PaymentType" NOT NULL DEFAULT 'monthly',
+    "maturity_date" TIMESTAMP(3),
+    "bullet_payment_amount" DECIMAL(20,7),
+    "payment_frequency" INTEGER NOT NULL DEFAULT 1,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -248,6 +273,12 @@ CREATE INDEX "investors_document_idx" ON "investors"("document");
 CREATE INDEX "investors_stellar_public_key_idx" ON "investors"("stellar_public_key");
 
 -- CreateIndex
+CREATE INDEX "investors_stellar_contract_id_idx" ON "investors"("stellar_contract_id");
+
+-- CreateIndex
+CREATE INDEX "investors_email_verified_idx" ON "investors"("email_verified");
+
+-- CreateIndex
 CREATE INDEX "investors_kyc_status_created_at_idx" ON "investors"("kyc_status", "created_at" DESC);
 
 -- CreateIndex
@@ -317,6 +348,9 @@ CREATE INDEX "interest_payments_investor_id_payment_date_idx" ON "interest_payme
 CREATE INDEX "interest_payments_payment_date_asset_code_idx" ON "interest_payments"("payment_date" DESC, "asset_code");
 
 -- CreateIndex
+CREATE INDEX "interest_payments_payment_type_idx" ON "interest_payments"("payment_type");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "interest_payments_investor_id_asset_code_payment_date_trans_key" ON "interest_payments"("investor_id", "asset_code", "payment_date", "transaction_hash");
 
 -- CreateIndex
@@ -356,6 +390,12 @@ CREATE INDEX "company_users_is_active_idx" ON "company_users"("is_active");
 CREATE INDEX "company_users_stellar_public_key_idx" ON "company_users"("stellar_public_key");
 
 -- CreateIndex
+CREATE INDEX "company_users_stellar_contract_id_idx" ON "company_users"("stellar_contract_id");
+
+-- CreateIndex
+CREATE INDEX "company_users_email_verified_idx" ON "company_users"("email_verified");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "platform_admins_email_key" ON "platform_admins"("email");
 
 -- CreateIndex
@@ -387,6 +427,9 @@ CREATE INDEX "offers_offer_type_idx" ON "offers"("offer_type");
 
 -- CreateIndex
 CREATE INDEX "offers_reviewed_by_idx" ON "offers"("reviewed_by");
+
+-- CreateIndex
+CREATE INDEX "offers_payment_type_idx" ON "offers"("payment_type");
 
 -- CreateIndex
 CREATE INDEX "investments_investor_id_idx" ON "investments"("investor_id");
