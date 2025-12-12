@@ -33,6 +33,35 @@ const completeAuthenticationValidation = [
   validate,
 ];
 
+/**
+ * @swagger
+ * /api/webauthn/{userType}/register/start:
+ *   post:
+ *     summary: Iniciar registro de passkey
+ *     description: Gera challenge para WebAuthn registration
+ *     tags: [WebAuthn]
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [investor, company_user, platform_admin]
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               userId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Challenge e opções de registro
+ */
 // Rotas de registro (criar passkey)
 router.post(
   '/:userType/register/start',
@@ -40,12 +69,78 @@ router.post(
   WebAuthnController.startRegistration
 );
 
+/**
+ * @swagger
+ * /api/webauthn/{userType}/register/complete:
+ *   post:
+ *     summary: Completar registro de passkey
+ *     description: Verifica e armazena credential
+ *     tags: [WebAuthn]
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [investor, company_user, platform_admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - credential
+ *               - challenge
+ *             properties:
+ *               credential:
+ *                 type: object
+ *               challenge:
+ *                 type: string
+ *               deviceName:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Passkey registrada com sucesso
+ *       400:
+ *         description: Verificação falhou
+ */
 router.post(
   '/:userType/register/complete',
   completeRegistrationValidation,
   WebAuthnController.completeRegistration
 );
 
+/**
+ * @swagger
+ * /api/webauthn/{userType}/login/start:
+ *   post:
+ *     summary: Iniciar autenticação passkey
+ *     description: Gera challenge para WebAuthn authentication
+ *     tags: [WebAuthn]
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [investor, company_user, platform_admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Challenge e opções de autenticação
+ */
 // Rotas de autenticação (login com passkey)
 router.post(
   '/:userType/login/start',
@@ -53,6 +148,40 @@ router.post(
   WebAuthnController.startAuthentication
 );
 
+/**
+ * @swagger
+ * /api/webauthn/{userType}/login/complete:
+ *   post:
+ *     summary: Completar autenticação passkey
+ *     description: Verifica signature e retorna JWT
+ *     tags: [WebAuthn]
+ *     parameters:
+ *       - in: path
+ *         name: userType
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [investor, company_user, platform_admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - credential
+ *               - challenge
+ *             properties:
+ *               credential:
+ *                 type: object
+ *               challenge:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Autenticação bem-sucedida, retorna JWT
+ *       401:
+ *         description: Autenticação falhou
+ */
 router.post(
   '/:userType/login/complete',
   completeAuthenticationValidation,

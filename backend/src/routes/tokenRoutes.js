@@ -25,10 +25,151 @@ const distributeTokenValidation = [
   validate,
 ];
 
+/**
+ * @swagger
+ * /api/tokens/issue:
+ *   post:
+ *     summary: Emitir novo token
+ *     description: Cria um novo security token no Stellar blockchain
+ *     tags: [Tokens]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - assetCode
+ *               - totalSupply
+ *             properties:
+ *               assetCode:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 12
+ *                 example: SIN01
+ *               totalSupply:
+ *                 type: number
+ *                 example: 1000000
+ *               description:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Token emitido com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *       400:
+ *         description: Dados inválidos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
 router.post('/issue', issueTokenValidation, issueToken);
+
+/**
+ * @swagger
+ * /api/tokens:
+ *   get:
+ *     summary: Listar todos os tokens
+ *     description: Retorna lista de todos os security tokens emitidos
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Lista de tokens
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Token'
+ */
 router.get('/', getTokens);
+
+/**
+ * @swagger
+ * /api/tokens/{assetCode}:
+ *   get:
+ *     summary: Buscar token por código
+ *     description: Retorna detalhes de um token específico
+ *     tags: [Tokens]
+ *     parameters:
+ *       - in: path
+ *         name: assetCode
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Código do ativo (ex. SIN01)
+ *     responses:
+ *       200:
+ *         description: Detalhes do token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Token'
+ *       404:
+ *         description: Token não encontrado
+ */
 router.get('/:assetCode', getTokenByAssetCode);
+
+/**
+ * @swagger
+ * /api/tokens/distribute:
+ *   post:
+ *     summary: Distribuir tokens
+ *     description: Distribui tokens para um investidor
+ *     tags: [Tokens]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - investorId
+ *               - assetCode
+ *               - amount
+ *             properties:
+ *               investorId:
+ *                 type: integer
+ *                 example: 1
+ *               assetCode:
+ *                 type: string
+ *                 example: SIN01
+ *               amount:
+ *                 type: number
+ *                 example: 1000
+ *     responses:
+ *       200:
+ *         description: Tokens distribuídos com sucesso
+ *       400:
+ *         description: Dados inválidos
+ */
 router.post('/distribute', distributeTokenValidation, distributeTokens);
+
+/**
+ * @swagger
+ * /api/tokens/{assetCode}/balance:
+ *   get:
+ *     summary: Consultar balanço do token
+ *     description: Retorna o balanço total de um token específico
+ *     tags: [Tokens]
+ *     parameters:
+ *       - in: path
+ *         name: assetCode
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Balanço do token
+ */
 router.get('/:assetCode/balance', getTokenBalance);
 
 export default router;

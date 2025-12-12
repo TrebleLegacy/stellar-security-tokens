@@ -8,11 +8,53 @@ import prisma from '../config/prisma.js';
 const router = express.Router();
 
 /**
- * Passkey Login - Simple version for MVP
- * POST /api/auth/passkey-login
- * 
- * For production, this should verify WebAuthn signature.
- * For MVP, we verify credential ID + email combination.
+ * @swagger
+ * /api/auth/passkey-login:
+ *   post:
+ *     summary: Login com passkey
+ *     description: Autenticação usando credencial passkey (WebAuthn). Retorna JWT token.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - credentialId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: investor@example.com
+ *               credentialId:
+ *                 type: string
+ *                 description: ID da credencial passkey
+ *     responses:
+ *       200:
+ *         description: Login realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     token:
+ *                       type: string
+ *                     investor:
+ *                       $ref: '#/components/schemas/Investor'
+ *       401:
+ *         description: Credenciais inválidas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 router.post('/passkey-login', [
   body('email').isEmail().withMessage('Valid email is required'),
@@ -65,8 +107,29 @@ router.post('/passkey-login', [
 });
 
 /**
- * Legacy login - DEPRECATED
- * Use /api/auth/passkey-login instead
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login tradicional (DEPRECATED)
+ *     description: Esta rota foi descontinuada. Use passkey-login.
+ *     tags: [Auth]
+ *     deprecated: true
+ *     responses:
+ *       410:
+ *         description: Método de autenticação não suportado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: false
+ *                 error:
+ *                   type: string
+ *                 migrateUrl:
+ *                   type: string
+ *                   example: /api/auth/passkey-login
  */
 router.post('/login', async (req, res) => {
   return res.status(410).json({

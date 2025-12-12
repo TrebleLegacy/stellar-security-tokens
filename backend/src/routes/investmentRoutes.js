@@ -14,7 +14,76 @@ const purchaseValidation = [
   validate,
 ];
 
+/**
+ * @swagger
+ * /api/investments/purchase:
+ *   post:
+ *     summary: Comprar tokens de uma oferta
+ *     description: Inicia uma compra de security tokens com USDC
+ *     tags: [Investments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - investorId
+ *               - usdcAmount
+ *             properties:
+ *               investorId:
+ *                 type: integer
+ *                 example: 1
+ *               usdcAmount:
+ *                 type: number
+ *                 example: 1000.00
+ *               assetCode:
+ *                 type: string
+ *                 example: SIN01
+ *               offerId:
+ *                 type: integer
+ *     responses:
+ *       200:
+ *         description: Compra iniciada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Investment'
+ *       400:
+ *         description: Dados inválidos ou saldo insuficiente
+ *       401:
+ *         description: Não autorizado
+ */
 router.post('/purchase', purchaseValidation, authenticateToken, purchaseInvestment);
+
+/**
+ * @swagger
+ * /api/investments/{id}/status:
+ *   get:
+ *     summary: Consultar status do investimento
+ *     description: Retorna o status atual de um investimento
+ *     tags: [Investments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do investimento
+ *     responses:
+ *       200:
+ *         description: Status do investimento
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Investment'
+ *       404:
+ *         description: Investimento não encontrado
+ */
 router.get('/:id/status', [
   param('id').isInt({ min: 1 }).withMessage('Valid investment ID is required'),
   validate,
