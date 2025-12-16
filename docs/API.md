@@ -10,10 +10,12 @@ http://localhost:3000/api
 
 ## Autenticação
 
-A maioria dos endpoints requer autenticação via JWT. Para obter um token:
+A autenticação é feita via Passkey (WebAuthn) e JWT.
 
-1. Faça login em `POST /api/auth/login`
-2. Use o token retornado no header `Authorization: Bearer <token>`
+1. Inicie o login via `POST /api/auth/login/challenge`
+2. Assine o desafio com sua Passkey
+3. Verifique a assinatura via `POST /api/auth/login/verify` para receber o token JWT
+4. Use o token retornado no header `Authorization: Bearer <token>`
 
 ---
 
@@ -21,39 +23,38 @@ A maioria dos endpoints requer autenticação via JWT. Para obter um token:
 
 ### Autenticação
 
-#### `POST /api/auth/login`
+#### `POST /api/auth/register/challenge`
 
-Autentica um investidor e retorna um token JWT.
+Inicia o registro de uma nova Passkey.
 
 **Request Body:**
 ```json
 {
   "email": "investor@example.com",
-  "password": "optional" // Atualmente não é usado, mas pode ser implementado
+  "name": "João Silva",
+  "userType": "investor" // ou "company_user", "platform_admin"
 }
 ```
 
 **Response 200:**
 ```json
 {
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "investor": {
-      "id": 1,
-      "name": "João Silva",
-      "email": "investor@example.com",
-      "kycStatus": "approved"
-    }
-  }
+  "challenge": "base64url...",
+  "rp": { "name": "Stellar Tokenizer" },
+  "user": { "id": "base64...", "name": "João Silva", "displayName": "João Silva" },
+  "pubKeyCredParams": [{ "type": "public-key", "alg": -7 }]
 }
 ```
 
-**Response 401:**
+#### `POST /api/auth/register/verify`
+
+Verifica a assinatura da Passkey e completa o registro.
+
+**Request Body:**
 ```json
 {
-  "success": false,
-  "error": "Invalid credentials"
+  "email": "investor@example.com",
+  "registrationData": { ... } // Dados retornados pelo navegador/authenticator
 }
 ```
 
@@ -63,7 +64,7 @@ Autentica um investidor e retorna um token JWT.
 
 #### `POST /api/investors/register`
 
-Registra um novo investidor e cria automaticamente uma conta Stellar.
+Registra dados iniciais do investidor (O registro completo ocorre via Passkey).
 
 **Request Body:**
 ```json
@@ -82,73 +83,19 @@ Registra um novo investidor e cria automaticamente uma conta Stellar.
     "id": 1,
     "name": "João Silva",
     "email": "joao@example.com",
-    "document": "12345678900",
-    "stellarPublicKey": "GABC123...",
-    "kycStatus": "pending",
-    "createdAt": "2024-01-15T10:30:00.000Z"
-  },
-  "stellarAccount": {
-    "publicKey": "GABC123...",
-    "note": "Keep your secret key secure. It will not be shown again."
+    "kycStatus": "pending"
   }
 }
 ```
-
-**Response 409:**
-```json
-{
-  "success": false,
-  "error": "Investor with this email already exists"
-}
-```
+*Nota: A carteira Stellar (Smart Wallet) é criada posteriormente através do fluxo de Passkey.*
 
 ---
 
-#### `POST /api/investors/whitelist/:investorId`
+#### `GET /api/investors/:id`
+*Substitui a antiga rota de Whitelist que foi removida.*
 
-Aprova a trustline de um investidor, permitindo que ele receba tokens.
+Obtém status do investidor, incluindo KYC e Carteira.
 
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request Body:**
-```json
-{
-  "assetCode": "SIN01" // Opcional, padrão: SIN01
-}
-```
-
-**Response 200:**
-```json
-{
-  "success": true,
-  "message": "Investor whitelisted successfully",
-  "data": {
-    "investor": {
-      "id": 1,
-      "name": "João Silva",
-      "email": "joao@example.com",
-      "kycStatus": "approved"
-    },
-    "stellarTransaction": {
-      "transactionHash": "abc123...",
-      "ledger": 12345
-    }
-  }
-}
-```
-
-**Response 404:**
-```json
-{
-  "success": false,
-  "error": "Investor not found"
-}
-```
-
----
 
 #### `GET /api/investors`
 
