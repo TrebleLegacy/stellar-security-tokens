@@ -8,7 +8,7 @@ coverage/
 .nyc_output/
 .env
 .env.bak
-
+.env.local
 /generated/prisma
 .obsidian/app.json
 .obsidian/appearance.json
