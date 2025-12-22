@@ -86,7 +86,7 @@ export const createAsset = (code, issuerPublicKey) => {
  */
 export const buildTransaction = async (sourceKeypair, operations, options = {}) => {
   const sourceAccount = await stellarServer.loadAccount(sourceKeypair.publicKey());
-  
+
   const transaction = new TransactionBuilder(sourceAccount, {
     fee: BASE_FEE,
     networkPassphrase: getNetworkPassphrase(),
@@ -104,7 +104,7 @@ export const buildTransaction = async (sourceKeypair, operations, options = {}) 
   }
 
   transaction.setTimeout(30);
-  
+
   return transaction.build();
 };
 
@@ -135,7 +135,7 @@ const parseStellarErrorCodes = (codes) => {
     'tx_bad_auth': 'Transaction authorization failed',
     'tx_insufficient_fee': 'Transaction fee too low',
     'tx_no_source_account': 'Source account does not exist',
-    
+
     // Operation codes
     'op_underfunded': 'Insufficient balance for operation',
     'op_no_trust': 'Trustline not established',
@@ -160,7 +160,7 @@ const parseStellarErrorCodes = (codes) => {
     userFriendlyMessage = `Stellar transaction error: ${transactionError}`;
   }
   if (operationErrors.length > 0) {
-    userFriendlyMessage += operationErrors.length > 0 
+    userFriendlyMessage += operationErrors.length > 0
       ? `. ${operationErrors.join('. ')}`
       : '';
   }
@@ -189,7 +189,7 @@ const parseStellarErrorCodes = (codes) => {
  */
 export const signAndSubmitTransaction = async (transaction, keypair) => {
   transaction.sign(keypair);
-  
+
   try {
     const result = await stellarServer.submitTransaction(transaction);
     return {
@@ -204,7 +204,7 @@ export const signAndSubmitTransaction = async (transaction, keypair) => {
       const errorResult = error.response.data.extras?.result_codes;
       const errorMessage = error.response.data.detail || error.message;
       const parsedCodes = parseStellarErrorCodes(errorResult);
-      
+
       return {
         success: false,
         error: errorMessage,

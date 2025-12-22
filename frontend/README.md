@@ -56,7 +56,6 @@ npm run build
 
 ### Investidores
 - Lista de investidores com status KYC
-- Botão para aprovar whitelist
 - Visualizar saldo de cada investidor
 
 ### Pagamentos

@@ -51,16 +51,25 @@ export class StellarService {
         }
       }
 
-      const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(issuerKeypair.publicKey())}`;
+      if (process.env.STELLAR_NETWORK === 'testnet') {
+        const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(issuerKeypair.publicKey())}`;
 
-      try {
-        const response = await fetch(friendbotUrl);
-        if (!response.ok) {
-          throw new Error(`Friendbot failed: ${response.statusText}`);
+        try {
+          const response = await fetch(friendbotUrl);
+          if (!response.ok) {
+            throw new Error(`Friendbot failed: ${response.statusText}`);
+          }
+          await response.json();
+        } catch (error) {
+          throw new Error(`Failed to fund issuer account via Friendbot: ${error.message}`);
         }
-        await response.json();
-      } catch (error) {
-        throw new Error(`Failed to fund issuer account via Friendbot: ${error.message}`);
+      } else {
+        // Mainnet: Verify account exists and has funds
+        try {
+          await stellarServer.loadAccount(issuerKeypair.publicKey());
+        } catch (error) {
+          throw new Error(`Issuer account not found on ${process.env.STELLAR_NETWORK || 'mainnet'}. Please fund it manually.`);
+        }
       }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -128,16 +137,24 @@ export class StellarService {
         }
       }
 
-      const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(distributorKeypair.publicKey())}`;
+      if (process.env.STELLAR_NETWORK === 'testnet') {
+        const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(distributorKeypair.publicKey())}`;
 
-      try {
-        const response = await fetch(friendbotUrl);
-        if (!response.ok) {
-          throw new Error(`Friendbot failed: ${response.statusText}`);
+        try {
+          const response = await fetch(friendbotUrl);
+          if (!response.ok) {
+            throw new Error(`Friendbot failed: ${response.statusText}`);
+          }
+          await response.json();
+        } catch (error) {
+          throw new Error(`Failed to fund distribution account via Friendbot: ${error.message}`);
         }
-        await response.json();
-      } catch (error) {
-        throw new Error(`Failed to fund distribution account via Friendbot: ${error.message}`);
+      } else {
+        try {
+          await stellarServer.loadAccount(distributorKeypair.publicKey());
+        } catch (error) {
+          throw new Error(`Distribution account not found on ${process.env.STELLAR_NETWORK || 'mainnet'}. Please fund it manually.`);
+        }
       }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -175,16 +192,53 @@ export class StellarService {
         };
       }
 
-      const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(keypair.publicKey())}`;
+      if (process.env.STELLAR_NETWORK === 'testnet') {
+        const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(keypair.publicKey())}`;
 
-      try {
-        const response = await fetch(friendbotUrl);
-        if (!response.ok) {
-          throw new Error(`Friendbot failed: ${response.statusText}`);
+        try {
+          const response = await fetch(friendbotUrl);
+          if (!response.ok) {
+            throw new Error(`Friendbot failed: ${response.statusText}`);
+          }
+          await response.json();
+        } catch (error) {
+          throw new Error(`Failed to fund investor account via Friendbot: ${error.message}`);
         }
-        await response.json();
-      } catch (error) {
-        throw new Error(`Failed to fund investor account via Friendbot: ${error.message}`);
+      } else {
+        // Mainnet: Sponsored Activation via Treasury
+        const treasuryKeypair = stellar.getTreasuryKeypair();
+        if (!treasuryKeypair) {
+          throw new Error('Treasury Keypair not configured. Cannot sponsor account activation on Mainnet.');
+        }
+
+        try {
+          const treasuryAccount = await stellarServer.loadAccount(treasuryKeypair.publicKey());
+
+          const transaction = new TransactionBuilder(treasuryAccount, {
+            fee: BASE_FEE,
+            networkPassphrase: stellar.getNetworkPassphrase(),
+          })
+            .addOperation(Operation.createAccount({
+              destination: keypair.publicKey(),
+              startingBalance: '3.0', // 1 (Base) + 0.5 (Trustline) + 1.5 (Gas/Buffer)
+            }))
+            .setTimeout(30)
+            .build();
+
+          transaction.sign(treasuryKeypair);
+
+          await stellarServer.submitTransaction(transaction);
+
+        } catch (error) {
+          throw new Error(`Failed to sponsor Mainnet account activation: ${error.message}`);
+        }
+
+        return {
+          success: true,
+          publicKey: keypair.publicKey(),
+          secretKey: keypair.secret(),
+          note: 'Account activated via Treasury sponsorship.',
+        };
       }
 
       await new Promise(resolve => setTimeout(resolve, 2000));
