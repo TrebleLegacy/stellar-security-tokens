@@ -1,0 +1,31 @@
+# Dividends & Payments
+
+How investors get paid.
+
+## The "Smart" Payment System
+
+Unlike traditional banks that take days to process dividends, our platform automates this via the Blockchain.
+
+### 1. Revenue Collection
+The Issuer (Company) deposits the interest/dividend payment in USDC into the **Distribution Account**.
+
+### 2. The Snapshot
+On the scheduled payment date (e.g., 1st of the Month), the system takes a "Snapshot".
+- It looks at the value of the token supply.
+- It calculates how much each investor owns *at that exact moment*.
+- Example:
+  - Alice owns 10% of tokens -> Gets 10% of the payment.
+  - Bob owns 5% of tokens -> Gets 5% of the payment.
+
+### 3. Fee Deduction
+Before distribution, the **Dividend Fee** (if configured) is deducted from the total pot.
+
+### 4. Distribution (Payout)
+The system sends USDC directly to the wallet of every token holder.
+- **Speed**: Hundreds of investors can be paid in minutes.
+- **Transparency**: Every payment is recorded on the blockchain (and `FeeLog` for taxes).
+
+## Payment Types
+- **Monthly Interest**: Regular income (e.g., Real Estate rent).
+- **Bullet**: One-time payment at the end (e.g., Loan repayment).
+- **Quarterly/Semi-Annual**: Flexible schedules.
