@@ -52,7 +52,7 @@ const purchaseValidation = [
  *             schema:
  *               $ref: '#/components/schemas/Investment'
  *       400:
- *         description: Dados inválidos ou saldo insuficiente
+ *         description: Dados inválidos ou saldo insuficiente para cobrir taxas (Blockchain Fee + Platform Fee)
  *       401:
  *         description: Não autorizado
  */

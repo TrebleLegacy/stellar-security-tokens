@@ -5,7 +5,6 @@ import {
   createAsset,
   buildTransaction,
   signAndSubmitTransaction,
-  signAndSubmitTransaction,
   getNetworkPassphrase,
   getTreasuryKeypair,
 } from '../config/stellar.js';
