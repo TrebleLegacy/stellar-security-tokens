@@ -72,19 +72,31 @@ export const purchaseInvestment = async (req, res, next) => {
     // Fee Logic
     const grossAmount = parseFloat(usdcAmount);
     const feePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
-    const feeAmount = grossAmount * (feePercent / 100);
-    const netTokenAmount = grossAmount - feeAmount;
+    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0); // Default 5 USDC
+
+    const percentageFeeAmount = grossAmount * (feePercent / 100);
+    const totalFeeAmount = percentageFeeAmount + fixedFee;
+
+    // Validate if amount covers fees
+    if (grossAmount <= totalFeeAmount) {
+      return res.status(400).json({
+        success: false,
+        error: `Investment amount (${grossAmount} USDC) is too low to cover the Blockchain Operation Fee (${fixedFee} USDC) + Platform Fees.`,
+      });
+    }
+
+    const netTokenAmount = grossAmount - totalFeeAmount;
 
     // Log Fee synchronously or async? Async is better but for financial logs consistency is key.
-    if (feeAmount > 0) {
+    if (totalFeeAmount > 0) {
       // Log fee intent - actual log might be better after payment success? 
       // User pays GROSS amount (usdcAmount). Platform takes fee. Investor gets NET tokens.
       await ConfigService.logFee({
-        amount: feeAmount,
+        amount: totalFeeAmount,
         assetCode: 'USDC',
         category: 'INVESTMENT_FEE',
         sourceId: investor.id,
-        description: `Investment Fee ${feePercent}% on ${grossAmount} USDC`,
+        description: `Fees: ${fixedFee} USDC (Blockchain Operation Fee) + ${feePercent}% (${percentageFeeAmount} USDC)`,
       });
     }
 
