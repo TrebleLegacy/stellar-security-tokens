@@ -6,7 +6,7 @@ export interface Investor {
   name: string;
   email: string;
   document: string;
-  status: 'pending' | 'active' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected';
   emailVerified: boolean;
   walletAddress: string | null;
   createdAt: string;
@@ -101,5 +101,35 @@ export const platformAdminsApi = {
     const response = await api.get('/platform-admins/fee-logs', { params: { limit, offset } });
     return response.data;
   },
-};
 
+  // Analytics
+  getMetrics: async (params?: { offer_id?: number; start_date?: string; end_date?: string }): Promise<ApiResponse<any>> => {
+    const response = await api.get('/platform-admins/investments/metrics', { params });
+    return response.data;
+  },
+
+  getStatistics: async (params: { start_date: string; end_date: string; offer_id?: number }): Promise<ApiResponse<any[]>> => {
+    const response = await api.get('/platform-admins/investments/statistics', { params });
+    return response.data;
+  },
+
+  getPendingInvestments: async (limit = 50): Promise<ApiResponse<any[]>> => {
+    const response = await api.get('/platform-admins/investments/pending', { params: { limit } });
+    return response.data;
+  },
+
+  getFundraisingProgress: async (): Promise<ApiResponse<any>> => {
+    const response = await api.get('/platform-admins/investments/fundraising');
+    return response.data;
+  },
+
+  getRevenueBreakdown: async (): Promise<ApiResponse<any>> => {
+    const response = await api.get('/platform-admins/investments/revenue-breakdown');
+    return response.data;
+  },
+
+  getInvestorCohorts: async (): Promise<ApiResponse<any>> => {
+    const response = await api.get('/platform-admins/investments/cohorts');
+    return response.data;
+  },
+};

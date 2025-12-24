@@ -148,6 +148,110 @@ router.put('/system-config', authenticateToken, requirePlatformAdmin, PlatformAd
 
 /**
  * @swagger
+ * /api/platform-admins/investments/metrics:
+ *   get:
+ *     summary: Obter métricas gerais de investimento
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: start_date
+ *         schema: { type: string }
+ *       - in: query
+ *         name: end_date
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Métricas retornadas
+ */
+router.get('/investments/metrics', authenticateToken, requirePlatformAdmin, InvestmentMetricsController.getMetrics);
+
+/**
+ * @swagger
+ * /api/platform-admins/investments/statistics:
+ *   get:
+ *     summary: Obter estatísticas de investimento por período
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: start_date
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: end_date
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Estatísticas retornadas
+ */
+router.get('/investments/statistics', authenticateToken, requirePlatformAdmin, InvestmentMetricsController.getStatistics);
+
+/**
+ * @swagger
+ * /api/platform-admins/investments/pending:
+ *   get:
+ *     summary: Obter investimentos pendentes de pagamento
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Lista de investimentos pendentes
+ */
+router.get('/investments/pending', authenticateToken, requirePlatformAdmin, InvestmentMetricsController.getPendingInvestments);
+
+/**
+ * @swagger
+ * /api/platform-admins/investments/fundraising:
+ *   get:
+ *     summary: Obter progresso de captação (Ofertas ativas)
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Lista de progresso das ofertas
+ */
+router.get('/investments/fundraising', authenticateToken, requirePlatformAdmin, InvestmentMetricsController.getFundraisingProgress);
+
+/**
+ * @swagger
+ * /api/platform-admins/investments/revenue-breakdown:
+ *   get:
+ *     summary: Obter breakdown de receita por categoria
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Totais de receita por categoria
+ */
+router.get('/investments/revenue-breakdown', authenticateToken, requirePlatformAdmin, InvestmentMetricsController.getRevenueBreakdown);
+
+/**
+ * @swagger
+ * /api/platform-admins/investments/cohorts:
+ *   get:
+ *     summary: Obter coortes de investidores (Ativos vs Inativos)
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Contagem de usuários ativos e inativos
+ */
+router.get('/investments/cohorts', authenticateToken, requirePlatformAdmin, InvestmentMetricsController.getInvestorCohorts);
+
+/**
+ * @swagger
  * /api/platform-admins/fee-logs:
  *   get:
  *     summary: Obter logs de taxas (Receita)
