@@ -92,5 +92,65 @@ export class InvestmentMetricsController {
       });
     }
   }
-}
+  /**
+   * Obtém progresso de captação
+   * GET /api/admin/investments/fundraising
+   */
+  static async getFundraisingProgress(req, res) {
+    try {
+      const progress = await InvestmentMetricsService.getFundraisingProgress();
+      res.json({
+        success: true,
+        data: progress,
+      });
+    } catch (error) {
+      console.error('Error fetching fundraising progress:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch fundraising progress',
+      });
+    }
+  }
 
+  /**
+   * Obtém breakdown de receita
+   * GET /api/admin/investments/revenue-breakdown
+   */
+  static async getRevenueBreakdown(req, res) {
+    try {
+      const breakdown = await InvestmentMetricsService.getRevenueBreakdown();
+      res.json({
+        success: true,
+        data: breakdown,
+      });
+    } catch (error) {
+      console.error('Error fetching revenue breakdown:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch revenue breakdown',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Obtém coortes de investidores
+   * GET /api/admin/investments/cohorts
+   */
+  static async getInvestorCohorts(req, res) {
+    try {
+      const cohorts = await InvestmentMetricsService.getInvestorCohorts();
+      res.json({
+        success: true,
+        data: cohorts,
+      });
+    } catch (error) {
+      console.error('Error fetching investor cohorts:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch investor cohorts',
+        details: error.message,
+      });
+    }
+  }
+}

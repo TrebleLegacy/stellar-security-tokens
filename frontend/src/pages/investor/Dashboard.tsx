@@ -21,8 +21,23 @@ export function InvestorDashboard() {
         );
     }
 
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
     return (
         <div className="space-y-6">
+            {/* KYC Pending Alert */}
+            {user.kycStatus === 'pending' && (
+                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-yellow-500" />
+                    <div>
+                        <h4 className="font-medium text-yellow-500">Account Under Review</h4>
+                        <p className="text-sm text-yellow-500/80">
+                            Your account is currently pending approval. You can browse offers but cannot invest until an admin approves your KYC.
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {/* Stats Row */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="glass-panel border-white/5 bg-white/5">

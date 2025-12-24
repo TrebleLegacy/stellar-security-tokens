@@ -17,6 +17,7 @@ import { AdminLogin } from './pages/admin/Login';
 import { AdminDashboard } from './pages/admin/Dashboard';
 import { UserManagement } from './pages/admin/UserManagement';
 import { FeeConfig } from './pages/admin/FeeConfig';
+import { Wallets } from './pages/admin/Wallets';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
+          <Route path="wallets" element={<Wallets />} />
           <Route path="fees" element={<FeeConfig />} />
         </Route>
       </Routes>

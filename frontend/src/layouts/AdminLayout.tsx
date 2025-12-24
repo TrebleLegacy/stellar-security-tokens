@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, DollarSign, Shield } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ export function AdminLayout() {
     const navItems = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
         { id: 'users', label: 'User Management', icon: Users, path: '/admin/users' },
+        { id: 'wallets', label: 'Wallets', icon: Wallet, path: '/admin/wallets' },
         { id: 'fees', label: 'Fee Configuration', icon: DollarSign, path: '/admin/fees' },
     ];
 

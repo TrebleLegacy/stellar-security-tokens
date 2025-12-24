@@ -370,7 +370,7 @@ export class PlatformAdminController {
         });
       }
 
-      if (investor.kycStatus === 'active') {
+      if (investor.kycStatus === 'approved') {
         return res.status(400).json({
           success: false,
           error: 'Investor is already approved',
@@ -380,10 +380,11 @@ export class PlatformAdminController {
       const updatedInvestor = await prisma.investor.update({
         where: { id: parseInt(id) },
         data: {
-          kycStatus: 'active',
+          kycStatus: 'approved',
           updatedAt: new Date(),
         },
       });
+
 
       // TODO: Send approval email to investor
       console.log(`[Admin] Investor ${id} approved by admin ${req.user?.id}`);

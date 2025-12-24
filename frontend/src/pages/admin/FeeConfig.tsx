@@ -173,27 +173,23 @@ export function FeeConfig() {
                             <span className="text-white">$100.00</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">- Blockchain Fee</span>
+                            <span className="text-muted-foreground">- Blockchain Fee (Investor pays)</span>
                             <span className="text-red-400">-${parseFloat(config['BLOCKCHAIN_OPERATION_FEE_FIXED'] || '0').toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
-                            <span className="text-muted-foreground">- Investment Fee ({config['INVESTMENT_FEE_PERCENT'] || '0'}%)</span>
+                            <span className="text-muted-foreground">- Investment Fee (Company pays) ({config['INVESTMENT_FEE_PERCENT'] || '0'}%)</span>
                             <span className="text-red-400">
-                                -${((100 - parseFloat(config['BLOCKCHAIN_OPERATION_FEE_FIXED'] || '0')) * parseFloat(config['INVESTMENT_FEE_PERCENT'] || '0') / 100).toFixed(2)}
+                                -${(100 * parseFloat(config['INVESTMENT_FEE_PERCENT'] || '0') / 100).toFixed(2)}
                             </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-white/10 font-medium">
                             <span className="text-white">Tokens to Investor</span>
-                            <span className="text-emerald-400">$100.00</span>
+                            <span className="text-emerald-400">${(100 - parseFloat(config['BLOCKCHAIN_OPERATION_FEE_FIXED'] || '0')).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between pt-1 font-medium text-xs">
                             <span className="text-muted-foreground">Net to Company</span>
                             <span className="text-white">
-                                ${(
-                                    100 -
-                                    parseFloat(config['BLOCKCHAIN_OPERATION_FEE_FIXED'] || '0') -
-                                    (100 - parseFloat(config['BLOCKCHAIN_OPERATION_FEE_FIXED'] || '0')) * parseFloat(config['INVESTMENT_FEE_PERCENT'] || '0') / 100
-                                ).toFixed(2)}
+                                ${(100 - (100 * parseFloat(config['INVESTMENT_FEE_PERCENT'] || '0') / 100)).toFixed(2)}
                             </span>
                         </div>
                     </div>

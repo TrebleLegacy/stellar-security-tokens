@@ -59,12 +59,12 @@ export class InvestmentMetricsService {
 
     const totalUsdcInvested = distributedInvestments.reduce((sum, inv) => sum + Number(inv.usdcAmount), 0);
     const totalTokensDistributed = distributedInvestments.reduce((sum, inv) => sum + Number(inv.tokenAmount), 0);
-    
+
     const avgProcessingTime = distributedInvestments.length > 0
       ? distributedInvestments.reduce((sum, inv) => {
-          const processingTime = (inv.updatedAt - inv.createdAt) / 1000; // seconds
-          return sum + processingTime;
-        }, 0) / distributedInvestments.length
+        const processingTime = (inv.updatedAt - inv.createdAt) / 1000; // seconds
+        return sum + processingTime;
+      }, 0) / distributedInvestments.length
       : 0;
 
     const successRate = total > 0 ? (distributed / total) * 100 : 0;
@@ -135,7 +135,7 @@ export class InvestmentMetricsService {
           uniqueInvestors: new Set(),
         };
       }
-      
+
       byDate[dateKey].totalInvestments++;
       if (inv.status === 'distributed') {
         byDate[dateKey].successful++;
@@ -178,13 +178,106 @@ export class InvestmentMetricsService {
           select: {
             name: true,
             email: true,
-            stellarPublicKey: true,
+            stellarContractId: true,
           },
         },
       },
       orderBy: { createdAt: 'asc' },
       take: limit,
     });
+  }
+
+  /**
+   * Obtém progresso de captação das ofertas ativas
+   * @returns {Promise<Array>} Lista de ofertas com progresso
+   */
+  static async getFundraisingProgress() {
+    const activeOffers = await prisma.offer.findMany({
+      where: { status: 'active' },
+      select: {
+        id: true,
+        offerName: true,
+        assetCode: true,
+        totalSupply: true,
+        investments: {
+          where: {
+            status: { in: ['payment_received', 'distributed'] },
+          },
+          select: {
+            tokenAmount: true,
+            usdcAmount: true,
+          },
+        },
+      },
+    });
+
+    return activeOffers.map(offer => {
+      const soldTokens = offer.investments.reduce((sum, inv) => sum + Number(inv.tokenAmount), 0);
+      const raisedUSDC = offer.investments.reduce((sum, inv) => sum + Number(inv.usdcAmount), 0);
+      const percentage = (soldTokens / Number(offer.totalSupply)) * 100;
+
+      return {
+        id: offer.id,
+        name: offer.offerName,
+        assetCode: offer.assetCode,
+        targetTokens: Number(offer.totalSupply),
+        soldTokens,
+        raisedUSDC,
+        percentage: parseFloat(percentage.toFixed(2)),
+      };
+    });
+  }
+
+  /**
+   * Obtém breakdown de receita por categoria
+   * @returns {Promise<Object>} Totais por categoria
+   */
+  static async getRevenueBreakdown() {
+    const revenueBySource = await prisma.feeLog.groupBy({
+      by: ['category'],
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const totalRevenue = revenueBySource.reduce((sum, item) => sum + Number(item._sum.amount || 0), 0);
+
+    const breakdown = revenueBySource.map(item => ({
+      category: item.category,
+      totalAmount: Number(item._sum.amount || 0),
+      percentage: totalRevenue > 0 ? (Number(item._sum.amount || 0) / totalRevenue) * 100 : 0,
+    }));
+
+    return {
+      total: totalRevenue,
+      breakdown,
+    };
+  }
+
+  /**
+   * Obtém coortes de investidores (Ativos vs Inativos)
+   * @returns {Promise<Object>} Counts de ativos e inativos
+   */
+  static async getInvestorCohorts() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const activeCount = await prisma.investor.count({
+      where: {
+        lastLogin: {
+          gte: thirtyDaysAgo,
+        },
+      },
+    });
+
+    const totalCount = await prisma.investor.count();
+    const dormantCount = totalCount - activeCount;
+
+    return {
+      active: activeCount,
+      dormant: dormantCount,
+      total: totalCount,
+    };
   }
 }
 

@@ -18,7 +18,7 @@ import { platformAdminsApi, type Investor } from '@/api/platformAdmins';
 export function UserManagement() {
     const [loading, setLoading] = useState(true);
     const [investors, setInvestors] = useState<Investor[]>([]);
-    const [filter, setFilter] = useState<'all' | 'pending' | 'active' | 'rejected'>('all');
+    const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
     const [search, setSearch] = useState('');
     const [error, setError] = useState('');
 
@@ -79,8 +79,8 @@ export function UserManagement() {
         switch (status) {
             case 'pending':
                 return <Badge variant="outline" className="border-yellow-500 text-yellow-500">Pending</Badge>;
-            case 'active':
-                return <Badge variant="outline" className="border-emerald-500 text-emerald-500">Active</Badge>;
+            case 'approved':
+                return <Badge variant="outline" className="border-emerald-500 text-emerald-500">Approved</Badge>;
             case 'rejected':
                 return <Badge variant="outline" className="border-red-500 text-red-500">Rejected</Badge>;
             default:
@@ -98,7 +98,7 @@ export function UserManagement() {
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <div className="flex gap-2">
-                    {(['all', 'pending', 'active', 'rejected'] as const).map((f) => (
+                    {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
                         <Button
                             key={f}
                             variant={filter === f ? 'default' : 'outline'}

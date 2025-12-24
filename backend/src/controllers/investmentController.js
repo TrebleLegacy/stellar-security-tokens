@@ -72,32 +72,43 @@ export const purchaseInvestment = async (req, res, next) => {
     // Fee Logic
     const grossAmount = parseFloat(usdcAmount);
     const feePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
-    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0); // Default 5 USDC
+    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0); // Blockchain Fee (Investor pays)
 
-    const percentageFeeAmount = grossAmount * (feePercent / 100);
-    const totalFeeAmount = percentageFeeAmount + fixedFee;
-
-    // Validate if amount covers fees (Company must receive at least 0 after fees)
-    if (grossAmount <= totalFeeAmount) {
+    // Validation: Amount must cover Blockchain Fee
+    if (grossAmount <= fixedFee) {
       return res.status(400).json({
         success: false,
-        error: `Investment amount (${grossAmount} USDC) is too low to cover the Platform Fees (${totalFeeAmount} USDC) which are deducted from the company's receipt.`,
+        error: `Investment amount (${grossAmount} USDC) is too low to cover the Blockchain Operation Fee (${fixedFee} USDC).`,
       });
     }
 
-    // Investor receives the FULL amount in tokens (Company pays the fee logic)
-    const tokenAmount = grossAmount;
+    // Investor pays Blockchain Fee (deducted from tokens received)
+    const tokenAmount = grossAmount - fixedFee;
 
-    // Log Fee
-    if (totalFeeAmount > 0) {
+    // Company pays Investment Fee (calculated on gross amount, charged later/accounted for)
+    const investmentFeeAmount = grossAmount * (feePercent / 100);
+
+    // Log Fees
+    if (fixedFee > 0) {
       await ConfigService.logFee({
-        amount: totalFeeAmount,
+        amount: fixedFee,
+        assetCode: 'USDC',
+        category: 'BLOCKCHAIN_FEE',
+        sourceId: investor.id,
+        description: `Blockchain Operation Fee: ${fixedFee} USDC (Paid by Investor)`,
+      });
+    }
+
+    if (investmentFeeAmount > 0) {
+      await ConfigService.logFee({
+        amount: investmentFeeAmount,
         assetCode: 'USDC',
         category: 'INVESTMENT_FEE',
-        sourceId: investor.id,
-        description: `Crowdfunding Fee: ${fixedFee} USDC (Fixed) + ${feePercent}% (${percentageFeeAmount} USDC) - Charge to Company`,
+        sourceId: investor.id, // Linked to investor for reference, but effectively charged to company
+        description: `Investment Fee: ${feePercent}% (${investmentFeeAmount} USDC) - Charge to Company`,
       });
     }
+
     const treasuryKeypair = getTreasuryKeypair();
 
     // Criar registro de investimento primeiro
@@ -106,7 +117,7 @@ export const purchaseInvestment = async (req, res, next) => {
       offer_id: offerId || null,
       asset_code: assetCode,
       usdc_amount: usdcAmount, // User sends full amount
-      token_amount: tokenAmount, // User receives net amount
+      token_amount: tokenAmount, // User receives NET amount (minus blockchain fee)
       memo: null, // Será gerado quando pagamento for detectado
     });
 

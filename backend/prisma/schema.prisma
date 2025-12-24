@@ -293,6 +293,7 @@ model PlatformAdmin {
   issuedTokens          Token[]
   reviewedOffers        Offer[]
   approvedDistributions TokenDistribution[]
+  proposedTransactions  MultiSigTransaction[]
 
   @@index([email])
   @@index([role])
@@ -459,4 +460,32 @@ model FeeLog {
   @@index([category])
   @@index([createdAt])
   @@map("fee_logs")
+}
+
+enum MultiSigTxStatus {
+  pending
+  executed
+  rejected
+  failed
+}
+
+model MultiSigTransaction {
+  id            Int              @id @default(autoincrement())
+  xdr           String           @db.Text
+  description   String?          @db.VarChar(255)
+  status        MultiSigTxStatus @default(pending)
+  initiatorId   Int?             @map("initiator_id")
+  signatures    Json             @default("[]")
+  network       String           @default("testnet")
+  thresholdMet  Boolean          @default(false) @map("threshold_met")
+  hash          String?          @db.VarChar(64)
+  errorMessage  String?          @map("error_message") @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamp
+  updatedAt     DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamp
+
+  initiator     PlatformAdmin?   @relation(fields: [initiatorId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([initiatorId])
+  @@map("multisig_transactions")
 }
