@@ -1,9 +1,9 @@
-
 import { Outlet, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, PieChart, ArrowLeftRight, Settings, LogOut, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 export function DashboardLayout() {
     const navigate = useNavigate();
@@ -72,6 +72,7 @@ export function DashboardLayout() {
                         {navItems.find(item => item.id === activeTab)?.label || 'Dashboard'}
                     </h1>
                     <div className="flex items-center gap-4">
+                        <NotificationBell />
                         <div className="text-sm text-muted-foreground">
                             Connected: <span className="text-emerald-400">Passkey Wallet</span>
                         </div>

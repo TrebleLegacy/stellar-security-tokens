@@ -489,3 +489,20 @@ model MultiSigTransaction {
   @@index([initiatorId])
   @@map("multisig_transactions")
 }
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  userType  String   @map("user_type") // 'investor', 'company_user', 'platform_admin'
+  type      String   // 'info', 'success', 'warning', 'error'
+  title     String   @db.VarChar(255)
+  message   String   @db.Text
+  actionLink String? @map("action_link") @db.VarChar(255)
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
+
+  @@index([userId, userType])
+  @@index([isRead])
+  @@index([createdAt(sort: Desc)])
+  @@map("notifications")
+}
