@@ -711,6 +711,26 @@ export class EmailService {
       };
 
       const info = await transporter.sendMail(mailOptions);
+
+      // Notification
+      try {
+        const { PrismaClient } = await import('@prisma/client');
+        const prisma = new PrismaClient();
+        const investor = await prisma.investor.findUnique({ where: { email: investorEmail } });
+
+        if (investor) {
+          const { NotificationService } = await import('./notification.service.js');
+          await NotificationService.createNotification(
+            investor.id,
+            'investor',
+            'success',
+            'Conta Aprovada!',
+            'Sua verificação de identidade (KYC) foi aprovada. Vocé já pode investir.',
+            '/investor/dashboard'
+          );
+        }
+      } catch (e) { console.error('Notification error:', e); }
+
       return { success: true, messageId: info.messageId };
     } catch (error) {
       console.error(`Error sending KYC approval email to ${investorEmail}:`, error);

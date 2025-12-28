@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { NotificationBell } from '@/components/NotificationBell';
 
 export function AdminLayout() {
     const navigate = useNavigate();
@@ -71,6 +72,7 @@ export function AdminLayout() {
                         {navItems.find(item => isActive(item.path))?.label || 'Admin Dashboard'}
                     </h1>
                     <div className="flex items-center gap-4">
+                        <NotificationBell />
                         <div className="text-sm text-muted-foreground">
                             Role: <span className="text-red-400">Platform Admin</span>
                         </div>

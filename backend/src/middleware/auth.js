@@ -1,7 +1,13 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 
+import path from 'path';
+
+// Try loading from current dir, then parent dir
 dotenv.config();
+if (!process.env.JWT_SECRET) {
+  dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+}
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
