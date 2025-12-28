@@ -49,7 +49,7 @@ export class OfferService {
       }
     }
 
-    // Para pagamentos bullet, data de vencimento e valor são obrigatórios
+    // Para pagamentos bullet, data de vencimento e taxa de juros são obrigatórios
     if (paymentType === 'bullet') {
       if (!maturityDate) {
         errors.push('maturity_date is required for bullet payments');
@@ -62,8 +62,9 @@ export class OfferService {
         }
       }
 
-      if (!bulletPaymentAmount || typeof bulletPaymentAmount !== 'number' || bulletPaymentAmount <= 0) {
-        errors.push('bullet_payment_amount is required and must be a positive number for bullet payments');
+      // Issue 5 Fix: Require annualInterestRate for bullet payments (used in dynamic calculation)
+      if (!annualInterestRate || typeof annualInterestRate !== 'number' || annualInterestRate <= 0) {
+        errors.push('annual_interest_rate is required and must be a positive number for bullet payments');
       }
     }
 

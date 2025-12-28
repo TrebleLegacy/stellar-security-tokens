@@ -541,6 +541,25 @@ export class PasskeyWalletService {
   static async buildWithdrawalTx(investorId, destinationAddress, amount, assetCode = 'USDC') {
     const server = this.getServer();
 
+    // Issue 9 Fix: Validate inputs
+    if (!destinationAddress || typeof destinationAddress !== 'string') {
+      throw new Error('Destination address is required');
+    }
+
+    // Validate address format (G... for classic, C... for contract)
+    if (!destinationAddress.match(/^[GC][A-Z0-9]{55}$/)) {
+      throw new Error('Invalid destination address format. Must be a valid Stellar address (G...) or contract (C...)');
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new Error('Amount must be a positive number');
+    }
+
+    if (parsedAmount > 1000000000) { // 1 billion max
+      throw new Error('Amount exceeds maximum allowed');
+    }
+
     // Get investor wallet
     const investor = await prisma.investor.findUnique({
       where: { id: investorId },
@@ -554,9 +573,15 @@ export class PasskeyWalletService {
     // In production, fetch this from DB or config
     let tokenContractId;
     if (assetCode === 'USDC') {
-      tokenContractId = process.env.USDC_CONTRACT_ID || 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75'; // Testnet USDC
+      tokenContractId = process.env.USDC_CONTRACT_ID;
+      if (!tokenContractId) {
+        throw new Error('USDC_CONTRACT_ID not configured');
+      }
     } else if (assetCode === 'XLM') {
-      tokenContractId = process.env.XLM_CONTRACT_ID || 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC'; // Native Token Contract
+      tokenContractId = process.env.XLM_CONTRACT_ID;
+      if (!tokenContractId) {
+        throw new Error('XLM_CONTRACT_ID not configured');
+      }
     } else {
       throw new Error('Unsupported asset for withdrawal');
     }

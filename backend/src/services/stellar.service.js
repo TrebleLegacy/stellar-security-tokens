@@ -475,8 +475,9 @@ export class StellarService {
         Operation.setTrustLineFlags({
           trustor: investorPublicKey,
           asset: asset,
-          setFlags: 0,
-          clearFlags: AuthRequiredFlag,
+          // Issue 2 Fix: Clear the 'authorized' flag (value 1) to revoke authorization
+          // This prevents the investor from transacting with this asset
+          clearFlags: 1, // AUTHORIZED_FLAG = 1
         }),
       ];
 
@@ -732,6 +733,14 @@ export class StellarService {
 
       if (!matchingPayment) {
         return null;
+      }
+
+      // Issue 1 Fix: Check if this payment was already used for another investment
+      const { Investment } = await import('../models/Investment.js');
+      const existingInvestment = await Investment.findByUSDC(matchingPayment.transaction_hash);
+      if (existingInvestment) {
+        console.log(`[verifyUSDCPayment] Payment ${matchingPayment.transaction_hash} already claimed by investment ${existingInvestment.id}`);
+        return null; // Already claimed - prevent double-spend
       }
 
       return {

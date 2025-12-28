@@ -116,6 +116,23 @@ export class Investment {
   }
 
   /**
+   * Issue 7 Fix: Busca investimento pendente por investidor e oferta
+   * @param {number} investorId - ID do investidor
+   * @param {number} offerId - ID da oferta
+   * @returns {Promise<Object|null>} Investimento pendente ou null
+   */
+  static async findPendingByInvestorAndOffer(investorId, offerId) {
+    return await prisma.investment.findFirst({
+      where: {
+        investorId,
+        offerId: offerId || undefined,
+        status: 'pending_payment',
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
    * Atualiza status do investimento
    * @param {number} id - ID do investimento
    * @param {Object} updateData - Dados para atualizar
