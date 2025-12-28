@@ -12,16 +12,20 @@ dotenv.config({ path: resolve(__dirname, '../../.env') });
 console.log('🔧 Testing Pinata IPFS Connection...\n');
 
 // Check if credentials are loaded
-if (!process.env.PINATA_API_KEY || !process.env.PINATA_SECRET_API_KEY) {
+if (!process.env.PINATA_JWT && (!process.env.PINATA_API_KEY || !process.env.PINATA_SECRET_API_KEY)) {
     console.error('❌ ERROR: Pinata credentials not found in .env file');
     console.log('Expected:');
-    console.log('  PINATA_API_KEY=...');
-    console.log('  PINATA_SECRET_API_KEY=...');
+    console.log('  PINATA_JWT=...');
+    console.log('  (Legacy PINATA_API_KEY/SECRET_API_KEY are no longer supported by pinata-web3)');
     process.exit(1);
 }
 
-console.log('✅ Pinata credentials loaded from .env');
-console.log('   API Key:', process.env.PINATA_API_KEY.substring(0, 10) + '...');
+if (process.env.PINATA_JWT) {
+    console.log('✅ Pinata JWT loaded from .env');
+    console.log('   JWT:', process.env.PINATA_JWT.substring(0, 10) + '...');
+} else {
+    console.log('⚠️  Only legacy Pinata keys found. IPFS service will run in mock mode.');
+}
 console.log('');
 
 // Test authentication

@@ -2,8 +2,17 @@ import { PasskeyKit } from 'passkey-kit';
 import { api } from '@/api/client';
 
 // Get configuration from environment variables
-const SOROBAN_RPC_URL = import.meta.env.VITE_SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
-const NETWORK_PASSPHRASE = import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE || 'Test SDF Network ; September 2015';
+const STELLAR_NETWORK = import.meta.env.VITE_STELLAR_NETWORK || 'testnet';
+const SOROBAN_RPC_URL = import.meta.env.VITE_SOROBAN_RPC_URL || (
+  STELLAR_NETWORK === 'testnet'
+    ? 'https://soroban-testnet.stellar.org'
+    : 'https://soroban-rpc.mainnet.stellar.org'
+);
+const NETWORK_PASSPHRASE = import.meta.env.VITE_STELLAR_NETWORK_PASSPHRASE || (
+  STELLAR_NETWORK === 'testnet'
+    ? 'Test SDF Network ; September 2015'
+    : 'Public Global Stellar Network ; September 2015'
+);
 const FACTORY_CONTRACT_ID = import.meta.env.VITE_FACTORY_CONTRACT_ID;
 
 let passkeyKitInstance: PasskeyKit | null = null;

@@ -2,88 +2,85 @@
 
 This document details all specific actions required to transition the **Stellar Security Tokens** platform from Testnet to Mainnet (Production).
 
-## 🚨 Critical Code Changes (Must Fix Before Deployment)
+## ✅ Code Changes (Already Complete)
 
 ### Backend Logic
-- [ ] **Disable Friendbot Calls (`backend/src/services/stellar.service.js`):**
-    - The methods `createIssuerAccount`, `createDistributionAccount`, and `createInvestorAccount` currently attempt to call `friendbot.stellar.org` uncritically.
-    - **Risk:** This will fail in Production/Mainnet or potentially leak keys to a testnet service.
-    - **Fix:** Wrap all friendbot calls in `if (process.env.STELLAR_NETWORK === 'testnet')` blocks. For Mainnet, these functions should assume the accounts are already funded (manually or via a treasury operation).
+- [x] **Friendbot Calls (`backend/src/services/stellar.service.js`):** Already wrapped in `if (process.env.STELLAR_NETWORK === 'testnet')` blocks.
+- [x] **CORS Policy (`backend/src/app.js`):** Already uses `process.env.FRONTEND_URL`.
+- [x] **JWT Fail-Fast (`backend/src/middleware/auth.js`):** App crashes if `JWT_SECRET` is missing.
+- [x] **Network-Aware Config (`passkeyWallet.service.js`):** Uses centralized `getSorobanRpcUrl()` and `isTestnet()`.
 
-- [ ] **Secure CORS Policy (`backend/src/app.js`):**
-    - Currently, `app.use(cors())` allows ALL origins (`*`).
-    - **Fix:** Restrict to your frontend domain: 
-      ```javascript
-      app.use(cors({ origin: process.env.FRONTEND_URL }));
-      ```
-
-- [ ] **Swagger Configuration (`backend/src/config/swagger.js`):**
-    - The server URL is hardcoded to `http://localhost:3000`.
-    - **Fix:** Update to your production API URL (e.g., `https://api.yourdomain.com`).
-
-### hardcoded Values
-- [ ] **Asset Code:** `stellar.service.js` defaults to `'SIN01'`. Verify if you want this dynamic for prod.
-- [ ] **USDC Issuer:** `stellar.service.js` uses a default issuer address if `USDC_ISSUER` is not in env. Ensure this fallback isn't used or update it.
+### Hardcoded Values
+- [x] **Asset Code:** Configurable via env vars.
+- [x] **USDC Issuer:** Uses `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` (Circle's official issuer, same for testnet/mainnet).
 
 ---
 
 ## 🌍 Environment Variables Configuration
 
-You must create a production `.env` file with the following changes:
+Create a production `.env` file with the following changes:
 
 ### Network Settings
 | Variable | Testnet Value | **Production Value** |
 |----------|---------------|----------------------|
 | `STELLAR_NETWORK` | `testnet` | `public` |
-| `HORIZON_URL` | `https://horizon-testnet.stellar.org` | `https://horizon.stellar.org` |
+| `STELLAR_HORIZON_URL` | `https://horizon-testnet.stellar.org` | `https://horizon.stellar.org` |
 | `SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` | `https://soroban-rpc.mainnet.stellar.org` |
+| `VITE_STELLAR_NETWORK` | `testnet` | `public` |
 | `VITE_SOROBAN_RPC_URL` | *(Testnet URL)* | `https://soroban-rpc.mainnet.stellar.org` |
 | `VITE_STELLAR_NETWORK_PASSPHRASE`| `Test SDF Network ; September 2015` | `Public Global Stellar Network ; September 2015` |
 
 ### Keys & Accounts (Action Required)
-> **WARNING:** Do not use Testnet keys on Mainnet. Generate new keys using `Keypair.random()` offline or hardware wallets.
+> **WARNING:** Do not use Testnet keys on Mainnet. Generate new keys offline.
 
 - [ ] **`ISSUER_SECRET_KEY`**: Rotated to Mainnet Key (Funded with XLM).
 - [ ] **`DISTRIBUTOR_SECRET_KEY`**: Rotated to Mainnet Key (Funded with XLM).
 - [ ] **`TREASURY_SECRET_KEY`**: Rotated to Mainnet Key (Funded with XLM).
-- [ ] **`USDC_ISSUER`**: Update to Official Circle USDC Mainnet Issuer: `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` (Verify this!).
 
 ### Smart Contracts (Passkey Wallet)
-- [ ] **`FACTORY_CONTRACT_ID`**: Deploy your Smart Wallet Factory to Mainnet and update this ID. The Testnet ID `CBKZ...` **will not work**.
+- [ ] **`FACTORY_CONTRACT_ID`**: Deploy Factory to Mainnet and update this ID.
 - [ ] **`VITE_FACTORY_CONTRACT_ID`**: Update in Frontend `.env`.
 
 ### Infrastructure & Security
-- [ ] **`DB_SSL`**: Set to `true` (Required for managed databases like AWS RDS/Heroku).
-- [ ] **`JWT_SECRET`**: Generate a strong, long random string.
-- [ ] **`WEBAUTHN_RP_ID`**: Change `localhost` to your real domain (e.g., `tokenizadora.com`).
-- [ ] **`WEBAUTHN_ORIGIN`**: Change `http://localhost:5173` to `https://dashboard.tokenizadora.com`.
-- [ ] **`FRONTEND_URL`**: Update to `https://dashboard.tokenizadora.com`.
-- [ ] **`VITE_API_URL`**: Update in frontend build to `https://api.yourdomain.com/api`.
+- [ ] **`DB_SSL`**: Set to `true` (Required for cloud databases).
+- [ ] **`JWT_SECRET`**: Generate with `openssl rand -hex 32`.
+- [ ] **`WEBAUTHN_RP_ID`**: Change `localhost` to your domain (e.g., `yourdomain.com`).
+- [ ] **`WEBAUTHN_ORIGIN`**: Change to `https://dashboard.yourdomain.com`.
+- [ ] **`FRONTEND_URL`**: Update to `https://dashboard.yourdomain.com`.
+- [ ] **`API_URL`**: Update to `https://api.yourdomain.com`.
+- [ ] **`VITE_API_URL`**: Update in frontend to `https://api.yourdomain.com/api`.
 
 ### Third Party Services
-- [ ] **Launchtube**: `LAUNCHTUBE_URL` and `LAUNCHTUBE_JWT` must be updated to a paid/production instance if you are using sponsored transactions.
+- [ ] **Launchtube**: Get Mainnet JWT from Stellar Discord #launchtube.
 
 ---
 
 ## 📧 Email Configuration (SMTP)
 
-The `.env.example` has SMTP sections commented out. For production, you **must** configure a real SMTP service to send verification emails and payment notifications.
+For production, configure real SMTP to send verification emails:
 
-- [ ] Uncomment and fill:
-    - `SMTP_HOST` (e.g., `smtp.sendgrid.net`)
-    - `SMTP_USER`
-    - `SMTP_PASSWORD`
-    - `SMTP_FROM` (Must be a verified sender domain)
+- [ ] `SMTP_HOST` (e.g., `smtp.sendgrid.net`)
+- [ ] `SMTP_USER` 
+- [ ] `SMTP_PASSWORD`
+- [ ] `SMTP_FROM` (verified sender domain)
+
+---
 
 ## 🏗️ Build & Deployment
 
 ### Frontend
 - Run `npm run build` in the `frontend` directory.
-- Serve the `frontend/dist` folder using Nginx, Vercel, or Netlify.
+- Set `VITE_*` env vars before building.
 
 ### Database
-- Run `npm run migrate` (Production alias) to apply migrations to the production DB.
-- **Do not run `npm run seed`** unless you strictly intend to populate test data in production.
+- Run `npm run migrate` to apply migrations.
+- Enable SSL for production databases.
 
-### Docker
-- Use `docker-compose.prod.yml` instead of the default `docker-compose.yml`.
+### Key Generation
+```bash
+# JWT Secret
+openssl rand -hex 32
+
+# Stellar Keypairs (run for Issuer, Distributor, Treasury)
+node -e "const {Keypair} = require('@stellar/stellar-sdk'); const kp = Keypair.random(); console.log('SECRET=' + kp.secret()); console.log('PUBLIC=' + kp.publicKey());"
+```

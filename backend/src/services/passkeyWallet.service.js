@@ -1,5 +1,5 @@
 import { PasskeyServer } from 'passkey-kit';
-import { getNetworkPassphrase, getIssuerKeypair } from '../config/stellar.js';
+import { getNetworkPassphrase, getIssuerKeypair, getSorobanRpcUrl, isTestnet } from '../config/stellar.js';
 import prisma from '../config/prisma.js';
 import {
   Contract,
@@ -35,7 +35,7 @@ export class PasskeyWalletService {
    */
   static getServer() {
     if (!this.#server) {
-      const rpcUrl = process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
+      const rpcUrl = getSorobanRpcUrl();
       const launchtubeUrl = process.env.LAUNCHTUBE_URL || 'https://launchtube.xyz';
       const launchtubeJwt = process.env.LAUNCHTUBE_JWT;
       const factoryContractId = process.env.FACTORY_CONTRACT_ID;
@@ -67,7 +67,7 @@ export class PasskeyWalletService {
     const defaultWasmHash = 'ecd990f0b45ca6817149b6175f79b32efb442f35731985a084131e8265c4cd90';
 
     return {
-      rpcUrl: process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org',
+      rpcUrl: getSorobanRpcUrl(),
       networkPassphrase: getNetworkPassphrase(),
       walletWasmHash: process.env.WALLET_WASM_HASH || defaultWasmHash,
     };
@@ -517,7 +517,7 @@ export class PasskeyWalletService {
         };
 
         // Add explorer link (using testnet for now as per env)
-        result.explorer = `https://stellar.expert/explorer/testnet/account/${user.stellarContractId}`;
+        result.explorer = `https://stellar.expert/explorer/${isTestnet() ? 'testnet' : 'public'}/account/${user.stellarContractId}`;
       } catch (error) {
         console.error('Failed to fetch wallet balances:', error);
         // Don't fail the whole request, just omit balances
