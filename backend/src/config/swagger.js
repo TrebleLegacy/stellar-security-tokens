@@ -118,6 +118,7 @@ const options = {
             { name: 'Tokens', description: 'Emissão e gestão de tokens' },
             { name: 'Investments', description: 'Investimentos em ofertas' },
             { name: 'Payments', description: 'Processamento de pagamentos' },
+            { name: 'Wallets', description: 'Gerenciamento de carteiras do sistema' },
             { name: 'Platform Admin', description: 'Administração da plataforma' },
         ],
     },

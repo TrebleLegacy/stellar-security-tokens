@@ -1,11 +1,69 @@
 import { Company } from '../models/Company.js';
 import { generateToken } from '../middleware/auth.js';
 import { StellarService } from '../services/stellar.service.js';
+import { ipfsService } from '../services/ipfs.service.js';
 
 /**
  * Controller para gerenciar empresas
  */
 export class CompanyController {
+  /**
+   * Formata documentos da empresa adicionando URLs IPFS completas
+   * @param {Object} documents - Documentos do banco (JSONB)
+   * @returns {Object} Documentos formatados com URLs completas
+   */
+  static formatDocuments(documents) {
+    if (!documents || typeof documents !== 'object') {
+      return {};
+    }
+
+    const formatted = {};
+    // Tipos de documentos de KYC de empresa
+    const docTypes = ['articles_incorporation', 'tax_id', 'proof_address', 'legal_rep_id', 'financials', 'other'];
+
+    for (const docType of docTypes) {
+      if (documents[docType]) {
+        const doc = documents[docType];
+        formatted[docType] = {
+          hash: doc.hash || null,
+          url: doc.url || (doc.hash ? ipfsService.getGatewayUrl(doc.hash) : null),
+          fileName: doc.fileName || null,
+          uploadedAt: doc.uploadedAt || null,
+        };
+      }
+    }
+    // Handle dynamic keys if any
+    Object.keys(documents).forEach(key => {
+      if (!docTypes.includes(key) && documents[key] && typeof documents[key] === 'object') {
+        formatted[key] = {
+          hash: documents[key].hash || null,
+          url: documents[key].url || (documents[key].hash ? ipfsService.getGatewayUrl(documents[key].hash) : null),
+          fileName: documents[key].fileName || null,
+          uploadedAt: documents[key].uploadedAt || null,
+        };
+      }
+    });
+
+    return formatted;
+  }
+
+  /**
+   * Formata empresa para resposta
+   */
+  static formatCompanyForResponse(company) {
+    if (!company) return null;
+
+    const kycDocuments = typeof company.kycDocuments === 'string'
+      ? JSON.parse(company.kycDocuments)
+      : company.kycDocuments || {};
+
+    return {
+      ...company,
+      kycDocuments: CompanyController.formatDocuments(kycDocuments),
+      kyc_documents: CompanyController.formatDocuments(kycDocuments), // snake_case aliases
+    };
+  }
+
   /**
    * Registra uma nova empresa
    * POST /api/companies/register
@@ -63,7 +121,7 @@ export class CompanyController {
 
       res.status(201).json({
         success: true,
-        data: company,
+        data: CompanyController.formatCompanyForResponse(company),
       });
     } catch (error) {
       console.error('Error registering company:', error);
@@ -100,7 +158,7 @@ export class CompanyController {
 
       res.json({
         success: true,
-        data: company,
+        data: CompanyController.formatCompanyForResponse(company),
       });
     } catch (error) {
       console.error('Error fetching company profile:', error);
@@ -152,7 +210,7 @@ export class CompanyController {
 
       res.json({
         success: true,
-        data: updatedCompany,
+        data: CompanyController.formatCompanyForResponse(updatedCompany),
       });
     } catch (error) {
       console.error('Error updating company profile:', error);
@@ -180,17 +238,51 @@ export class CompanyController {
       }
 
       const { Offer } = await import('../models/Offer.js');
+      const { OfferController } = await import('./offerController.js');
       const offers = await Offer.findByCompany(companyId);
+
+      // Formatar ofertas também
+      const formattedOffers = offers.map(o => OfferController.formatOfferForResponse(o));
 
       res.json({
         success: true,
-        data: offers,
+        data: formattedOffers,
       });
     } catch (error) {
       console.error('Error fetching company offers:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to fetch company offers',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Detalhes de uma empresa (admin/public)
+   * GET /api/admin/companies/:id
+   */
+  static async getCompanyDetails(req, res) {
+    try {
+      const { id } = req.params;
+      const company = await Company.findById(parseInt(id));
+
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          error: 'Company not found',
+        });
+      }
+
+      res.json({
+        success: true,
+        data: CompanyController.formatCompanyForResponse(company),
+      });
+    } catch (error) {
+      console.error('Error fetching company details:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch company details',
         details: error.message,
       });
     }
@@ -210,9 +302,11 @@ export class CompanyController {
         status || null
       );
 
+      const formattedCompanies = companies.map(c => CompanyController.formatCompanyForResponse(c));
+
       res.json({
         success: true,
-        data: companies,
+        data: formattedCompanies,
         pagination: {
           limit: parseInt(limit),
           offset: parseInt(offset),
@@ -253,9 +347,17 @@ export class CompanyController {
         });
       }
 
+      // Send email notification
+      const { EmailService } = await import('../services/email.service.js');
+      await EmailService.sendCompanyStatusUpdate(
+        updatedCompany.email,
+        updatedCompany.name,
+        status
+      );
+
       res.json({
         success: true,
-        data: updatedCompany,
+        data: CompanyController.formatCompanyForResponse(updatedCompany),
       });
     } catch (error) {
       console.error('Error updating company status:', error);
@@ -286,7 +388,7 @@ export class CompanyController {
 
       res.json({
         success: true,
-        data: updatedCompany,
+        data: CompanyController.formatCompanyForResponse(updatedCompany),
       });
     } catch (error) {
       console.error('Error approving company (debug):', error);
