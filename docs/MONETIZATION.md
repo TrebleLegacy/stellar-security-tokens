@@ -70,6 +70,6 @@ All collected fees are recorded in the `FeeLog` database table for auditing and 
   - `relatedId`: ID of the investment or payment
   - `type`: `INVESTMENT_FEE` or `DIVIDEND_FEE`
   - `amount`: USDC amount collected
-  - `assetCode`: Asset involved (e.g., SIN01)
+  - `assetCode`: Asset involved (e.g., REIT01)
   - `description`: Detailed breakdown (e.g., "Investment Fee: 1.5% + 5.0 USDC Fixed")
   - `createdAt`: Timestamp
