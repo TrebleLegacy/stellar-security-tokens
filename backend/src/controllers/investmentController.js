@@ -139,7 +139,7 @@ export const purchaseInvestment = async (req, res, next) => {
             id: investment.id,
             status: investment.status,
             usdcAmount: parseFloat(usdcAmount),
-            feeAmount: feeAmount,
+            feeAmount: fixedFee,
             tokenAmount: tokenAmount,
             assetCode: assetCode,
           },

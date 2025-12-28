@@ -533,9 +533,7 @@ export class PaymentService {
           assetCode,
           tokenBalance: tokenBalance.toString(),
           interestRate: annualInterestRate.toString(),
-          interestAmount: grossInterest.toString(), // Record GROSS interest for accounting? Or Net?
-          // Usually InterestPayment table has interestAmount. We should probably add feeAmount column to table later.
-          // For now, let's store GROSS in interestAmount and NET in usdcAmount (actual pay).
+          // interestAmount stores GROSS interest; usdcAmount stores NET amount (paid to investor)
           interestAmount: grossInterest.toString(),
           usdcAmount: netInterest.toString(),
           offerId,

@@ -1,8 +1,13 @@
 import { PinataSDK } from 'pinata-web3';
 import dotenv from 'dotenv';
 import { Blob } from 'buffer';
+import path from 'path';
 
-dotenv.config();
+// Load env vars from various locations
+if (!process.env.PINATA_JWT) {
+  dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+  dotenv.config();
+}
 
 /**
  * Service for interacting with IPFS via Pinata
@@ -93,11 +98,15 @@ export class IpfsService {
    * @returns {Promise<boolean>}
    */
   async testConnection() {
-    if (!this.isEnabled) return true;
+    if (!this.isEnabled) {
+      console.warn('Cannot test connection: IPFS service is in mock mode (missing PINATA_JWT)');
+      return false;
+    }
     try {
       const result = await this.pinata.testAuthentication();
       return result.message === 'Congratulations! You are communicating with the Pinata API!';
     } catch (error) {
+      console.error('Pinata authentication failed:', error.message);
       return false;
     }
   }

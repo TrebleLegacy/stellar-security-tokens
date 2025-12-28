@@ -14,8 +14,25 @@ dotenv.config();
 
 const network = process.env.STELLAR_NETWORK || 'testnet';
 const horizonUrl = process.env.STELLAR_HORIZON_URL || process.env.HORIZON_URL || 'https://horizon-testnet.stellar.org';
+const sorobanRpcUrl = process.env.SOROBAN_RPC_URL || (
+  network === 'testnet'
+    ? 'https://soroban-testnet.stellar.org'
+    : 'https://soroban-rpc.mainnet.stellar.org'
+);
 
 export const stellarServer = new Horizon.Server(horizonUrl);
+
+/**
+ * Get the Soroban RPC URL for smart contract interactions
+ * @returns {string} Soroban RPC URL (testnet or mainnet based on STELLAR_NETWORK)
+ */
+export const getSorobanRpcUrl = () => sorobanRpcUrl;
+
+/**
+ * Check if currently configured for testnet
+ * @returns {boolean} True if on testnet, false if on mainnet/public
+ */
+export const isTestnet = () => network === 'testnet';
 
 /**
  * Obtém o passphrase da rede Stellar baseado na configuração

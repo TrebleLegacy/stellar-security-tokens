@@ -3,7 +3,10 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_here_change_in_production';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error('FATAL: JWT_SECRET environment variable is required. Set it in your .env file.');
+}
 
 /**
  * Middleware de autenticação JWT obrigatória
@@ -76,7 +79,7 @@ export const optionalAuth = (req, res, next) => {
  */
 export const requireRole = (allowedRoles) => {
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-  
+
   return (req, res, next) => {
     authenticateToken(req, res, () => {
       if (!roles.includes(req.user.role)) {
