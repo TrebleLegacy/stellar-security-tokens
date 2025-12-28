@@ -115,6 +115,28 @@ router.put('/profile', requireCompanyUser, CompanyController.updateCompanyProfil
 
 /**
  * @swagger
+ * /api/companies/admin/{id}:
+ *   get:
+ *     summary: "[Admin] Detalhes de uma empresa"
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Detalhes da empresa
+ *       404:
+ *         description: Empresa não encontrada
+ */
+router.get('/admin/:id', requirePlatformAdmin, CompanyController.getCompanyDetails);
+
+/**
+ * @swagger
  * /api/companies/offers:
  *   get:
  *     summary: Listar ofertas da empresa

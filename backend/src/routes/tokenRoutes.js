@@ -33,6 +33,8 @@ const distributeTokenValidation = [
  *     summary: Emitir novo token
  *     description: Cria um novo security token no Stellar blockchain
  *     tags: [Tokens]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -126,6 +128,8 @@ router.get('/:assetCode', getTokenByAssetCode);
  *     summary: Distribuir tokens
  *     description: Distribui tokens para um investidor
  *     tags: [Tokens]
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:

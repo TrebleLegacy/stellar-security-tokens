@@ -106,8 +106,10 @@ export class Offer {
    * @param {string} [status] - Filtrar por status
    * @returns {Promise<Array>} Array de ofertas
    */
-  static async findAll(limit = 100, offset = 0, status = null) {
-    const where = status ? { status: status.toLowerCase() } : {};
+  static async findAll(limit = 100, offset = 0, status = null, companyId = null) {
+    const where = {};
+    if (status) where.status = status.toLowerCase();
+    if (companyId) where.companyId = parseInt(companyId);
 
     return await prisma.offer.findMany({
       where,

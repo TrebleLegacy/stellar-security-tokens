@@ -115,6 +115,30 @@ export class OfferController {
       offer_rules: offerRules,
     };
   }
+
+  /**
+   * Obtém a taxa de emissão de token (público/opcional)
+   * GET /api/offers/fees
+   */
+  static async getIssuanceFee(req, res) {
+    try {
+      const fee = await OfferService.getIssuanceFee();
+      res.json({
+        success: true,
+        data: {
+          issuanceFee: fee,
+          currency: 'USDC', // Configurable? currently assumed
+        },
+      });
+    } catch (error) {
+      console.error('Error fetching issuance fee:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch issuance fee',
+      });
+    }
+  }
+
   /**
    * Cria uma nova oferta (company_user)
    * POST /api/companies/offers
@@ -377,12 +401,74 @@ export class OfferController {
         offer_rules,
       } = req.body;
 
+      // Handle file uploads (merge with existing)
+      let currentDocuments = typeof offer.legalDocuments === 'string'
+        ? JSON.parse(offer.legalDocuments)
+        : offer.legalDocuments || {};
+
+      if (req.files && req.files.length > 0) {
+        for (const file of req.files) {
+          const docType = file.fieldname;
+          try {
+            const uploadResult = await ipfsService.uploadFile(
+              file.buffer,
+              file.originalname,
+              {
+                companyId: offer.companyId,
+                assetCode: offer.assetCode, // Use existing asset code
+                type: docType
+              }
+            );
+
+            currentDocuments[docType] = {
+              hash: uploadResult.ipfsHash,
+              fileName: file.originalname,
+              uploadedAt: new Date().toISOString(),
+              url: uploadResult.url
+            };
+          } catch (uploadError) {
+            console.error(`Failed to upload ${docType}:`, uploadError);
+            // Decide if we abort or continue. For now, log and ensure partial success or fail hard?
+            // Let's fail hard to ensure data integrity
+            throw new Error(`Failed to upload document: ${file.originalname}`);
+          }
+        }
+      }
+
+      // Handle numeric updates
+      let updatedTotalSupply = total_supply;
+      if (updatedTotalSupply) updatedTotalSupply = parseFloat(updatedTotalSupply);
+
+      let updatedInterestRate = annual_interest_rate;
+      if (updatedInterestRate) updatedInterestRate = parseFloat(updatedInterestRate);
+
+      // Handle offer rules parsing
+      let updatedRules = offer_rules;
+      if (typeof updatedRules === 'string') {
+        try {
+          updatedRules = JSON.parse(updatedRules);
+        } catch (e) {
+          // If parse fails, ignore or keep existing? Let's assume partial updates might send strings
+          console.warn('Failed to parse offer_rules string:', e);
+        }
+      }
+
+      // Automatically reset status to 'pending_review' if it was 'rejected'
+      // This allows the admin to review the corrections
+      let newStatus = offer.status;
+      if (offer.status === 'rejected' || offer.status === 'pending_review') {
+        newStatus = 'pending_review';
+      }
+
       const updatedOffer = await Offer.update(parseInt(id), {
         offer_name,
         description,
-        total_supply,
-        annual_interest_rate,
-        offer_rules,
+        total_supply: updatedTotalSupply,
+        annual_interest_rate: updatedInterestRate,
+        offer_rules: updatedRules,
+        legal_documents: currentDocuments,
+        status: newStatus, // Reset status to prompt re-review
+        updatedAt: new Date(),
       });
 
       res.json({
@@ -390,10 +476,50 @@ export class OfferController {
         data: OfferController.formatOfferForResponse(updatedOffer),
       });
     } catch (error) {
-      console.error('Error updating offer:', error);
+      console.error('Error fetching file uploads:', error);
       res.status(500).json({
         success: false,
         error: 'Failed to update offer',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Lista investidores de uma oferta (Cap Table)
+   * GET /api/companies/offers/:id/investors
+   */
+  static async getOfferInvestors(req, res) {
+    try {
+      const { id } = req.params;
+      const offer = await Offer.findById(parseInt(id));
+
+      if (!offer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Offer not found',
+        });
+      }
+
+      // Check ownership (skip for admin)
+      if (req.user.role === 'company_user' && offer.companyId !== req.user.companyId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied',
+        });
+      }
+
+      const investors = await OfferService.getOfferInvestors(parseInt(id));
+
+      res.json({
+        success: true,
+        data: investors,
+      });
+    } catch (error) {
+      console.error('Error fetching offer investors:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to fetch offer investors',
         details: error.message,
       });
     }
@@ -482,12 +608,17 @@ export class OfferController {
    */
   static async getAllOffers(req, res) {
     try {
-      const { limit = 100, offset = 0, status } = req.query;
+      const { limit = 100, offset = 0, status, company_id } = req.query;
+
+      const filters = {};
+      if (status) filters.status = status;
+      if (company_id) filters.companyId = parseInt(company_id);
 
       const offers = await Offer.findAll(
         parseInt(limit),
         parseInt(offset),
-        status || null
+        filters.status || null,
+        filters.companyId || null
       );
 
       // Formatar ofertas com documentos IPFS
@@ -549,6 +680,19 @@ export class OfferController {
           success: false,
           error: 'Offer not found',
         });
+      }
+
+      // Send notification to company
+      const company = await Company.findById(updatedOffer.companyId);
+      if (company) {
+        const { EmailService } = await import('../services/email.service.js');
+        await EmailService.sendOfferStatusUpdate(
+          company.email,
+          company.name,
+          updatedOffer.offerName,
+          status,
+          rejection_reason
+        );
       }
 
       res.json({

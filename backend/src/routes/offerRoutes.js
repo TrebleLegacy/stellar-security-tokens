@@ -145,7 +145,49 @@ router.get('/companies/offers', requireCompanyUser, OfferController.getCompanyOf
  *         description: Detalhes da oferta
  *   put:
  *     summary: Atualizar oferta
+ *     description: Atualiza oferta existente via Multipart Form Data (permite envio de novos arquivos)
  *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               offer_name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               total_supply:
+ *                 type: number
+ *               annual_interest_rate:
+ *                 type: number
+ *               documents:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *     responses:
+ *       200:
+ *         description: Oferta atualizada
+ */
+router.get('/companies/offers/:id', requireCompanyUser, OfferController.getOfferDetails);
+router.put('/companies/offers/:id', requireCompanyUser, upload.any(), OfferController.updateOffer);
+
+/**
+ * @swagger
+ * /api/companies/offers/{id}/investors:
+ *   get:
+ *     summary: Lista investidores da oferta (Cap Table)
+ *     description: Retorna a lista de investidores que compraram tokens desta oferta
+ *     tags: [Companies]
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -156,10 +198,33 @@ router.get('/companies/offers', requireCompanyUser, OfferController.getCompanyOf
  *           type: integer
  *     responses:
  *       200:
- *         description: Oferta atualizada
+ *         description: Lista de investidores
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       investorId:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       email:
+ *                         type: string
+ *                       totalTokens:
+ *                         type: number
+ *                       totalInvested:
+ *                         type: number
+ *       403:
+ *         description: Acesso negado
  */
-router.get('/companies/offers/:id', requireCompanyUser, OfferController.getOfferDetails);
-router.put('/companies/offers/:id', requireCompanyUser, OfferController.updateOffer);
+router.get('/companies/offers/:id/investors', requireRole(['company_user', 'platform_admin']), OfferController.getOfferInvestors);
 
 /**
  * @swagger
@@ -185,6 +250,35 @@ router.put('/companies/offers/:id', requireCompanyUser, OfferController.updateOf
  */
 // Rotas públicas (para investidores)
 router.get('/offers/active', optionalAuth, OfferController.getActiveOffers);
+
+/**
+ * @swagger
+ * /api/offers/fees:
+ *   get:
+ *     summary: Obter taxas de emissão
+ *     description: Retorna o valor atual da taxa de emissão de tokens
+ *     tags: [Offers]
+ *     responses:
+ *       200:
+ *         description: Valor da taxa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     issuanceFee:
+ *                       type: number
+ *                       example: 500
+ *                     currency:
+ *                       type: string
+ *                       example: USDC
+ */
+router.get('/offers/fees', optionalAuth, OfferController.getIssuanceFee);
 
 /**
  * @swagger

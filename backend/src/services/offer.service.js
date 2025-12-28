@@ -353,5 +353,49 @@ export class OfferService {
       }
     });
   }
+
+  /**
+   * Busca investidores de uma oferta (Cap Table)
+   * @param {number} offerId - ID da oferta
+   * @returns {Promise<Array>} Lista de investidores agregada
+   */
+  static async getOfferInvestors(offerId) {
+    const investments = await prisma.investment.findMany({
+      where: {
+        offerId: parseInt(offerId),
+        status: { in: ['payment_received', 'distributed'] }
+      },
+      include: {
+        investor: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            stellarContractId: true
+          }
+        }
+      }
+    });
+
+    // Aggregate by investor
+    const capTable = {};
+    for (const inv of investments) {
+      if (!capTable[inv.investorId]) {
+        capTable[inv.investorId] = {
+          investorId: inv.investorId,
+          name: inv.investor.name,
+          email: inv.investor.email,
+          walletAddress: inv.investor.stellarContractId,
+          totalTokens: 0,
+          totalInvested: 0,
+          investedAt: inv.createdAt // First investment date
+        };
+      }
+      capTable[inv.investorId].totalTokens += parseFloat(inv.tokenAmount);
+      capTable[inv.investorId].totalInvested += parseFloat(inv.usdcAmount);
+    }
+
+    return Object.values(capTable);
+  }
 }
 
