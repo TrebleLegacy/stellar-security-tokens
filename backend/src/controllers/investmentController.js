@@ -68,6 +68,31 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
+    // Issue 7 Fix: Check for existing pending investment from same investor/offer
+    const existingPending = await Investment.findPendingByInvestorAndOffer(parseInt(investorId, 10), offerId);
+    if (existingPending) {
+      const treasuryKeypair = getTreasuryKeypair();
+      return res.status(200).json({
+        success: true,
+        message: 'Existing pending investment found. Please complete payment.',
+        data: {
+          investment: {
+            id: existingPending.id,
+            status: existingPending.status,
+            usdcAmount: parseFloat(existingPending.usdcAmount),
+            tokenAmount: parseFloat(existingPending.tokenAmount),
+            assetCode: existingPending.assetCode,
+          },
+          paymentInstructions: {
+            treasuryAddress: treasuryKeypair.publicKey(),
+            requiredAmount: existingPending.usdcAmount.toString(),
+            assetCode: 'USDC',
+            message: `Send ${existingPending.usdcAmount} USDC to ${treasuryKeypair.publicKey()}`,
+          },
+        },
+      });
+    }
+
     const token = await Token.findByAssetCode(assetCode);
     if (!token) {
       return res.status(404).json({
@@ -111,7 +136,7 @@ export const purchaseInvestment = async (req, res, next) => {
         amount: investmentFeeAmount,
         assetCode: 'USDC',
         category: 'INVESTMENT_FEE',
-        sourceId: investor.id, // Linked to investor for reference, but effectively charged to company
+        sourceId: offerId || null, // Issue 8 Fix: Use offerId (Company pays this fee)
         description: `Investment Fee: ${feePercent}% (${investmentFeeAmount} USDC) - Charge to Company`,
       });
     }

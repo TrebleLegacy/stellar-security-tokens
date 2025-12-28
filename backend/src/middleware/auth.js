@@ -105,6 +105,11 @@ export const requireRole = (allowedRoles) => {
  */
 export const requireOwnData = (req, res, next) => {
   authenticateToken(req, res, () => {
+    // Issue 4 Fix: Admins can access any user's data
+    if (req.user.role === 'platform_admin') {
+      return next();
+    }
+
     const resourceId = parseInt(req.params.id || req.params.investorId);
     const userId = req.user.userId;
 

@@ -7,7 +7,11 @@ import { Token } from '../models/Token.js';
 import { EmailService } from './email.service.js';
 import crypto from 'crypto';
 
-const USDC_ISSUER = process.env.USDC_ISSUER || 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
+// Issue 10 Fix: Require USDC_ISSUER from environment (no hardcoded fallback)
+const USDC_ISSUER = process.env.USDC_ISSUER;
+if (!USDC_ISSUER) {
+  console.warn('[PaymentMonitor] USDC_ISSUER not configured. Payment monitoring may not work correctly.');
+}
 const USDC_ASSET_CODE = 'USDC';
 const RECONNECT_DELAY = parseInt(process.env.PAYMENT_MONITOR_RECONNECT_DELAY || '5000', 10);
 
