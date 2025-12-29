@@ -86,9 +86,8 @@ export function Wallets() {
         setError('');
         setSuccess('');
         try {
-            // In a real app, we would fetch the XDR, sign with Freighter/Albedo, and send back
-            // For this phase, we assume the backend handles the "signature" or we just send the XDR back
-            // As per plan: "Simulate Sign action"
+            // In production, this would use passkey signing or admin key from secure storage
+            // For now, we simulate signing by sending the XDR back
             const proposal = proposals.find(p => p.id === id);
             if (!proposal) return;
 
