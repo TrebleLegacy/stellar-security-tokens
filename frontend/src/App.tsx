@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
 import { CompanyRegister } from './pages/auth/CompanyRegister';
+import { CompanyPendingApproval } from './pages/auth/CompanyPendingApproval';
 import { RegistrationSuccess } from './pages/auth/RegistrationSuccess';
 import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { DashboardLayout } from './layouts/DashboardLayout';
@@ -36,6 +37,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/company/register" element={<CompanyRegister />} />
+        <Route path="/company/pending-approval" element={<CompanyPendingApproval />} />
         <Route path="/registration-success" element={<RegistrationSuccess />} />
         <Route path="/investor/verify-email" element={<VerifyEmail />} />
 

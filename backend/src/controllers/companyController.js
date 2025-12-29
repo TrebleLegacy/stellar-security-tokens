@@ -72,22 +72,26 @@ export class CompanyController {
     try {
       const {
         name,
-        cnpj,
+        cnpj, // Optional - for Brazilian companies
         email,
         legal_representative,
         address,
         phone,
+        // Passkey fields from frontend
+        credentialId,
+        publicKey,
+        contractId,
       } = req.body;
 
-      // Validações básicas
-      if (!name || !cnpj || !email || !legal_representative) {
+      // Validações básicas (CNPJ is now optional)
+      if (!name || !email || !legal_representative) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: name, cnpj, email, legal_representative',
+          error: 'Missing required fields: name, email, legal_representative',
         });
       }
 
-      // Verificar se email ou CNPJ já existem
+      // Verificar se email já existe
       const existingEmail = await Company.findByEmail(email);
       if (existingEmail) {
         return res.status(409).json({
@@ -96,31 +100,54 @@ export class CompanyController {
         });
       }
 
-      const existingCnpj = await Company.findByCnpj(cnpj);
-      if (existingCnpj) {
-        return res.status(409).json({
-          success: false,
-          error: 'CNPJ already registered',
-        });
+      // Verificar CNPJ apenas se fornecido
+      if (cnpj) {
+        const existingCnpj = await Company.findByCnpj(cnpj);
+        if (existingCnpj) {
+          return res.status(409).json({
+            success: false,
+            error: 'CNPJ already registered',
+          });
+        }
       }
 
-      // Criar conta Stellar automaticamente
-      const stellarAccount = await StellarService.createInvestorAccount();
+      // Prepare passkey data if provided
+      let passkeyData = {};
+      if (credentialId && contractId) {
+        let publicKeyBuffer = null;
+        if (publicKey) {
+          if (typeof publicKey === 'string') {
+            publicKeyBuffer = Buffer.from(publicKey, 'base64');
+          } else if (Buffer.isBuffer(publicKey)) {
+            publicKeyBuffer = publicKey;
+          }
+        }
+
+        passkeyData = {
+          stellarContractId: contractId,
+          passkeyCredentialId: credentialId,
+          passkeyPublicKey: publicKeyBuffer,
+        };
+      }
 
       const company = await Company.create({
         name,
-        cnpj,
+        cnpj: cnpj || null, // Optional
         email,
         legal_representative,
         address,
         phone,
-        stellarPublicKey: stellarAccount.publicKey,
         status: 'pending',
         kyc_status: 'pending',
+        ...passkeyData,
       });
+
+      // TODO: Send "registration pending" email to company
+      // TODO: Send notification to admins about new company
 
       res.status(201).json({
         success: true,
+        message: 'Company registered successfully. Your account is under review.',
         data: CompanyController.formatCompanyForResponse(company),
       });
     } catch (error) {
