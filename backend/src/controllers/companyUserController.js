@@ -227,17 +227,26 @@ export class CompanyUserController {
     }
   }
 
-  // ============================================================================
-  // PASSKEY WALLET REGISTRATION FLOW
-  // ============================================================================
-
   /**
    * Register company user with email verification (Step 1 of Passkey Wallet flow)
    * POST /api/company-users/register-passkey
+   * 
+   * Now supports single-step registration (like investors):
+   * - If credentialId + contractId provided: create user with wallet immediately
+   * - If not provided: use legacy multi-step flow (email verification → create-wallet)
    */
   static async registerWithPasskey(req, res) {
     try {
-      const { company_id, email, name, role = 'user' } = req.body;
+      const {
+        company_id,
+        email,
+        name,
+        role = 'user',
+        // New fields for single-step registration
+        credentialId,
+        publicKey,
+        contractId
+      } = req.body;
 
       // Validate required fields
       if (!company_id || !email || !name) {
@@ -272,6 +281,75 @@ export class CompanyUserController {
         });
       }
 
+      // Single-step flow (frontend already created passkey and deployed wallet)
+      if (credentialId && contractId) {
+        // Convert publicKey from base64 to Buffer if provided
+        const publicKeyBuffer = publicKey
+          ? (Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64'))
+          : null;
+
+        // Generate verification token for email
+        const verificationToken = EmailService.generateVerificationToken();
+        const verificationExpiry = EmailService.getVerificationExpiry();
+
+        // Create company user with passkey data
+        const user = await prisma.companyUser.create({
+          data: {
+            companyId: company_id,
+            email,
+            name,
+            role,
+            stellarContractId: contractId,
+            passkeyCredentialId: credentialId,
+            passkeyPublicKey: publicKeyBuffer,
+            emailVerified: false,
+            emailVerificationToken: verificationToken,
+            emailVerificationExpiry: verificationExpiry,
+          },
+        });
+
+        // Send verification email (async, don't block)
+        EmailService.sendVerificationEmail(email, name, verificationToken)
+          .catch(error => {
+            console.error('Failed to send verification email:', error);
+          });
+
+        // Generate JWT token for immediate login
+        const token = generateToken({
+          userId: user.id,
+          email: user.email,
+          userType: 'company',
+          role: user.role,
+          companyId: user.companyId,
+        });
+
+        return res.status(201).json({
+          success: true,
+          message: 'Registration successful. Please verify your email.',
+          data: {
+            token,
+            user: {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              companyId: user.companyId,
+              role: user.role,
+              stellarContractId: user.stellarContractId,
+              emailVerified: false,
+            },
+            company: {
+              id: company.id,
+              name: company.name,
+              cnpj: company.cnpj,
+              email: company.email,
+              status: company.status,
+              kycStatus: company.kycStatus,
+            },
+          },
+        });
+      }
+
+      // Legacy multi-step flow (no passkey data provided)
       // Generate verification token
       const verificationToken = EmailService.generateVerificationToken();
       const verificationExpiry = EmailService.getVerificationExpiry();

@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { passkeyClient } from '@/lib/passkey';
+import { Building2, User, Wallet } from 'lucide-react';
 
 export function Login() {
     const [email, setEmail] = useState('');
@@ -31,8 +32,12 @@ export function Login() {
 
             console.log('Login successful:', user.email);
 
-            // Redirect to Dashboard
-            navigate('/dashboard');
+            // Redirect to appropriate Dashboard based on user type
+            if (userType === 'company') {
+                navigate('/company/dashboard');
+            } else {
+                navigate('/dashboard');
+            }
 
         } catch (err: any) {
             console.error(err);
@@ -45,8 +50,8 @@ export function Login() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-slate-950 p-4">
             <div className="w-full max-w-md space-y-8 relative">
-                {/* Background Glow Effect */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-blue-500/20 rounded-full blur-3xl -z-10" />
+                {/* Background Glow Effect - changes color based on userType */}
+                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-3xl -z-10 transition-colors duration-500 ${userType === 'investor' ? 'bg-blue-500/20' : 'bg-teal-500/20'}`} />
 
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-bold tracking-tighter text-white">Stellar Tokens</h1>
@@ -64,8 +69,14 @@ export function Login() {
                     <CardContent>
                         <Tabs defaultValue="investor" onValueChange={(v) => setUserType(v as 'investor' | 'company')} className="w-full">
                             <TabsList className="grid w-full grid-cols-2 mb-6 bg-white/5">
-                                <TabsTrigger value="investor">Investor</TabsTrigger>
-                                <TabsTrigger value="company">Company</TabsTrigger>
+                                <TabsTrigger value="investor" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                                    <User className="w-4 h-4 mr-2" />
+                                    Investor
+                                </TabsTrigger>
+                                <TabsTrigger value="company" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white">
+                                    <Building2 className="w-4 h-4 mr-2" />
+                                    Company
+                                </TabsTrigger>
                             </TabsList>
 
                             <form onSubmit={handleLogin}>
@@ -77,7 +88,7 @@ export function Login() {
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
                                             required
-                                            className="bg-white/5 border-white/10 focus:border-blue-500/50"
+                                            className={`bg-white/5 border-white/10 transition-colors ${userType === 'investor' ? 'focus:border-blue-500/50' : 'focus:border-teal-500/50'}`}
                                         />
                                     </div>
                                     {error && (
@@ -87,25 +98,50 @@ export function Login() {
                                     )}
                                     <Button
                                         type="submit"
-                                        className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg shadow-blue-900/20"
+                                        className={`w-full text-white font-semibold shadow-lg transition-colors ${userType === 'investor' ? 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/20' : 'bg-teal-600 hover:bg-teal-500 shadow-teal-900/20'}`}
                                         disabled={isLoading}
                                     >
+                                        <Wallet className="w-4 h-4 mr-2" />
                                         {isLoading ? 'Connecting...' : `Connect ${userType === 'investor' ? 'Investor' : 'Company'} Wallet`}
                                     </Button>
                                 </div>
                             </form>
                         </Tabs>
                     </CardContent>
-                    <div className="px-6 pb-6 text-center">
-                        <p className="text-sm text-slate-400">
-                            Not a user?{' '}
-                            <Link to="/register" className="text-blue-400 hover:text-blue-300 hover:underline transition-colors">
-                                Sign Up here
+
+                    {/* Distinct Registration CTAs based on userType */}
+                    <div className="px-6 pb-6">
+                        <div className={`p-4 rounded-lg border transition-colors ${userType === 'investor' ? 'bg-blue-500/5 border-blue-500/20' : 'bg-teal-500/5 border-teal-500/20'}`}>
+                            <p className="text-sm text-center text-slate-300 mb-3">
+                                {userType === 'investor'
+                                    ? "Don't have an investor account?"
+                                    : "Need to register your company?"
+                                }
+                            </p>
+                            <Link
+                                to={userType === 'investor' ? '/register' : '/company/register'}
+                                className={`flex items-center justify-center gap-2 w-full py-2 px-4 rounded-lg font-medium text-sm transition-colors ${userType === 'investor'
+                                    ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30'
+                                    : 'bg-teal-600/20 text-teal-400 hover:bg-teal-600/30 border border-teal-500/30'
+                                    }`}
+                            >
+                                {userType === 'investor' ? (
+                                    <>
+                                        <User className="w-4 h-4" />
+                                        Create Investor Account
+                                    </>
+                                ) : (
+                                    <>
+                                        <Building2 className="w-4 h-4" />
+                                        Register Company User
+                                    </>
+                                )}
                             </Link>
-                        </p>
+                        </div>
                     </div>
                 </Card>
             </div>
         </div>
     );
 }
+
