@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/auth/Login';
 import { Register } from './pages/auth/Register';
+import { CompanyRegister } from './pages/auth/CompanyRegister';
 import { RegistrationSuccess } from './pages/auth/RegistrationSuccess';
 import { VerifyEmail } from './pages/auth/VerifyEmail';
 import { DashboardLayout } from './layouts/DashboardLayout';
@@ -19,16 +20,26 @@ import { UserManagement } from './pages/admin/UserManagement';
 import { FeeConfig } from './pages/admin/FeeConfig';
 import { Wallets } from './pages/admin/Wallets';
 
+// Company imports
+import { CompanyLayout } from './layouts/CompanyLayout';
+import { CompanyDashboard } from './pages/company/Dashboard';
+import { Offers } from './pages/company/Offers';
+import { CreateOffer } from './pages/company/CreateOffer';
+import { OfferDetails as CompanyOfferDetails } from './pages/company/OfferDetails';
+import { Reports } from './pages/company/Reports';
+import { Settings as CompanySettings } from './pages/company/Settings';
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/company/register" element={<CompanyRegister />} />
         <Route path="/registration-success" element={<RegistrationSuccess />} />
         <Route path="/investor/verify-email" element={<VerifyEmail />} />
 
-        {/* Protected Dashboard Routes */}
+        {/* Investor Dashboard Routes */}
         <Route path="/" element={<DashboardLayout />}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<InvestorDashboard />} />
@@ -37,6 +48,17 @@ function App() {
           <Route path="market/:id" element={<OfferDetails />} />
           <Route path="transactions" element={<Transactions />} />
           <Route path="settings" element={<Settings />} />
+        </Route>
+
+        {/* Company Routes */}
+        <Route path="/company" element={<CompanyLayout />}>
+          <Route index element={<Navigate to="/company/dashboard" replace />} />
+          <Route path="dashboard" element={<CompanyDashboard />} />
+          <Route path="offers" element={<Offers />} />
+          <Route path="offers/new" element={<CreateOffer />} />
+          <Route path="offers/:id" element={<CompanyOfferDetails />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="settings" element={<CompanySettings />} />
         </Route>
 
         {/* Admin Routes */}
@@ -55,3 +77,4 @@ function App() {
 
 
 export default App;
+
