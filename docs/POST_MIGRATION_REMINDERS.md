@@ -30,3 +30,12 @@ This document tracks items that need to be addressed **after** the initial Mainn
 
 ## 4. Housekeeping
 - [ ] **Clean `.env`**: After verifying production, remove any lingering `TESTNET` variables from the production environment to prevent confusion.
+
+## 5. Security Hardening
+- [ ] **Admin Seeding Scripts**: The files `backend/src/database/checkAndCreateAdmin.js` and `backend/src/database/create_admin.js` contain hardcoded default passwords (`admin123456` and `admin123`). Before production: either delete these scripts, require password as CLI argument, or add a `NODE_ENV=production` check to prevent accidental execution.
+- [ ] **CORS Configuration**: Once domain is finalized, ensure `FRONTEND_URL` env var is set to the exact production domain (e.g., `https://app.tokenizadora.com`). Consider restricting to specific origins in `backend/src/app.js`.
+- [ ] **Request Body Size Limit**: Add `express.json({ limit: '10kb' })` in `backend/src/app.js` to prevent large payload attacks.
+- [ ] **Refresh Tokens**: Implement short-lived access tokens (15 min) + long-lived refresh tokens (7 days) to reduce exposure if a token is stolen. Currently using single 24h JWT.
+- [ ] **Token Blocklist**: Implement Redis-backed token blocklist for proper logout. Currently, logout only clears the token client-side but the token remains valid server-side until expiry. Add `POST /api/auth/logout` endpoint that adds token to blocklist, and check blocklist in `authenticateToken` middleware.
+- [ ] **Security Audit Logging**: Log security-relevant events (logins, failed auth attempts, password changes, admin actions, sensitive operations) to a dedicated audit log for compliance and incident investigation. Consider using a structured logging library (winston/pino) with a separate audit transport.
+
