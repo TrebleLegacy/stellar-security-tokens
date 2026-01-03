@@ -1,7 +1,9 @@
 import express from 'express';
+import { body, param, query } from 'express-validator';
 import { WalletController } from '../controllers/walletController.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { requirePlatformAdmin } from '../middleware/authorize.js';
+import { validate } from '../middleware/validator.js';
 
 const router = express.Router();
 
@@ -71,8 +73,21 @@ router.get('/', WalletController.getWalletStatuses);
  *       201:
  *         description: Proposal created
  */
-router.get('/transactions', WalletController.getTransactionProposals);
-router.post('/transactions', WalletController.createTransactionProposal);
+router.get('/transactions',
+    query('status').optional().isIn(['pending', 'executed', 'rejected']).withMessage('Invalid status filter'),
+    validate,
+    WalletController.getTransactionProposals
+);
+
+router.post('/transactions',
+    body('sourceWallet').isIn(['treasury', 'issuer', 'distributor']).withMessage('Invalid source wallet'),
+    body('amount').isNumeric().withMessage('Amount must be numeric'),
+    body('destination').isString().isLength({ min: 56, max: 56 }).withMessage('Destination must be a valid Stellar address'),
+    body('assetCode').optional().isString().isLength({ max: 12 }).withMessage('Asset code must be 12 characters or less'),
+    body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be 500 characters or less'),
+    validate,
+    WalletController.createTransactionProposal
+);
 
 /**
  * @swagger
@@ -99,6 +114,11 @@ router.post('/transactions', WalletController.createTransactionProposal);
  *       200:
  *         description: Transaction submitted or updated
  */
-router.post('/transactions/:id/submit', WalletController.signAndSubmitProposal);
+router.post('/transactions/:id/submit',
+    param('id').isInt({ min: 1 }).withMessage('Transaction ID must be a positive integer'),
+    body('signedXDR').isString().notEmpty().withMessage('signedXDR is required'),
+    validate,
+    WalletController.signAndSubmitProposal
+);
 
 export default router;
