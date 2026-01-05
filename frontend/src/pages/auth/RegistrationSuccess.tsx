@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle2, AlertTriangle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { passkeyClient } from '@/lib/passkey';
-import { api } from '@/lib/api';
 
 export function RegistrationSuccess() {
     const navigate = useNavigate();
@@ -16,30 +15,35 @@ export function RegistrationSuccess() {
         setIsLoading(true);
         setError('');
         try {
+            // Retrieve email from stored user data (set during registration)
+            const storedUserStr = localStorage.getItem('user');
+            const storedUser = storedUserStr ? JSON.parse(storedUserStr) : null;
+            const email = storedUser?.email;
+
+            if (!email) {
+                throw new Error("User email not found. Please try logging in from the main page.");
+            }
+
             // Force a login attempt to verify the passkey was saved correctly
-            const { credentialId, signature, clientDataJSON, authenticatorData } = await passkeyClient.login();
+            // passkeyClient.login() performs the full authentication flow (challenge -> sign -> verify with backend)
+            const result = await passkeyClient.login(email);
 
-            // Verify with backend
-            const response = await api.post('/auth/login', {
-                credentialId,
-                signature,
-                clientDataJSON,
-                authenticatorData
-            });
-
-            if (!response.success) {
-                throw new Error(response.message || 'Verification failed');
+            if (!result.success) {
+                throw new Error(result.message || 'Verification failed');
             }
 
             // If successful, store session and redirect based on user type
-            if (response.data && response.data.token) {
-                localStorage.setItem('token', response.data.token);
-                localStorage.setItem('user', JSON.stringify(response.data.user));
-                localStorage.setItem('userType', response.data.userType);
+            if (result.data && result.data.token) {
+                localStorage.setItem('token', result.data.token);
+                localStorage.setItem('user', JSON.stringify(result.data.user));
 
-                if (response.data.userType === 'company') {
+                // Determine user type
+                const userType = result.data.user?.role === 'company_admin' || result.data.user?.role === 'company_user' ? 'company' : 'investor';
+                localStorage.setItem('userType', userType);
+
+                if (userType === 'company') {
                     // Check status for company
-                    if (response.data.user.status === 'pending') {
+                    if (result.data.user.status === 'pending') {
                         navigate('/company/pending-approval');
                     } else {
                         navigate('/company/dashboard');
@@ -48,7 +52,6 @@ export function RegistrationSuccess() {
                     navigate('/dashboard');
                 }
             }
-
         } catch (err: any) {
             console.error("Verification failed", err);
             setError("We couldn't verify your passkey. It seems it wasn't saved correctly. Please try again or re-register.");

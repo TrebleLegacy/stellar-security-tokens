@@ -38,13 +38,19 @@ export class ApiClient {
   }
 
   async post(endpoint: string, data: any) {
+    const isFormData = data instanceof FormData;
+    const headers: Record<string, string> = {
+      ...this.getAuthHeader(),
+    };
+
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeader(),
-      },
-      body: JSON.stringify(data),
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -63,13 +69,19 @@ export class ApiClient {
   }
 
   async put(endpoint: string, data: any) {
+    const isFormData = data instanceof FormData;
+    const headers: Record<string, string> = {
+      ...this.getAuthHeader(),
+    };
+
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeader(),
-      },
-      body: JSON.stringify(data),
+      headers,
+      body: isFormData ? data : JSON.stringify(data),
     });
 
     if (response.status === 401 || response.status === 403) {

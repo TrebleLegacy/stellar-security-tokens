@@ -35,9 +35,52 @@ export const offersApi = {
     annual_interest_rate?: number;
     offer_type: 'collateral' | 'sale';
     offer_rules: Record<string, any>;
-    legal_documents: Record<string, any>;
+    legal_documents?: Record<string, any>; // Metadata if any, but files passed separately
+    contract?: File;
+    terms?: File;
+    prospectus?: File;
+    other_docs?: File[];
   }): Promise<ApiResponse<Offer>> => {
-    const response = await api.post('/companies/offers', data);
+    const formData = new FormData();
+
+    // Append simple fields
+    formData.append('asset_code', data.asset_code);
+    formData.append('offer_name', data.offer_name);
+    formData.append('description', data.description);
+    formData.append('total_supply', data.total_supply);
+    formData.append('offer_type', data.offer_type);
+
+    if (data.annual_interest_rate !== undefined) {
+      formData.append('annual_interest_rate', data.annual_interest_rate.toString());
+    }
+
+    // Append complex objects as JSON strings
+    formData.append('offer_rules', JSON.stringify(data.offer_rules));
+
+    // Append files
+    if (data.contract) formData.append('contract', data.contract);
+    if (data.terms) formData.append('terms', data.terms);
+    if (data.prospectus) formData.append('prospectus', data.prospectus);
+
+    // For now, we are not handling 'other_docs' array in specific keys, 
+    // but the backend iterates req.files. If we want generic uploads, we might need a specific structure.
+    // The backend uses file.fieldname as docType. 
+
+    // Allow appending custom extra fields if needed for test
+    if (data.legal_documents) {
+      formData.append('legal_documents', JSON.stringify(data.legal_documents));
+    }
+
+    // Note: When sending FormData, browser sets Content-Type to multipart/form-data correctly
+    // We pass the formData directly to the API client which should handle it.
+    // However, our ApiClient sets 'Content-Type': 'application/json' by default.
+    // We need to ensure api.post handles FormData correctly (usually by NOT setting Content-Type so browser sets boundary).
+
+    // Checking ApiClient implementation in frontend/src/lib/api.ts...
+    // The current implementation sets 'Content-Type': 'application/json'. 
+    // We need to modify api.post to check if body is FormData.
+
+    const response = await api.post('/companies/offers', formData);
     return response.data;
   },
 

@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../config/prisma.js';
 import { AlertService } from './alert.service.js';
-
-const prisma = new PrismaClient();
 
 export class NotificationService {
     /**
