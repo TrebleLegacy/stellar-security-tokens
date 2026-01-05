@@ -17,9 +17,9 @@ interface OfferFormData {
     max_investment: string;
     // Legal documents will be handled separately via IPFS
     legal_documents: {
-        contract?: { name: string; hash?: string };
-        terms?: { name: string; hash?: string };
-        prospectus?: { name: string; hash?: string };
+        contract?: { name: string; file?: File };
+        terms?: { name: string; file?: File };
+        prospectus?: { name: string; file?: File };
     };
 }
 
@@ -60,6 +60,18 @@ export function CreateOffer() {
         }
     };
 
+    const handleFileChange = (docType: 'contract' | 'terms' | 'prospectus', file: File | undefined) => {
+        if (file) {
+            setFormData(prev => ({
+                ...prev,
+                legal_documents: {
+                    ...prev.legal_documents,
+                    [docType]: { name: file.name, file: file }
+                }
+            }));
+        }
+    };
+
     const handleSubmit = async () => {
         setIsSubmitting(true);
         setError(null);
@@ -76,7 +88,10 @@ export function CreateOffer() {
                     min_investment: formData.min_investment,
                     max_investment: formData.max_investment || undefined,
                 },
-                legal_documents: formData.legal_documents,
+                legal_documents: {}, // Metadata is optional, relying on file fields
+                contract: formData.legal_documents.contract?.file,
+                terms: formData.legal_documents.terms?.file,
+                prospectus: formData.legal_documents.prospectus?.file,
             });
 
             if (response.success) {
@@ -85,6 +100,7 @@ export function CreateOffer() {
                 setError(response.error || 'Failed to create offer');
             }
         } catch (err: any) {
+            // ... error handling
             console.error('Failed to create offer:', err);
             setError(err.message || 'Failed to create offer');
         } finally {
@@ -93,6 +109,7 @@ export function CreateOffer() {
     };
 
     const isStepValid = () => {
+        // ... existing validation
         switch (step) {
             case 1:
                 return formData.offer_name && formData.asset_code && formData.description;
@@ -111,13 +128,9 @@ export function CreateOffer() {
     return (
         <div className="max-w-3xl mx-auto space-y-6">
             {/* Header */}
+            {/* ... */}
             <div className="flex items-center gap-4">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => navigate('/company/offers')}
-                    className="text-muted-foreground hover:text-white"
-                >
+                <Button variant="ghost" size="icon" onClick={() => navigate('/company/offers')} className="text-muted-foreground hover:text-white">
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
@@ -131,8 +144,7 @@ export function CreateOffer() {
                 {Array.from({ length: totalSteps }, (_, i) => (
                     <div
                         key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-teal-500' : 'bg-white/10'
-                            }`}
+                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-teal-500' : 'bg-white/10'}`}
                     />
                 ))}
             </div>
@@ -187,8 +199,8 @@ export function CreateOffer() {
                                         type="button"
                                         onClick={() => updateFormData({ offer_type: 'collateral' })}
                                         className={`p-4 rounded-lg border text-left transition-all ${formData.offer_type === 'collateral'
-                                                ? 'border-teal-500 bg-teal-500/10'
-                                                : 'border-white/10 bg-white/5 hover:bg-white/10'
+                                            ? 'border-teal-500 bg-teal-500/10'
+                                            : 'border-white/10 bg-white/5 hover:bg-white/10'
                                             }`}
                                     >
                                         <p className="font-medium text-white">Collateral (Debt)</p>
@@ -200,8 +212,8 @@ export function CreateOffer() {
                                         type="button"
                                         onClick={() => updateFormData({ offer_type: 'sale' })}
                                         className={`p-4 rounded-lg border text-left transition-all ${formData.offer_type === 'sale'
-                                                ? 'border-teal-500 bg-teal-500/10'
-                                                : 'border-white/10 bg-white/5 hover:bg-white/10'
+                                            ? 'border-teal-500 bg-teal-500/10'
+                                            : 'border-white/10 bg-white/5 hover:bg-white/10'
                                             }`}
                                     >
                                         <p className="font-medium text-white">Sale (Equity)</p>
@@ -299,7 +311,7 @@ export function CreateOffer() {
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
-                                {['contract', 'terms', 'prospectus'].map((docType) => (
+                                {(['contract', 'terms', 'prospectus'] as const).map((docType) => (
                                     <div key={docType} className="p-4 border border-dashed border-white/20 rounded-lg">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-3">
@@ -310,28 +322,30 @@ export function CreateOffer() {
                                                             docType === 'terms' ? 'Terms & Conditions' : 'Prospectus'}
                                                     </p>
                                                     <p className="text-xs text-muted-foreground">
-                                                        {formData.legal_documents[docType as keyof typeof formData.legal_documents]?.name || 'No file selected'}
+                                                        {formData.legal_documents[docType]?.name || 'No file selected'}
                                                     </p>
                                                 </div>
                                             </div>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="border-white/10 hover:bg-white/5"
-                                                onClick={() => {
-                                                    // TODO: Implement file upload via IPFS
-                                                    const mockFileName = `${docType}_document.pdf`;
-                                                    updateFormData({
-                                                        legal_documents: {
-                                                            ...formData.legal_documents,
-                                                            [docType]: { name: mockFileName },
-                                                        },
-                                                    });
-                                                }}
-                                            >
-                                                <Upload className="w-4 h-4 mr-2" />
-                                                Upload
-                                            </Button>
+                                            <div className="relative">
+                                                <input
+                                                    type="file"
+                                                    id={`file-${docType}`}
+                                                    className="hidden"
+                                                    onChange={(e) => handleFileChange(docType, e.target.files?.[0])}
+                                                    accept=".pdf,.doc,.docx"
+                                                />
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="border-white/10 hover:bg-white/5 cursor-pointer"
+                                                    asChild
+                                                >
+                                                    <label htmlFor={`file-${docType}`}>
+                                                        <Upload className="w-4 h-4 mr-2" />
+                                                        Upload
+                                                    </label>
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}

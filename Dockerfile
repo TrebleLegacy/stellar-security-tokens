@@ -26,5 +26,5 @@ RUN mkdir -p /app/logs
 EXPOSE 3000
 
 # Comando para iniciar o servidor
-CMD ["node", "backend/src/index.js"]
+CMD ["node", "--import", "tsx", "backend/src/index.js"]
 

@@ -40,6 +40,9 @@ export class PaymentMonitor {
     this.isRunning = false;
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 10;
+    this.lastCursor = 'now'; // Initialize cursor tracking
+    this.connectionStabilityTimer = null;
+    this.isReconnecting = false; // Guard against multiple simultaneous reconnects
   }
 
   /**
@@ -75,13 +78,33 @@ export class PaymentMonitor {
    */
   async startStream() {
     try {
+      // Ensure any existing stream is closed before starting a new one
+      if (this.stream) {
+        try {
+          this.stream();
+        } catch (e) {
+          // ignore error on close
+        }
+        this.stream = null;
+      }
+
+      console.log(`[PaymentMonitor] Starting stream with cursor: ${this.lastCursor}`);
+
+      this.isReconnecting = false; // Clear guard now that we're starting fresh
+
       this.stream = stellarServer
         .payments()
         .forAccount(this.treasuryPublicKey)
-        .cursor('now')
+        .cursor(this.lastCursor)
         .stream({
           onmessage: async (payment) => {
             try {
+              // Update cursor tracking
+              if (payment.paging_token) {
+                this.lastCursor = payment.paging_token;
+              }
+              // Received a message => connection works.
+              this.reconnectAttempts = 0;
               await this.handlePayment(payment);
             } catch (error) {
               console.error('[PaymentMonitor] Error handling payment:', error);
@@ -94,7 +117,17 @@ export class PaymentMonitor {
         });
 
       console.log('[PaymentMonitor] Stream started successfully');
-      this.reconnectAttempts = 0; // Reset contador após sucesso
+
+      // Do NOT reset reconnectAttempts immediately.
+      // Reset it only if the connection stays alive for a while (e.g., 60s)
+      if (this.connectionStabilityTimer) clearTimeout(this.connectionStabilityTimer);
+      this.connectionStabilityTimer = setTimeout(() => {
+        if (this.isRunning) {
+          console.log('[PaymentMonitor] Connection stable for 60s. Resetting reconnection attempts.');
+          this.reconnectAttempts = 0;
+        }
+      }, 60000);
+
     } catch (error) {
       console.error('[PaymentMonitor] Failed to start stream:', error);
       this.handleStreamError(error);
@@ -107,9 +140,31 @@ export class PaymentMonitor {
    * @private
    */
   async handleStreamError(error) {
-    if (!this.isRunning) {
-      return; // Não reconectar se foi parado manualmente
+    // Always close the current stream on error to stop EventSource auto-retries
+    if (this.connectionStabilityTimer) {
+      clearTimeout(this.connectionStabilityTimer);
+      this.connectionStabilityTimer = null;
     }
+
+    if (this.stream) {
+      try {
+        this.stream();
+      } catch (e) {
+        console.error('[PaymentMonitor] Error closing stream during error handling:', e);
+      }
+      this.stream = null;
+    }
+
+    if (!this.isRunning) {
+      return; // Do not reconnect if manually stopped
+    }
+
+    // Guard against multiple simultaneous reconnect attempts from EventSource firing onerror multiple times
+    if (this.isReconnecting) {
+      console.log('[PaymentMonitor] Reconnection already in progress, ignoring duplicate error.');
+      return;
+    }
+    this.isReconnecting = true;
 
     this.reconnectAttempts++;
 
@@ -311,6 +366,11 @@ export class PaymentMonitor {
   stop() {
     console.log('[PaymentMonitor] Stopping...');
     this.isRunning = false;
+
+    if (this.connectionStabilityTimer) {
+      clearTimeout(this.connectionStabilityTimer);
+      this.connectionStabilityTimer = null;
+    }
 
     if (this.stream) {
       try {

@@ -108,8 +108,9 @@ services:
       sh -c "
         echo 'Waiting for database...' &&
         sleep 5 &&
-        node backend/src/database/migrate.js &&
-        cd backend && node --import tsx src/index.js
+        cd backend &&
+        node --import tsx src/database/migrate.js &&
+        node --import tsx src/index.js
       "
 
   frontend:
