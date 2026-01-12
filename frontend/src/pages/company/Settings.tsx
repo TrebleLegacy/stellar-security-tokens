@@ -62,7 +62,7 @@ export function Settings() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -78,11 +78,11 @@ export function Settings() {
     const getStatusIcon = (status?: string) => {
         switch (status) {
             case 'approved':
-                return <CheckCircle className="w-5 h-5 text-emerald-400" />;
+                return <CheckCircle className="w-5 h-5 text-success" />;
             case 'pending':
-                return <Clock className="w-5 h-5 text-yellow-400" />;
+                return <Clock className="w-5 h-5 text-warning" />;
             case 'rejected':
-                return <AlertCircle className="w-5 h-5 text-red-400" />;
+                return <AlertCircle className="w-5 h-5 text-destructive" />;
             default:
                 return <Clock className="w-5 h-5 text-muted-foreground" />;
         }
@@ -90,9 +90,10 @@ export function Settings() {
 
     const getStatusColor = (status?: string) => {
         switch (status) {
-            case 'approved': return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
-            case 'pending': return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
-            case 'rejected': return 'text-red-400 bg-red-500/10 border-red-500/20';
+            case 'approved': return 'text-success bg-success/10 border-success/20';
+            case 'pending': return 'text-warning bg-warning/10 border-warning/20';
+            case 'rejected': return 'text-destructive bg-destructive/10 border-destructive/20';
+            case 'active': return 'text-success bg-success/10 border-success/20';
             default: return 'text-muted-foreground bg-white/5 border-white/10';
         }
     };
@@ -105,9 +106,9 @@ export function Settings() {
             </div>
 
             {saveSuccess && (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-3">
-                    <CheckCircle className="w-5 h-5 text-emerald-400" />
-                    <p className="text-emerald-400">Changes saved successfully!</p>
+                <div className="p-4 bg-success/10 border border-success/20 rounded-lg flex items-center gap-3">
+                    <CheckCircle className="w-5 h-5 text-success" />
+                    <p className="text-success">Changes saved successfully!</p>
                 </div>
             )}
 
@@ -156,9 +157,9 @@ export function Settings() {
                     )}
                 </CardHeader>
                 <CardContent className="space-y-6">
-                    <div className="flex items-center gap-4 p-4 bg-white/5 rounded-lg">
-                        <div className="w-16 h-16 rounded-lg bg-teal-500/20 flex items-center justify-center">
-                            <Building2 className="w-8 h-8 text-teal-400" />
+                    <div className="flex items-center gap-4 p-4 bg-muted/20 rounded-lg">
+                        <div className="w-16 h-16 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Building2 className="w-8 h-8 text-primary" />
                         </div>
                         <div>
                             <h3 className="text-xl font-semibold text-white">{company?.name}</h3>
@@ -184,7 +185,7 @@ export function Settings() {
                                     value={formData.address}
                                     onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
                                     placeholder="Enter company address"
-                                    className="bg-white/5 border-white/10 focus:border-teal-500/50"
+                                    className="glass-panel text-foreground bg-black/20 focus:border-primary/50"
                                 />
                             ) : (
                                 <p className="text-white">{company?.address || 'Not provided'}</p>
@@ -198,7 +199,7 @@ export function Settings() {
                                     value={formData.phone}
                                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                                     placeholder="Enter phone number"
-                                    className="bg-white/5 border-white/10 focus:border-teal-500/50"
+                                    className="glass-panel text-foreground bg-black/20 focus:border-primary/50"
                                 />
                             ) : (
                                 <p className="text-white">{company?.phone || 'Not provided'}</p>
@@ -224,7 +225,7 @@ export function Settings() {
                             <Button
                                 onClick={handleSave}
                                 disabled={isSaving}
-                                className="bg-teal-600 hover:bg-teal-500 text-white"
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                                 {isSaving ? (
                                     <>

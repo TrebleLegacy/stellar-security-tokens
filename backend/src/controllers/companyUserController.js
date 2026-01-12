@@ -641,5 +641,68 @@ export class CompanyUserController {
       });
     }
   }
+
+  /**
+   * Propose a withdrawal transaction for company user
+   * POST /api/company-users/:userId/withdraw/propose
+   */
+  static async proposeWithdrawal(req, res) {
+    try {
+      const { userId } = req.params;
+      const { destination, amount, assetCode } = req.body;
+
+      // Verify the requesting user owns this wallet
+      if (parseInt(userId, 10) !== req.user?.userId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized access to wallet',
+        });
+      }
+
+      const result = await PasskeyWalletService.buildWithdrawalTx(
+        parseInt(userId, 10),
+        destination,
+        amount,
+        assetCode,
+        UserType.COMPANY_USER
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('Error proposing company user withdrawal:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to propose withdrawal',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Submit a signed withdrawal transaction
+   * POST /api/company-users/withdraw/submit
+   */
+  static async submitWithdrawal(req, res) {
+    try {
+      const { signedXdr } = req.body;
+
+      const result = await PasskeyWalletService.submitWithdrawalTx(signedXdr);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('Error submitting company user withdrawal:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to submit withdrawal',
+        details: error.message,
+      });
+    }
+  }
 }
 

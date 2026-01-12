@@ -634,5 +634,165 @@ export class CompanyController {
       });
     }
   }
+
+  // ============================================================================
+  // WALLET OPERATIONS
+  // ============================================================================
+
+  /**
+   * Get wallet status and balances for a company
+   * GET /api/companies/:companyId/wallet-status
+   */
+  static async getWalletStatus(req, res) {
+    try {
+      const { companyId } = req.params;
+      const requestingCompanyId = req.user.companyId;
+
+      // Verify the requesting user belongs to this company
+      if (parseInt(companyId) !== requestingCompanyId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized access to wallet',
+        });
+      }
+
+      const company = await Company.findById(parseInt(companyId));
+      if (!company) {
+        return res.status(404).json({
+          success: false,
+          error: 'Company not found',
+        });
+      }
+
+      if (!company.stellarContractId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Company does not have a wallet',
+          data: {
+            hasWallet: false,
+            passkeyRegistered: !!company.passkeyCredentialId,
+          },
+        });
+      }
+
+      // Import service dynamically to avoid circular dependency
+      const { PasskeyWalletService } = await import('../services/passkeyWallet.service.js');
+
+      // Get balances from the Soroban wallet
+      let balances = { xlm: '0', usdc: '0' };
+      let explorer = null;
+
+      try {
+        const isContractAddress = company.stellarContractId.startsWith('C');
+        if (isContractAddress) {
+          balances = await PasskeyWalletService.getSorobanWalletBalances(company.stellarContractId);
+          explorer = `https://stellar.expert/explorer/${process.env.STELLAR_NETWORK === 'PUBLIC' ? 'public' : 'testnet'}/contract/${company.stellarContractId}`;
+        } else {
+          const accountInfo = await StellarService.getAccountInfo(company.stellarContractId);
+          balances.xlm = accountInfo.balances.find(b => b.asset_type === 'native')?.balance || '0';
+          balances.usdc = accountInfo.balances.find(b => b.asset_code === 'USDC')?.balance || '0';
+          explorer = `https://stellar.expert/explorer/${process.env.STELLAR_NETWORK === 'PUBLIC' ? 'public' : 'testnet'}/account/${company.stellarContractId}`;
+        }
+      } catch (balanceError) {
+        console.error('Failed to fetch wallet balances:', balanceError);
+        // Continue with zero balances - wallet exists, just can't fetch balances
+      }
+
+      res.json({
+        success: true,
+        data: {
+          hasWallet: true,
+          walletAddress: company.stellarContractId,
+          passkeyRegistered: !!company.passkeyCredentialId,
+          balances,
+          explorer,
+        },
+      });
+    } catch (error) {
+      console.error('Error getting company wallet status:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get wallet status',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Propose a withdrawal transaction for company
+   * POST /api/companies/:companyId/withdraw/propose
+   */
+  static async proposeWithdrawal(req, res) {
+    try {
+      const { companyId } = req.params;
+      const { destination, amount, assetCode } = req.body;
+      const requestingCompanyId = req.user.companyId;
+
+      // Verify the requesting user belongs to this company
+      if (parseInt(companyId) !== requestingCompanyId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Unauthorized access to wallet',
+        });
+      }
+
+      const company = await Company.findById(parseInt(companyId));
+      if (!company || !company.stellarContractId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Company wallet not found',
+        });
+      }
+
+      // Import service dynamically
+      const { PasskeyWalletService, UserType } = await import('../services/passkeyWallet.service.js');
+
+      // Build the withdrawal transaction using Company's wallet
+      // Note: We pass company ID but use COMPANY type (need to add this type support)
+      const result = await PasskeyWalletService.buildWithdrawalTxForCompany(
+        parseInt(companyId),
+        destination,
+        amount,
+        assetCode
+      );
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('Error proposing company withdrawal:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to propose withdrawal',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Submit a signed withdrawal transaction
+   * POST /api/companies/withdraw/submit
+   */
+  static async submitWithdrawal(req, res) {
+    try {
+      const { signedXdr } = req.body;
+
+      const { PasskeyWalletService } = await import('../services/passkeyWallet.service.js');
+      const result = await PasskeyWalletService.submitWithdrawalTx(signedXdr);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      console.error('Error submitting company withdrawal:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to submit withdrawal',
+        details: error.message,
+      });
+    }
+  }
 }
 

@@ -15,14 +15,14 @@ export function Offers() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="p-4 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20">
+            <div className="p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
                 Failed to load offers: {error}
             </div>
         );
@@ -55,7 +55,7 @@ export function Offers() {
                 </div>
                 <Button
                     onClick={() => navigate('/company/offers/new')}
-                    className="bg-teal-600 hover:bg-teal-500 text-white shadow-lg shadow-teal-900/20"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
                 >
                     <Plus className="w-4 h-4 mr-2" />
                     Create New Offer
@@ -70,7 +70,7 @@ export function Offers() {
                         placeholder="Search offers..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 bg-white/5 border-white/10 focus:border-teal-500/50"
+                        className="pl-10 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                     />
                 </div>
                 <div className="flex gap-2">
@@ -79,7 +79,7 @@ export function Offers() {
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="pl-10 pr-8 py-2 rounded-md bg-white/5 border border-white/10 text-white appearance-none cursor-pointer focus:border-teal-500/50 focus:outline-none"
+                            className="pl-10 pr-8 py-2 rounded-md glass-panel bg-black/20 border border-white/10 text-white appearance-none cursor-pointer focus:border-primary/50 focus:outline-none"
                         >
                             {statusOptions.map(option => (
                                 <option key={option.value} value={option.value} className="bg-slate-900">
@@ -103,8 +103,8 @@ export function Offers() {
                             <CardHeader className="pb-3">
                                 <div className="flex items-start justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-teal-500/20 flex items-center justify-center">
-                                            <FileText className="w-5 h-5 text-teal-400" />
+                                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                                            <FileText className="w-5 h-5 text-primary" />
                                         </div>
                                         <div>
                                             <CardTitle className="text-base">{offer.offer_name}</CardTitle>
@@ -132,7 +132,7 @@ export function Offers() {
                                     {offer.annual_interest_rate && (
                                         <div>
                                             <p className="text-muted-foreground">Interest Rate</p>
-                                            <p className="text-emerald-400">{offer.annual_interest_rate}% APY</p>
+                                            <p className="text-success">{offer.annual_interest_rate}% APY</p>
                                         </div>
                                     )}
                                     <div>
@@ -161,7 +161,7 @@ export function Offers() {
                         {!searchTerm && statusFilter === 'all' && (
                             <Button
                                 onClick={() => navigate('/company/offers/new')}
-                                className="bg-teal-600 hover:bg-teal-500 text-white"
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                                 <Plus className="w-4 h-4 mr-2" />
                                 Create Your First Offer
@@ -178,18 +178,18 @@ function StatusBadge({ status }: { status: string }) {
     const getStatusStyles = () => {
         switch (status) {
             case 'active':
-                return 'bg-emerald-500/20 text-emerald-400';
+                return 'bg-success/15 text-success';
             case 'approved':
-                return 'bg-blue-500/20 text-blue-400';
+                return 'bg-primary/15 text-primary';
             case 'pending_review':
             case 'under_review':
-                return 'bg-yellow-500/20 text-yellow-400';
+                return 'bg-warning/15 text-warning';
             case 'rejected':
-                return 'bg-red-500/20 text-red-400';
+                return 'bg-destructive/15 text-destructive';
             case 'closed':
-                return 'bg-gray-500/20 text-gray-400';
+                return 'bg-muted/50 text-muted-foreground';
             default:
-                return 'bg-gray-500/20 text-gray-400';
+                return 'bg-muted/50 text-muted-foreground';
         }
     };
 

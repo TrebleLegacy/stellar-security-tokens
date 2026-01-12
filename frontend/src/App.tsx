@@ -31,6 +31,8 @@ import { OfferDetails as CompanyOfferDetails } from './pages/company/OfferDetail
 import { PayInvestors } from './pages/company/PayInvestors';
 import { Reports } from './pages/company/Reports';
 import { Settings as CompanySettings } from './pages/company/Settings';
+import { Wallet as CompanyWallet } from './pages/company/Wallet';
+import { SelectOfferType } from './pages/company/SelectOfferType';
 import { DefaultCases } from './pages/admin/DefaultCases';
 import { AdminSettings } from './pages/admin/Settings';
 import { Companies } from './pages/admin/Companies';
@@ -63,9 +65,11 @@ function App() {
           <Route index element={<Navigate to="/company/dashboard" replace />} />
           <Route path="dashboard" element={<CompanyDashboard />} />
           <Route path="offers" element={<Offers />} />
-          <Route path="offers/new" element={<CreateOffer />} />
+          <Route path="offers/new" element={<SelectOfferType />} />
+          <Route path="offers/create" element={<CreateOffer />} />
           <Route path="offers/:id" element={<CompanyOfferDetails />} />
           <Route path="payments/:offerId" element={<PayInvestors />} />
+          <Route path="wallet" element={<CompanyWallet />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<CompanySettings />} />
         </Route>

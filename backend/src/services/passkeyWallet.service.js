@@ -625,18 +625,23 @@ export class PasskeyWalletService {
     return balances;
   }
 
-
   /**
    * Build a withdrawal transaction to be signed by the user's Passkey
    * 
-   * @param {number} investorId - The investor ID
+   * @param {number} userId - The user ID (investor or company user)
    * @param {string} destinationAddress - Destination Stellar address (G...)
    * @param {string} amount - Amount to withdraw
    * @param {string} assetCode - Asset code (USDC, XLM)
+   * @param {string} userType - Type of user: 'investor' or 'company_user' (default: 'investor')
    * @returns {Promise<Object>} Transaction XDR and network info
    */
-  static async buildWithdrawalTx(investorId, destinationAddress, amount, assetCode = 'USDC') {
+  static async buildWithdrawalTx(userId, destinationAddress, amount, assetCode = 'USDC', userType = UserType.INVESTOR) {
     const server = this.getServer();
+    const model = this.#getPrismaModel(userType);
+
+    if (!model) {
+      throw new Error(`Invalid user type: ${userType}`);
+    }
 
     // Issue 9 Fix: Validate inputs
     if (!destinationAddress || typeof destinationAddress !== 'string') {
@@ -657,13 +662,13 @@ export class PasskeyWalletService {
       throw new Error('Amount exceeds maximum allowed');
     }
 
-    // Get investor wallet
-    const investor = await prisma.investor.findUnique({
-      where: { id: investorId },
+    // Get user wallet (works for both investors and company users)
+    const user = await prisma[model].findUnique({
+      where: { id: userId },
     });
 
-    if (!investor || !investor.stellarContractId) {
-      throw new Error('Investor wallet not found');
+    if (!user || !user.stellarContractId) {
+      throw new Error(`${userType === UserType.INVESTOR ? 'Investor' : 'Company user'} wallet not found`);
     }
 
     // Determine asset contract ID based on code (simplified map for MVP)
@@ -688,7 +693,7 @@ export class PasskeyWalletService {
     const issuerKeypair = getIssuerKeypair(); // Sponsor/Source
 
     // Function: transfer(from, to, amount)
-    const walletAddress = Address.fromString(investor.stellarContractId);
+    const walletAddress = Address.fromString(user.stellarContractId);
     const destination = Address.fromString(destinationAddress);
 
     // Convert amount to Stroops (7 decimals)
@@ -716,7 +721,7 @@ export class PasskeyWalletService {
     return {
       xdr: tx.toXDR(),
       networkPassphrase,
-      walletId: investor.stellarContractId
+      walletId: user.stellarContractId
     };
   }
 
@@ -740,6 +745,96 @@ export class PasskeyWalletService {
     return {
       hash: result.hash,
       status: result.status
+    };
+  }
+
+  /**
+   * Build a withdrawal transaction for a Company entity  
+   * (Companies are stored differently than investors/companyUsers)
+   * 
+   * @param {number} companyId - The company ID
+   * @param {string} destinationAddress - Destination Stellar address (G...)
+   * @param {string} amount - Amount to withdraw
+   * @param {string} assetCode - Asset code (USDC, XLM)
+   * @returns {Promise<Object>} Transaction XDR and network info
+   */
+  static async buildWithdrawalTxForCompany(companyId, destinationAddress, amount, assetCode = 'USDC') {
+    const server = this.getServer();
+
+    // Validate inputs
+    if (!destinationAddress || typeof destinationAddress !== 'string') {
+      throw new Error('Destination address is required');
+    }
+
+    if (!destinationAddress.match(/^[GC][A-Z0-9]{55}$/)) {
+      throw new Error('Invalid destination address format. Must be a valid Stellar address (G...) or contract (C...)');
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (!amount || isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new Error('Amount must be a positive number');
+    }
+
+    if (parsedAmount > 1000000000) {
+      throw new Error('Amount exceeds maximum allowed');
+    }
+
+    // Get company wallet from company table
+    const company = await prisma.company.findUnique({
+      where: { id: companyId },
+    });
+
+    if (!company || !company.stellarContractId) {
+      throw new Error('Company wallet not found');
+    }
+
+    // Determine asset contract ID
+    let tokenContractId;
+    if (assetCode === 'USDC') {
+      tokenContractId = process.env.USDC_CONTRACT_ID;
+      if (!tokenContractId) {
+        throw new Error('USDC_CONTRACT_ID not configured');
+      }
+    } else if (assetCode === 'XLM') {
+      tokenContractId = process.env.XLM_CONTRACT_ID;
+      if (!tokenContractId) {
+        throw new Error('XLM_CONTRACT_ID not configured');
+      }
+    } else {
+      throw new Error('Unsupported asset for withdrawal');
+    }
+
+    // Build the transaction
+    const networkPassphrase = getNetworkPassphrase();
+    const issuerKeypair = getIssuerKeypair();
+
+    const walletAddress = Address.fromString(company.stellarContractId);
+    const destination = Address.fromString(destinationAddress);
+
+    const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 10_000_000));
+
+    const contract = new Contract(tokenContractId);
+    const transferOp = contract.call(
+      'transfer',
+      xdr.ScVal.scvAddress(walletAddress.toScAddress()),
+      xdr.ScVal.scvAddress(destination.toScAddress()),
+      xdr.ScVal.scvI128(xdr.Int128Parts.fromBigInt(amountBigInt))
+    );
+
+    const tx = new TransactionBuilder(
+      await server.rpc.getAccount(issuerKeypair.publicKey()),
+      { fee: BASE_FEE, networkPassphrase }
+    )
+      .addOperation(transferOp)
+      .setTimeout(180)
+      .build();
+
+    tx.sign(issuerKeypair);
+
+    return {
+      xdr: tx.toXDR(),
+      networkPassphrase,
+      walletId: company.stellarContractId
     };
   }
 }

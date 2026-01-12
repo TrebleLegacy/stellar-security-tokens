@@ -40,17 +40,20 @@ const createTransporter = () => {
 
   const transporter = nodemailer.createTransport(smtpConfig);
 
-  // Verificar conexão ao inicializar (assíncrono, não bloqueia)
-  transporter.verify().then(() => {
-    console.log('✅ Email service configured successfully');
-    console.log(`   SMTP Host: ${smtpConfig.host}:${smtpConfig.port}`);
-    console.log(`   From: ${process.env.SMTP_FROM || smtpConfig.auth.user}`);
-  }).catch((error) => {
-    console.warn('⚠️  SMTP connection verification failed:', error.message);
-    console.warn('   Email sending may not work. Please check your SMTP configuration.');
-    console.warn('   Run "npm run test:email" to diagnose the issue.');
-    console.warn('   System will continue to work, but emails will be skipped.');
-  });
+  // Delay SMTP verification to allow Docker DNS to initialize
+  // This prevents the "EAI_AGAIN" warning during container startup
+  setTimeout(() => {
+    transporter.verify().then(() => {
+      console.log('✅ Email service configured successfully');
+      console.log(`   SMTP Host: ${smtpConfig.host}:${smtpConfig.port}`);
+      console.log(`   From: ${process.env.SMTP_FROM || smtpConfig.auth.user}`);
+    }).catch((error) => {
+      console.warn('⚠️  SMTP connection verification failed:', error.message);
+      console.warn('   Email sending may not work. Please check your SMTP configuration.');
+      console.warn('   Run "npm run test:email" to diagnose the issue.');
+      console.warn('   System will continue to work, but emails will be skipped.');
+    });
+  }, 5000); // Wait 5 seconds for DNS to be ready
 
   return transporter;
 };

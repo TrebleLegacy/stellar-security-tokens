@@ -26,7 +26,7 @@ interface Company {
     id: number;
     name: string;
     cnpj: string;
-    status: 'pending' | 'active' | 'suspended';
+    status: 'pending' | 'approved' | 'active' | 'suspended' | 'rejected';
     walletAddress: string | null;
     stellarContractId: string | null;
     activeOffers: number;
@@ -61,6 +61,13 @@ export function Companies() {
         company: null,
         loading: false,
     });
+
+    // Sponsor Modal State
+    const [sponsorModal, setSponsorModal] = useState<{ open: boolean; company: Company | null; result?: { success: boolean; message?: string; explorer?: string } }>({
+        open: false,
+        company: null,
+    });
+    const [sponsorAmount, setSponsorAmount] = useState('10');
 
     useEffect(() => {
         loadCompanies();
@@ -124,6 +131,32 @@ export function Companies() {
                 company: { ...company, offers: [], balances: { xlm: '0', usdc: '0' } },
                 loading: false,
             });
+        }
+    };
+
+    const handleSponsor = async () => {
+        if (!sponsorModal.company) return;
+        setActionLoading(true);
+        try {
+            const response = await api.post(`/platform-admins/companies/${sponsorModal.company.id}/sponsor`, {
+                amount: sponsorAmount
+            });
+            setSponsorModal({
+                ...sponsorModal,
+                result: {
+                    success: true,
+                    message: response.data.message || `Sent ${sponsorAmount} XLM successfully`,
+                    explorer: response.data.data?.explorer
+                }
+            });
+            loadCompanies();
+        } catch (err: any) {
+            setSponsorModal({
+                ...sponsorModal,
+                result: { success: false, message: err.response?.data?.error || 'Failed to sponsor wallet' }
+            });
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -247,6 +280,18 @@ export function Companies() {
                                                             Reject
                                                         </Button>
                                                     </div>
+                                                )}
+                                                {(company.status === 'approved' || company.status === 'active') && company.stellarContractId && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
+                                                        onClick={() => setSponsorModal({ open: true, company, result: undefined })}
+                                                        disabled={actionLoading}
+                                                    >
+                                                        <Wallet className="w-4 h-4 mr-1" />
+                                                        Sponsor
+                                                    </Button>
                                                 )}
                                             </td>
                                             <td className="py-3 px-2">
@@ -436,6 +481,74 @@ export function Companies() {
                             {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                             Reject
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sponsor Modal */}
+            <Dialog open={sponsorModal.open} onOpenChange={(open) => setSponsorModal({ open, company: sponsorModal.company })}>
+                <DialogContent className="bg-slate-900 border-white/10">
+                    <DialogHeader>
+                        <DialogTitle>Sponsor Company Wallet</DialogTitle>
+                        <DialogDescription>
+                            Send XLM to {sponsorModal.company?.name}'s wallet to cover transaction fees.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {sponsorModal.result ? (
+                        <div className="space-y-4 py-4">
+                            {sponsorModal.result.success ? (
+                                <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                                    <p className="text-emerald-400 font-medium mb-2">✅ {sponsorModal.result.message}</p>
+                                    {sponsorModal.result.explorer && (
+                                        <a
+                                            href={sponsorModal.result.explorer}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-1 text-sm text-blue-400 hover:underline"
+                                        >
+                                            <ExternalLink className="w-4 h-4" />
+                                            View Transaction
+                                        </a>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
+                                    <p className="text-red-400">❌ {sponsorModal.result.message}</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="xlmAmount">Amount (XLM)</Label>
+                                <Input
+                                    id="xlmAmount"
+                                    type="number"
+                                    min="1"
+                                    max="1000"
+                                    placeholder="10"
+                                    value={sponsorAmount}
+                                    onChange={(e) => setSponsorAmount(e.target.value)}
+                                    className="bg-white/5 border-white/10"
+                                />
+                                <p className="text-xs text-muted-foreground">Default: 10 XLM for transaction fees</p>
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSponsorModal({ open: false, company: null })}>
+                            {sponsorModal.result ? 'Close' : 'Cancel'}
+                        </Button>
+                        {!sponsorModal.result && (
+                            <Button
+                                className="bg-blue-600 hover:bg-blue-700"
+                                onClick={handleSponsor}
+                                disabled={actionLoading}
+                            >
+                                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Wallet className="w-4 h-4 mr-2" />}
+                                Send XLM
+                            </Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

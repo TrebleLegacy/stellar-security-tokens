@@ -292,5 +292,72 @@ router.get('/:userId/wallet-status', CompanyUserController.getWalletStatus);
 // Get passkey kit configuration for frontend
 router.get('/passkey/config', CompanyUserController.getPasskeyConfig);
 
+// ============================================================================
+// WITHDRAWAL ROUTES (Wallet Operations)
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/company-users/{userId}/withdraw/propose:
+ *   post:
+ *     summary: Propose a withdrawal transaction
+ *     tags: [Company Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - destination
+ *               - amount
+ *               - assetCode
+ *             properties:
+ *               destination:
+ *                 type: string
+ *               amount:
+ *                 type: string
+ *               assetCode:
+ *                 type: string
+ *                 enum: [USDC, XLM]
+ *     responses:
+ *       200:
+ *         description: Transaction XDR ready for signing
+ */
+router.post('/:userId/withdraw/propose', requireCompanyUser, CompanyUserController.proposeWithdrawal);
+
+/**
+ * @swagger
+ * /api/company-users/withdraw/submit:
+ *   post:
+ *     summary: Submit a signed withdrawal transaction
+ *     tags: [Company Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - signedXdr
+ *             properties:
+ *               signedXdr:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Transaction submitted successfully
+ */
+router.post('/withdraw/submit', requireCompanyUser, CompanyUserController.submitWithdrawal);
+
 export default router;
 

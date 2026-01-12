@@ -38,7 +38,7 @@ export function OfferDetails() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -54,7 +54,7 @@ export function OfferDetails() {
                     <ArrowLeft className="w-4 h-4 mr-2" />
                     Back to Offers
                 </Button>
-                <div className="p-4 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20">
+                <div className="p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
                     {error || 'Offer not found'}
                 </div>
             </div>
@@ -88,14 +88,14 @@ export function OfferDetails() {
                     {offer.status === 'active' && offer.offer_type === 'collateral' && (
                         <Button
                             onClick={() => navigate(`/company/payments/${offer.id}`)}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                            className="bg-success hover:bg-success/90 text-success-foreground"
                         >
                             <DollarSign className="w-4 h-4 mr-2" />
                             Pay Investors
                         </Button>
                     )}
                     {canEdit && (
-                        <Button className="bg-teal-600 hover:bg-teal-500 text-white">
+                        <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
                             <Edit className="w-4 h-4 mr-2" />
                             Edit Offer
                         </Button>
@@ -139,8 +139,8 @@ export function OfferDetails() {
                         />
                     </div>
                     {offer.status === 'rejected' && offer.rejection_reason && (
-                        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                            <p className="text-sm text-red-400">
+                        <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                            <p className="text-sm text-destructive">
                                 <strong>Rejection Reason:</strong> {offer.rejection_reason}
                             </p>
                         </div>
@@ -175,7 +175,7 @@ export function OfferDetails() {
                             {offer.annual_interest_rate && (
                                 <div>
                                     <h4 className="text-sm font-medium text-muted-foreground mb-2">Annual Interest Rate</h4>
-                                    <p className="text-emerald-400">{offer.annual_interest_rate}% APY</p>
+                                    <p className="text-success">{offer.annual_interest_rate}% APY</p>
                                 </div>
                             )}
                             <div>
@@ -221,14 +221,14 @@ export function OfferDetails() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                                <DollarSign className="w-5 h-5 text-emerald-400" />
+                                <DollarSign className="w-5 h-5 text-success" />
                                 <div>
                                     <p className="text-xs text-muted-foreground">Total Raised</p>
                                     <p className="text-lg font-semibold text-white">$0.00</p>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
-                                <Users className="w-5 h-5 text-blue-400" />
+                                <Users className="w-5 h-5 text-primary" />
                                 <div>
                                     <p className="text-xs text-muted-foreground">Investors</p>
                                     <p className="text-lg font-semibold text-white">0</p>
@@ -253,7 +253,7 @@ export function OfferDetails() {
                                             rel="noopener noreferrer"
                                             className="flex items-center gap-3 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors"
                                         >
-                                            <FileText className="w-4 h-4 text-teal-400" />
+                                            <FileText className="w-4 h-4 text-primary" />
                                             <span className="text-sm text-white flex-1 capitalize">{key}</span>
                                             <ExternalLink className="w-4 h-4 text-muted-foreground" />
                                         </a>
@@ -276,18 +276,18 @@ function StatusBadge({ status }: { status: string }) {
     const getStatusStyles = () => {
         switch (status) {
             case 'active':
-                return 'bg-emerald-500/20 text-emerald-400';
+                return 'bg-success/15 text-success';
             case 'approved':
-                return 'bg-blue-500/20 text-blue-400';
+                return 'bg-primary/15 text-primary';
             case 'pending_review':
             case 'under_review':
-                return 'bg-yellow-500/20 text-yellow-400';
+                return 'bg-warning/15 text-warning';
             case 'rejected':
-                return 'bg-red-500/20 text-red-400';
+                return 'bg-destructive/15 text-destructive';
             case 'closed':
-                return 'bg-gray-500/20 text-gray-400';
+                return 'bg-muted/50 text-muted-foreground';
             default:
-                return 'bg-gray-500/20 text-gray-400';
+                return 'bg-muted/50 text-muted-foreground';
         }
     };
 
@@ -322,25 +322,25 @@ function TimelineStep({
     return (
         <div className="flex flex-col items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isRejected
-                ? 'bg-red-500/20'
+                ? 'bg-destructive/20'
                 : isComplete
-                    ? 'bg-emerald-500/20'
+                    ? 'bg-success/20'
                     : isCurrent
-                        ? 'bg-teal-500/20'
-                        : 'bg-white/10'
+                        ? 'bg-primary/20'
+                        : 'bg-muted/10'
                 }`}>
                 {isRejected ? (
-                    <XCircle className="w-4 h-4 text-red-400" />
+                    <XCircle className="w-4 h-4 text-destructive" />
                 ) : isComplete ? (
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle className="w-4 h-4 text-success" />
                 ) : isCurrent ? (
-                    <Clock className="w-4 h-4 text-teal-400" />
+                    <Clock className="w-4 h-4 text-primary" />
                 ) : (
-                    <div className="w-2 h-2 rounded-full bg-white/30" />
+                    <div className="w-2 h-2 rounded-full bg-muted/30" />
                 )}
             </div>
             <div className="text-center">
-                <p className={`text-xs font-medium ${isCurrent ? 'text-teal-400' : isComplete ? 'text-white' : 'text-muted-foreground'
+                <p className={`text-xs font-medium ${isCurrent ? 'text-primary' : isComplete ? 'text-white' : 'text-muted-foreground'
                     }`}>
                     {label}
                 </p>
@@ -356,6 +356,6 @@ function TimelineStep({
 
 function TimelineConnector({ isComplete }: { isComplete: boolean }) {
     return (
-        <div className={`flex-1 h-0.5 ${isComplete ? 'bg-emerald-500/50' : 'bg-white/10'}`} />
+        <div className={`flex-1 h-0.5 ${isComplete ? 'bg-success/50' : 'bg-muted/10'}`} />
     );
 }

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ArrowRight, Check, FileText, Upload, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, ArrowRight, Check, FileText, Upload, Loader2, Landmark, TrendingUp } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { offersApi } from "@/api/offers";
 
 interface OfferFormData {
@@ -41,10 +41,25 @@ const initialFormData: OfferFormData = {
 
 export function CreateOffer() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState<OfferFormData>(initialFormData);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Get offer type from URL params
+    const offerType = searchParams.get('type') as 'collateral' | 'sale' | null;
+
+    // Initialize offer type from URL or redirect if not provided
+    useEffect(() => {
+        if (!offerType) {
+            navigate('/company/offers/new');
+            return;
+        }
+        if (offerType === 'collateral' || offerType === 'sale') {
+            setFormData(prev => ({ ...prev, offer_type: offerType }));
+        }
+    }, [offerType, navigate]);
 
     const totalSteps = 4;
 
@@ -150,7 +165,7 @@ export function CreateOffer() {
                 {Array.from({ length: totalSteps }, (_, i) => (
                     <div
                         key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-teal-500' : 'bg-white/10'}`}
+                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-primary' : 'bg-muted/20'}`}
                     />
                 ))}
             </div>
@@ -170,7 +185,7 @@ export function CreateOffer() {
                                     placeholder="e.g. Premium Real Estate Fund"
                                     value={formData.offer_name}
                                     onChange={(e) => updateFormData({ offer_name: e.target.value })}
-                                    className="bg-white/5 border-white/10 focus:border-teal-500/50"
+                                    className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                                 />
                             </div>
 
@@ -180,7 +195,7 @@ export function CreateOffer() {
                                     placeholder="e.g. PRFUND (3-12 characters)"
                                     value={formData.asset_code}
                                     onChange={(e) => updateFormData({ asset_code: e.target.value.toUpperCase().slice(0, 12) })}
-                                    className="bg-white/5 border-white/10 focus:border-teal-500/50 uppercase"
+                                    className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 uppercase text-foreground"
                                     maxLength={12}
                                 />
                                 <p className="text-xs text-muted-foreground">
@@ -199,34 +214,34 @@ export function CreateOffer() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-white">Offer Type *</label>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => updateFormData({ offer_type: 'collateral' })}
-                                        className={`p-4 rounded-lg border text-left transition-all ${formData.offer_type === 'collateral'
-                                            ? 'border-teal-500 bg-teal-500/10'
-                                            : 'border-white/10 bg-white/5 hover:bg-white/10'
-                                            }`}
-                                    >
-                                        <p className="font-medium text-white">Collateral (Debt)</p>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Fixed interest rate, investors receive periodic payments
+                                <label className="text-sm font-medium text-white">Offer Type</label>
+                                <div className={`p-4 rounded-lg border flex items-center gap-3 ${formData.offer_type === 'collateral'
+                                        ? 'border-blue-500/50 bg-blue-500/10'
+                                        : 'border-emerald-500/50 bg-emerald-500/10'
+                                    }`}>
+                                    {formData.offer_type === 'collateral' ? (
+                                        <Landmark className="w-5 h-5 text-blue-400" />
+                                    ) : (
+                                        <TrendingUp className="w-5 h-5 text-emerald-400" />
+                                    )}
+                                    <div>
+                                        <p className="font-medium text-white">
+                                            {formData.offer_type === 'collateral' ? 'Collateral (Debt)' : 'Sale (Equity)'}
                                         </p>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => updateFormData({ offer_type: 'sale' })}
-                                        className={`p-4 rounded-lg border text-left transition-all ${formData.offer_type === 'sale'
-                                            ? 'border-teal-500 bg-teal-500/10'
-                                            : 'border-white/10 bg-white/5 hover:bg-white/10'
-                                            }`}
-                                    >
-                                        <p className="font-medium text-white">Sale (Equity)</p>
-                                        <p className="text-xs text-muted-foreground mt-1">
-                                            Token represents ownership, dividends based on profits
+                                        <p className="text-xs text-muted-foreground">
+                                            {formData.offer_type === 'collateral'
+                                                ? 'Fixed interest rate with scheduled payments'
+                                                : 'Ownership stake with variable dividends'}
                                         </p>
-                                    </button>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="ml-auto text-xs text-muted-foreground hover:text-white"
+                                        onClick={() => navigate('/company/offers/new')}
+                                    >
+                                        Change
+                                    </Button>
                                 </div>
                             </div>
                         </CardContent>
@@ -249,7 +264,7 @@ export function CreateOffer() {
                                         placeholder="1000000"
                                         value={formData.total_supply}
                                         onChange={(e) => updateFormData({ total_supply: e.target.value })}
-                                        className="pl-8 bg-white/5 border-white/10 focus:border-teal-500/50"
+                                        className="pl-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                                     />
                                 </div>
                                 <p className="text-xs text-muted-foreground">
@@ -267,7 +282,7 @@ export function CreateOffer() {
                                             placeholder="12.5"
                                             value={formData.annual_interest_rate}
                                             onChange={(e) => updateFormData({ annual_interest_rate: e.target.value })}
-                                            className="pr-8 bg-white/5 border-white/10 focus:border-teal-500/50"
+                                            className="pr-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                                         />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
                                     </div>
@@ -293,7 +308,7 @@ export function CreateOffer() {
                                                 type="button"
                                                 onClick={() => updateFormData({ payment_type: option.value as any })}
                                                 className={`p-2 rounded-lg border text-sm transition-all ${formData.payment_type === option.value
-                                                    ? 'border-teal-500 bg-teal-500/10 text-teal-400'
+                                                    ? 'border-primary bg-primary/10 text-primary'
                                                     : 'border-white/10 bg-white/5 hover:bg-white/10 text-white'
                                                     }`}
                                             >
@@ -317,7 +332,7 @@ export function CreateOffer() {
                                         placeholder="1"
                                         value={formData.payment_day}
                                         onChange={(e) => updateFormData({ payment_day: e.target.value })}
-                                        className="bg-white/5 border-white/10 focus:border-teal-500/50 w-24"
+                                        className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 w-24 text-foreground"
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         Day of the month when payments are distributed (1-28)
@@ -335,7 +350,7 @@ export function CreateOffer() {
                                             placeholder="100"
                                             value={formData.min_investment}
                                             onChange={(e) => updateFormData({ min_investment: e.target.value })}
-                                            className="pl-8 bg-white/5 border-white/10 focus:border-teal-500/50"
+                                            className="pl-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                                         />
                                     </div>
                                 </div>
@@ -348,7 +363,7 @@ export function CreateOffer() {
                                             placeholder="No limit"
                                             value={formData.max_investment}
                                             onChange={(e) => updateFormData({ max_investment: e.target.value })}
-                                            className="pl-8 bg-white/5 border-white/10 focus:border-teal-500/50"
+                                            className="pl-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                                         />
                                     </div>
                                 </div>
@@ -459,13 +474,13 @@ export function CreateOffer() {
                                         {formData.offer_type === 'collateral' && (
                                             <div>
                                                 <p className="text-xs text-muted-foreground">Interest Rate</p>
-                                                <p className="text-emerald-400">{formData.annual_interest_rate}% APY</p>
+                                                <p className="text-success">{formData.annual_interest_rate}% APY</p>
                                             </div>
                                         )}
                                         {formData.offer_type === 'collateral' && (
                                             <div>
                                                 <p className="text-xs text-muted-foreground">Payment Schedule</p>
-                                                <p className="text-teal-400 capitalize">
+                                                <p className="text-primary capitalize">
                                                     {formData.payment_type.replace('_', '-')}
                                                     {formData.payment_type !== 'bullet' && ` (Day ${formData.payment_day})`}
                                                 </p>
@@ -488,7 +503,7 @@ export function CreateOffer() {
                                         {Object.entries(formData.legal_documents).length > 0 ? (
                                             Object.entries(formData.legal_documents).map(([key, doc]) => (
                                                 <div key={key} className="flex items-center gap-2 text-sm">
-                                                    <Check className="w-4 h-4 text-emerald-400" />
+                                                    <Check className="w-4 h-4 text-success" />
                                                     <span className="text-white capitalize">{key}:</span>
                                                     <span className="text-muted-foreground">{doc?.name}</span>
                                                 </div>
@@ -500,8 +515,8 @@ export function CreateOffer() {
                                 </div>
                             </div>
 
-                            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                                <p className="text-sm text-yellow-400">
+                            <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                                <p className="text-sm text-warning">
                                     <strong>Note:</strong> After submission, your offer will be reviewed by platform administrators.
                                     You will be notified once it's approved or if any changes are required.
                                 </p>
@@ -526,7 +541,7 @@ export function CreateOffer() {
                         <Button
                             onClick={handleNext}
                             disabled={!isStepValid()}
-                            className="bg-teal-600 hover:bg-teal-500 text-white"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
                             Next
                             <ArrowRight className="w-4 h-4 ml-2" />
@@ -535,7 +550,7 @@ export function CreateOffer() {
                         <Button
                             onClick={handleSubmit}
                             disabled={isSubmitting}
-                            className="bg-teal-600 hover:bg-teal-500 text-white"
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
                         >
                             {isSubmitting ? (
                                 <>
