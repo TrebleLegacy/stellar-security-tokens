@@ -2,6 +2,9 @@ import { Company } from '../models/Company.js';
 import { generateToken } from '../middleware/auth.js';
 import { StellarService } from '../services/stellar.service.js';
 import { ipfsService } from '../services/ipfs.service.js';
+import jwt from 'jsonwebtoken';
+import { generate6DigitCode, storeEmailCode, verifyEmailCode as redisVerifyEmailCode } from '../config/redis.js';
+import { EmailService } from '../services/email.service.js';
 
 /**
  * Controller para gerenciar empresas
@@ -65,8 +68,9 @@ export class CompanyController {
   }
 
   /**
-   * Registra uma nova empresa
+   * Registra uma nova empresa (Step 3 of email-first flow)
    * POST /api/companies/register
+   * REQUIRES: registrationToken from verify-email-code endpoint
    */
   static async registerCompany(req, res) {
     try {
@@ -76,7 +80,6 @@ export class CompanyController {
         country, // USA or BRASIL
         tax_id, // EIN for USA, CNPJ for Brasil
         tax_id_type, // EIN or CNPJ
-        email,
         legal_representative,
         address,
         phone,
@@ -84,18 +87,44 @@ export class CompanyController {
         credentialId,
         publicKey,
         contractId,
+        // Email verification token
+        registrationToken,
       } = req.body;
 
-      // Validações básicas
-      if (!name || !email || !legal_representative) {
+      // Verify registration token (from email verification step)
+      let verifiedEmail;
+      if (registrationToken) {
+        try {
+          const decoded = jwt.verify(registrationToken, process.env.JWT_SECRET || 'stellar-tokens-secret');
+          if (decoded.purpose !== 'company_registration' || !decoded.verified) {
+            return res.status(401).json({
+              success: false,
+              error: 'Invalid registration token',
+            });
+          }
+          verifiedEmail = decoded.email;
+        } catch (jwtError) {
+          return res.status(401).json({
+            success: false,
+            error: 'Registration token expired or invalid. Please start the registration process again.',
+          });
+        }
+      } else {
+        // For backwards compatibility, allow email in body (but log warning)
+        console.warn('[registerCompany] Registration without token - email not verified');
+        verifiedEmail = req.body.email;
+      }
+
+      // Validações básicas - only name is required now
+      if (!name || !verifiedEmail) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: name, email, legal_representative',
+          error: 'Missing required fields: name (email comes from verification token)',
         });
       }
 
       // Verificar se email já existe
-      const existingEmail = await Company.findByEmail(email);
+      const existingEmail = await Company.findByEmail(verifiedEmail);
       if (existingEmail) {
         return res.status(409).json({
           success: false,
@@ -143,7 +172,8 @@ export class CompanyController {
         country: country || null,
         tax_id: effectiveTaxId || null,
         tax_id_type: effectiveTaxIdType || null,
-        email,
+        email: verifiedEmail,
+        email_verified: !!registrationToken, // true if registered via email verification flow
         legal_representative,
         address,
         phone,
@@ -432,6 +462,174 @@ export class CompanyController {
       res.status(500).json({
         success: false,
         error: 'Failed to approve company',
+        details: error.message,
+      });
+    }
+  }
+
+  // ============================================================================
+  // EMAIL-FIRST REGISTRATION FLOW
+  // ============================================================================
+
+  /**
+   * Step 1: Initiate company registration by sending 6-digit verification code
+   * POST /api/companies/initiate-registration
+   */
+  static async initiateCompanyRegistration(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email is required',
+        });
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid email format',
+        });
+      }
+
+      // Check if email already registered
+      const existingCompany = await Company.findByEmail(email);
+      if (existingCompany) {
+        return res.status(409).json({
+          success: false,
+          error: 'A company with this email already exists. Please log in instead.',
+        });
+      }
+
+      // Generate and store 6-digit code
+      const code = generate6DigitCode();
+      const stored = await storeEmailCode(email, code);
+
+      if (!stored) {
+        console.warn('[initiateCompanyRegistration] Redis unavailable, code storage failed');
+        // Continue anyway - email service will log code in dev mode
+      }
+
+      // Send verification email
+      await EmailService.send6DigitVerificationCode(email, code);
+
+      res.json({
+        success: true,
+        message: 'Verification code sent to your email',
+        data: {
+          email,
+          expiresIn: '10 minutes',
+        },
+      });
+    } catch (error) {
+      console.error('Error initiating company registration:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to send verification code',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Step 2: Verify email code and return registration token
+   * POST /api/companies/verify-email-code
+   */
+  static async verifyCompanyEmailCode(req, res) {
+    try {
+      const { email, code } = req.body;
+
+      if (!email || !code) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email and code are required',
+        });
+      }
+
+      // Verify code from Redis
+      const result = await redisVerifyEmailCode(email, code);
+
+      if (!result.valid) {
+        return res.status(400).json({
+          success: false,
+          error: result.error || 'Invalid verification code',
+        });
+      }
+
+      // Generate registration token (JWT valid for 30 minutes)
+      const registrationToken = jwt.sign(
+        {
+          email: email.toLowerCase(),
+          purpose: 'company_registration',
+          verified: true,
+        },
+        process.env.JWT_SECRET || 'stellar-tokens-secret',
+        { expiresIn: '30m' }
+      );
+
+      res.json({
+        success: true,
+        message: 'Email verified successfully',
+        data: {
+          email,
+          registrationToken,
+          expiresIn: '30 minutes',
+          nextStep: 'Complete registration with your company details and create a passkey',
+        },
+      });
+    } catch (error) {
+      console.error('Error verifying company email code:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to verify code',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Resend verification code for company registration
+   * POST /api/companies/resend-code
+   */
+  static async resendCompanyCode(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          error: 'Email is required',
+        });
+      }
+
+      // Check if email already registered
+      const existingCompany = await Company.findByEmail(email);
+      if (existingCompany) {
+        return res.status(409).json({
+          success: false,
+          error: 'A company with this email already exists',
+        });
+      }
+
+      // Generate new code
+      const code = generate6DigitCode();
+      await storeEmailCode(email, code);
+
+      // Send verification email
+      await EmailService.send6DigitVerificationCode(email, code);
+
+      res.json({
+        success: true,
+        message: 'New verification code sent',
+      });
+    } catch (error) {
+      console.error('Error resending company verification code:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to resend verification code',
         details: error.message,
       });
     }

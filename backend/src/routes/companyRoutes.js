@@ -6,11 +6,111 @@ import { CompanyController } from '../controllers/companyController.js';
 
 const router = express.Router();
 
+// ============================================================================
+// EMAIL-FIRST REGISTRATION FLOW (Step 1-2-3)
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/companies/initiate-registration:
+ *   post:
+ *     summary: Start company registration - send verification code
+ *     description: Step 1 of email-first flow. Sends 6-digit code to email.
+ *     tags: [Companies]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Verification code sent
+ *       409:
+ *         description: Email already registered
+ */
+router.post('/initiate-registration', [
+  body('email').isEmail().withMessage('Valid email is required'),
+  validate,
+], CompanyController.initiateCompanyRegistration);
+
+/**
+ * @swagger
+ * /api/companies/verify-email-code:
+ *   post:
+ *     summary: Verify email code
+ *     description: Step 2 of email-first flow. Returns registration token.
+ *     tags: [Companies]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - code
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               code:
+ *                 type: string
+ *                 minLength: 6
+ *                 maxLength: 6
+ *     responses:
+ *       200:
+ *         description: Email verified, registration token returned
+ *       400:
+ *         description: Invalid code
+ */
+router.post('/verify-email-code', [
+  body('email').isEmail().withMessage('Valid email is required'),
+  body('code').isLength({ min: 6, max: 6 }).withMessage('6-digit code is required'),
+  validate,
+], CompanyController.verifyCompanyEmailCode);
+
+/**
+ * @swagger
+ * /api/companies/resend-code:
+ *   post:
+ *     summary: Resend verification code
+ *     tags: [Companies]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: New code sent
+ */
+router.post('/resend-code', [
+  body('email').isEmail().withMessage('Valid email is required'),
+  validate,
+], CompanyController.resendCompanyCode);
+
+// ============================================================================
+// REGISTRATION COMPLETION (Step 3 - requires registrationToken)
+// ============================================================================
+
 const registerValidation = [
   body('name').trim().notEmpty().withMessage('Name is required'),
-  body('cnpj').trim().notEmpty().withMessage('CNPJ is required'),
-  body('email').isEmail().withMessage('Valid email is required'),
-  body('legal_representative').trim().notEmpty().withMessage('Legal representative is required'),
+  body('legal_representative').optional().isString(), // Now optional
+  body('registrationToken').optional().isString(), // Email comes from token
   body('address').optional().isString(),
   body('phone').optional().isString(),
   validate,
@@ -20,8 +120,8 @@ const registerValidation = [
  * @swagger
  * /api/companies/register:
  *   post:
- *     summary: Registrar nova empresa
- *     description: Cadastra uma nova empresa na plataforma
+ *     summary: Complete company registration with passkey
+ *     description: Step 3 of email-first flow. Requires registrationToken from verify-email-code.
  *     tags: [Companies]
  *     requestBody:
  *       required: true
@@ -31,34 +131,42 @@ const registerValidation = [
  *             type: object
  *             required:
  *               - name
- *               - cnpj
- *               - email
  *               - legal_representative
+ *               - registrationToken
  *             properties:
  *               name:
  *                 type: string
  *                 example: Empresa ABC Ltda
- *               cnpj:
+ *               registrationToken:
  *                 type: string
- *                 example: "12.345.678/0001-99"
- *               email:
- *                 type: string
- *                 format: email
+ *                 description: JWT token from verify-email-code endpoint
  *               legal_representative:
  *                 type: string
+ *               country:
+ *                 type: string
+ *                 enum: [USA, BRASIL]
+ *               tax_id:
+ *                 type: string
+ *               tax_id_type:
+ *                 type: string
+ *                 enum: [CNPJ, EIN]
  *               address:
  *                 type: string
  *               phone:
  *                 type: string
+ *               credentialId:
+ *                 type: string
+ *               publicKey:
+ *                 type: string
+ *               contractId:
+ *                 type: string
  *     responses:
  *       201:
- *         description: Empresa registrada com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Success'
+ *         description: Company registered successfully
  *       400:
- *         description: Dados inválidos
+ *         description: Invalid data
+ *       401:
+ *         description: Invalid or expired registration token
  */
 // Rotas públicas
 router.post('/register', registerValidation, CompanyController.registerCompany);

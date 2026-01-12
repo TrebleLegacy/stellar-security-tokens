@@ -10,23 +10,30 @@ export class Company {
    * @param {string} companyData.name - Nome da empresa
    * @param {string} companyData.cnpj - CNPJ da empresa (único)
    * @param {string} companyData.email - Email da empresa (único)
-   * @param {string} companyData.legal_representative - Representante legal
-   * @param {string} companyData.stellarPublicKey - Chave pública Stellar (obrigatória, 56 caracteres)
+   * @param {string} [companyData.legal_representative] - Representante legal
+   * @param {string} [companyData.stellarPublicKey] - Chave pública Stellar (opcional, 56 caracteres)
+   * @param {string} [companyData.stellarContractId] - Smart Wallet Contract ID (for passkey-based auth)
+   * @param {string} [companyData.passkeyCredentialId] - Passkey Credential ID
+   * @param {Buffer} [companyData.passkeyPublicKey] - Passkey Public Key
    * @param {string} [companyData.address] - Endereço
    * @param {string} [companyData.phone] - Telefone
    * @param {string} [companyData.status='pending'] - Status da empresa
    * @param {string} [companyData.kyc_status='pending'] - Status KYC
    * @param {Object} [companyData.kyc_documents] - Documentos KYC (JSONB)
    * @returns {Promise<Object>} Empresa criada
-   * @throws {Error} Se houver violação de constraint (email/cnpj duplicado) ou stellarPublicKey inválido
+   * @throws {Error} Se houver violação de constraint (email/cnpj duplicado)
    */
   static async create(companyData) {
     const {
       name,
       cnpj,
       email,
+      email_verified,
       legal_representative,
       stellarPublicKey,
+      stellarContractId,
+      passkeyCredentialId,
+      passkeyPublicKey,
       address,
       phone,
       status = 'pending',
@@ -34,22 +41,22 @@ export class Company {
       kyc_documents = {},
     } = companyData;
 
-    if (!stellarPublicKey) {
-      throw new Error('stellarPublicKey é obrigatório para criar uma empresa');
-    }
-    
-    // Validar formato da chave Stellar (56 caracteres, começando com G)
-    if (!/^G[A-Z0-9]{55}$/.test(stellarPublicKey)) {
+    // Validate stellarPublicKey format if provided
+    if (stellarPublicKey && !/^G[A-Z0-9]{55}$/.test(stellarPublicKey)) {
       throw new Error('stellarPublicKey deve ter 56 caracteres e começar com G');
     }
 
     return await prisma.company.create({
       data: {
         name,
-        cnpj,
+        cnpj: cnpj || null,
         email,
-        legalRepresentative: legal_representative,
-        stellarPublicKey,
+        emailVerified: email_verified || false,
+        legalRepresentative: legal_representative || null,
+        stellarPublicKey: stellarPublicKey || null,
+        stellarContractId: stellarContractId || null,
+        passkeyCredentialId: passkeyCredentialId || null,
+        passkeyPublicKey: passkeyPublicKey || null,
         address: address || null,
         phone: phone || null,
         status: status.toLowerCase(),
@@ -101,7 +108,7 @@ export class Company {
    */
   static async findAll(limit = 100, offset = 0, status = null) {
     const where = status ? { status: status.toLowerCase() } : {};
-    
+
     return await prisma.company.findMany({
       where,
       take: limit,

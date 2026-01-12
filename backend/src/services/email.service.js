@@ -962,6 +962,9 @@ export class EmailService {
     }
 
     try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost';
+      const loginLink = `${frontendUrl}/login`;
+
       const statusMessages = {
         'approved': 'Aprovada',
         'rejected': 'Rejeitada',
@@ -969,12 +972,31 @@ export class EmailService {
       };
 
       const readableStatus = statusMessages[status] || status;
-      const subject = `Atualização de Status da Empresa - ${companyName}`;
+
+      // Different subject based on status
+      const subject = status === 'approved'
+        ? `🎉 Empresa Aprovada! - ${companyName}`
+        : `Atualização de Status - ${companyName}`;
 
       const reasonHtml = reason ? `
-        <div style="background-color: #fcebeb; border-left: 4px solid #e74c3c; padding: 10px; margin: 15px 0;">
+        <div style="background-color: #fcebeb; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0; border-radius: 0 8px 8px 0;">
           <strong>Motivo/Observações:</strong><br>
           ${reason}
+        </div>
+      ` : '';
+
+      // Login button only for approved status
+      const loginButtonHtml = status === 'approved' ? `
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${loginLink}" style="display: inline-block; background: linear-gradient(135deg, #C9A962 0%, #a88a4a 100%); color: #0A1628; font-weight: 600; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-size: 15px; box-shadow: 0 4px 15px rgba(201,169,98,0.3);">Acessar Painel da Empresa</a>
+        </div>
+      ` : '';
+
+      // Approved message content
+      const approvedContent = status === 'approved' ? `
+        <div style="background: linear-gradient(135deg, #e6f4ea 0%, #d4edda 100%); border-left: 4px solid #34a853; padding: 20px; border-radius: 0 12px 12px 0; margin: 24px 0;">
+          <div style="color: #137333; font-size: 16px; font-weight: 600; margin-bottom: 8px;">✓ Cadastro Aprovado</div>
+          <p style="color: #137333; font-size: 14px; margin: 0;">Sua empresa foi verificada e aprovada! Agora você pode acessar o painel para criar ofertas de tokens.</p>
         </div>
       ` : '';
 
@@ -987,35 +1009,54 @@ export class EmailService {
           <html>
           <head>
             <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background-color: #34495e; color: white; padding: 20px; text-align: center; }
-              .content { padding: 20px; background-color: #f9f9f9; }
-              .status { font-weight: bold; color: #34495e; }
-              .footer { text-align: center; padding: 20px; font-size: 12px; color: #666; }
+              body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0A1628; }
+              .wrapper { width: 100%; background-color: #0A1628; padding: 40px 0; }
+              .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.3); }
+              .header { background: linear-gradient(135deg, #0A1628 0%, #1a2d4a 100%); padding: 48px 30px; text-align: center; }
+              .logo { font-size: 28px; font-weight: 700; color: #C9A962; letter-spacing: 1px; margin-bottom: 8px; font-family: Georgia, 'Times New Roman', serif; }
+              .header-subtitle { color: rgba(255,255,255,0.7); font-size: 14px; }
+              .content { padding: 40px 30px; background-color: #ffffff; }
+              .greeting { color: #0A1628; font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+              .text { color: #4a5568; font-size: 15px; line-height: 1.7; margin-bottom: 16px; }
+              .status-badge { display: inline-block; padding: 8px 16px; border-radius: 20px; font-weight: 600; font-size: 14px; }
+              .status-approved { background-color: #e6f4ea; color: #137333; }
+              .status-rejected { background-color: #fcebeb; color: #c72c41; }
+              .status-pending { background-color: #fff3cd; color: #856404; }
+              .footer { background-color: #f8f9fa; padding: 24px 30px; text-align: center; border-top: 1px solid #e2e8f0; }
+              .footer-text { color: #a0aec0; font-size: 12px; line-height: 1.5; }
+              .brand { color: #0A1628; font-weight: 600; }
             </style>
           </head>
           <body>
-            <div class="container">
-              <div class="header">
-                <h1>Atualização de Status</h1>
-              </div>
-              <div class="content">
-                <p>Olá,</p>
-                <p>O status da empresa <strong>${companyName}</strong> foi atualizado para: <span class="status">${readableStatus}</span></p>
-                ${reasonHtml}
-                <p>Acesse o painel para mais detalhes.</p>
-                <p>Atenciosamente,<br>Equipe Stellar Security Tokens</p>
-              </div>
-              <div class="footer">
-                <p>Este é um email automático.</p>
+            <div class="wrapper">
+              <div class="container">
+                <div class="header">
+                  ${status === 'approved' ? '<div style="font-size: 48px; margin-bottom: 16px;">🎉</div>' : ''}
+                  <div class="logo">✦ STELLAR TOKENS</div>
+                  <div class="header-subtitle">Atualização de Status da Empresa</div>
+                </div>
+                <div class="content">
+                  <p class="greeting">Olá,</p>
+                  <p class="text">O status da empresa <strong>${companyName}</strong> foi atualizado para:</p>
+                  <p style="text-align: center; margin: 24px 0;">
+                    <span class="status-badge status-${status}">${readableStatus}</span>
+                  </p>
+                  ${approvedContent}
+                  ${reasonHtml}
+                  ${loginButtonHtml}
+                  <p class="text">Atenciosamente,<br>Equipe Stellar Security Tokens</p>
+                </div>
+                <div class="footer">
+                  <p class="footer-text">Esta é uma mensagem automática da <span class="brand">Stellar Security Tokens</span>.<br>Por favor, não responda este email.</p>
+                </div>
               </div>
             </div>
           </body>
           </html>
         `,
-        text: `Atualização de Status - ${companyName}\n\nNovo Status: ${readableStatus}\n${reason ? `Motivo: ${reason}\n` : ''}\nAtenciosamente,\nEquipe Stellar Security Tokens`
+        text: `Atualização de Status - ${companyName}\n\nNovo Status: ${readableStatus}\n${reason ? `Motivo: ${reason}\n` : ''}${status === 'approved' ? `\nAcesse o painel: ${loginLink}\n` : ''}\nAtenciosamente,\nEquipe Stellar Security Tokens`
       };
 
       const info = await transporter.sendMail(mailOptions);

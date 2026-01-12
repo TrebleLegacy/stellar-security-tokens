@@ -23,13 +23,15 @@ export const requireInvestor = (req, res, next) => {
  */
 export const requireCompanyUser = (req, res, next) => {
   authenticateToken(req, res, () => {
-    if (req.user.role !== 'company_user') {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied. Company user role required.',
-      });
+    // Check for either userType 'company' (new flow) or role 'company_user' (legacy/employee)
+    if (req.user.userType === 'company' || req.user.role === 'company_user') {
+      return next();
     }
-    next();
+
+    return res.status(403).json({
+      success: false,
+      error: 'Access denied. Company user role required.',
+    });
   });
 };
 
@@ -54,7 +56,7 @@ export const requirePlatformAdmin = (req, res, next) => {
  */
 export const requireAdminRole = (allowedRoles) => {
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-  
+
   return (req, res, next) => {
     authenticateToken(req, res, () => {
       if (req.user.role !== 'platform_admin') {
@@ -83,6 +85,22 @@ export const requireAdminRole = (allowedRoles) => {
 export const requireCompanyAccess = async (req, res, next) => {
   try {
     authenticateToken(req, res, async () => {
+      // Support for direct Company login (passkey)
+      if (req.user.userType === 'company') {
+        const requestedCompanyId = parseInt(req.params.companyId || req.body.company_id || req.query.company_id);
+
+        // If specific company requested, verify matches authenticated company
+        if (requestedCompanyId && requestedCompanyId !== req.user.companyId) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access denied. You do not have access to this company.',
+          });
+        }
+
+        req.companyId = req.user.companyId;
+        return next();
+      }
+
       if (req.user.role !== 'company_user') {
         return res.status(403).json({
           success: false,
@@ -91,7 +109,7 @@ export const requireCompanyAccess = async (req, res, next) => {
       }
 
       const companyId = parseInt(req.params.companyId || req.body.company_id || req.query.company_id);
-      
+
       if (!companyId) {
         return res.status(400).json({
           success: false,
@@ -125,6 +143,37 @@ export const requireCompanyAccess = async (req, res, next) => {
 export const requireOfferAccess = async (req, res, next) => {
   try {
     authenticateToken(req, res, async () => {
+      // Support for direct Company login (passkey)
+      if (req.user.userType === 'company') {
+        const offerId = parseInt(req.params.offerId || req.params.id);
+
+        if (!offerId) {
+          return res.status(400).json({
+            success: false,
+            error: 'Offer ID is required',
+          });
+        }
+
+        const offer = await Offer.findById(offerId);
+        if (!offer) {
+          return res.status(404).json({
+            success: false,
+            error: 'Offer not found',
+          });
+        }
+
+        if (offer.companyId !== req.user.companyId) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access denied. You do not have access to this offer.',
+          });
+        }
+
+        req.offerId = offerId;
+        req.companyId = offer.companyId;
+        return next();
+      }
+
       if (req.user.role !== 'company_user') {
         return res.status(403).json({
           success: false,
@@ -133,7 +182,7 @@ export const requireOfferAccess = async (req, res, next) => {
       }
 
       const offerId = parseInt(req.params.offerId || req.params.id);
-      
+
       if (!offerId) {
         return res.status(400).json({
           success: false,
@@ -195,7 +244,7 @@ export const requireOwnData = (req, res, next) => {
  */
 export const requireRole = (allowedRoles) => {
   const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
-  
+
   return (req, res, next) => {
     authenticateToken(req, res, () => {
       if (!roles.includes(req.user.role)) {
