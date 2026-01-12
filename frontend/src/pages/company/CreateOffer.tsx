@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ArrowRight, Check, FileText, Upload, Loader2, Landmark, TrendingUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileText, Upload, Loader2, Landmark, TrendingUp, X, AlertTriangle, Calendar } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { offersApi } from "@/api/offers";
 
@@ -61,7 +61,10 @@ export function CreateOffer() {
         }
     }, [offerType, navigate]);
 
-    const totalSteps = 4;
+    // Total steps is 6: Step 1 is SelectOfferType page, Steps 2-6 are here.
+    // We display step + 1 to account for the type selection being step 1.
+    const totalSteps = 6;
+    const displayStep = step + 1;
 
     const updateFormData = (updates: Partial<OfferFormData>) => {
         setFormData(prev => ({ ...prev, ...updates }));
@@ -116,7 +119,8 @@ export function CreateOffer() {
             });
 
             if (response.success) {
-                navigate('/company/offers');
+                // Move to confirmation step (step 5 internal = displayStep 6)
+                setStep(5);
             } else {
                 setError(response.error || 'Failed to create offer');
             }
@@ -150,14 +154,29 @@ export function CreateOffer() {
         <div className="max-w-3xl mx-auto space-y-6">
             {/* Header */}
             {/* ... */}
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/company/offers')} className="text-muted-foreground hover:text-white">
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div>
-                    <h2 className="text-2xl font-bold text-white">Create New Offer</h2>
-                    <p className="text-muted-foreground">Step {step} of {totalSteps}</p>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => step > 1 ? setStep(step - 1) : navigate('/company/offers/new')}
+                        className="text-muted-foreground hover:text-white"
+                    >
+                        <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-white">Create New Offer</h2>
+                        <p className="text-muted-foreground">Step {displayStep} of {totalSteps}</p>
+                    </div>
                 </div>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => navigate('/company/offers')}
+                    className="text-muted-foreground hover:text-white"
+                >
+                    <X className="w-5 h-5" />
+                </Button>
             </div>
 
             {/* Progress Indicator */}
@@ -165,7 +184,7 @@ export function CreateOffer() {
                 {Array.from({ length: totalSteps }, (_, i) => (
                     <div
                         key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= step ? 'bg-primary' : 'bg-muted/20'}`}
+                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= displayStep ? 'bg-primary' : 'bg-muted/20'}`}
                     />
                 ))}
             </div>
@@ -216,8 +235,8 @@ export function CreateOffer() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-white">Offer Type</label>
                                 <div className={`p-4 rounded-lg border flex items-center gap-3 ${formData.offer_type === 'collateral'
-                                        ? 'border-blue-500/50 bg-blue-500/10'
-                                        : 'border-emerald-500/50 bg-emerald-500/10'
+                                    ? 'border-blue-500/50 bg-blue-500/10'
+                                    : 'border-emerald-500/50 bg-emerald-500/10'
                                     }`}>
                                     {formData.offer_type === 'collateral' ? (
                                         <Landmark className="w-5 h-5 text-blue-400" />
@@ -428,144 +447,278 @@ export function CreateOffer() {
 
                 {step === 4 && (
                     <>
-                        <CardHeader>
-                            <CardTitle>Review & Submit</CardTitle>
-                            <CardDescription>Review your offer details before submitting for approval</CardDescription>
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2">
+                                <Check className="w-5 h-5 text-primary" />
+                                Review & Submit
+                            </CardTitle>
+                            <CardDescription>Confirm your offer details before submitting for approval</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             {error && (
-                                <div className="p-3 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 text-sm">
-                                    {error}
+                                <div className="p-4 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 flex items-start gap-3">
+                                    <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                                    <p className="text-sm">{error}</p>
                                 </div>
                             )}
 
-                            <div className="space-y-4">
-                                <div className="p-4 bg-white/5 rounded-lg space-y-3">
-                                    <h4 className="text-sm font-medium text-muted-foreground">Basic Information</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Offer Name</p>
-                                            <p className="text-white">{formData.offer_name}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Asset Code</p>
-                                            <p className="text-white font-mono">{formData.asset_code}</p>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <p className="text-xs text-muted-foreground">Description</p>
-                                            <p className="text-white text-sm">{formData.description}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Offer Type</p>
-                                            <p className="text-white capitalize">{formData.offer_type}</p>
-                                        </div>
-                                    </div>
+                            {/* Offer Type Badge */}
+                            <div className={`p-4 rounded-xl border flex items-center gap-4 ${formData.offer_type === 'collateral'
+                                ? 'bg-gradient-to-r from-blue-500/10 to-transparent border-blue-500/30'
+                                : 'bg-gradient-to-r from-emerald-500/10 to-transparent border-emerald-500/30'
+                                }`}>
+                                <div className={`p-3 rounded-lg ${formData.offer_type === 'collateral' ? 'bg-blue-500/20' : 'bg-emerald-500/20'
+                                    }`}>
+                                    {formData.offer_type === 'collateral'
+                                        ? <Landmark className="w-6 h-6 text-blue-400" />
+                                        : <TrendingUp className="w-6 h-6 text-emerald-400" />
+                                    }
                                 </div>
-
-                                <div className="p-4 bg-white/5 rounded-lg space-y-3">
-                                    <h4 className="text-sm font-medium text-muted-foreground">Financial Details</h4>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Total Supply</p>
-                                            <p className="text-white">
-                                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(parseFloat(formData.total_supply || '0'))}
-                                            </p>
-                                        </div>
-                                        {formData.offer_type === 'collateral' && (
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Interest Rate</p>
-                                                <p className="text-success">{formData.annual_interest_rate}% APY</p>
-                                            </div>
-                                        )}
-                                        {formData.offer_type === 'collateral' && (
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Payment Schedule</p>
-                                                <p className="text-primary capitalize">
-                                                    {formData.payment_type.replace('_', '-')}
-                                                    {formData.payment_type !== 'bullet' && ` (Day ${formData.payment_day})`}
-                                                </p>
-                                            </div>
-                                        )}
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Min Investment</p>
-                                            <p className="text-white">${formData.min_investment || '0'}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-muted-foreground">Max Investment</p>
-                                            <p className="text-white">{formData.max_investment ? `$${formData.max_investment}` : 'No limit'}</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 bg-white/5 rounded-lg space-y-3">
-                                    <h4 className="text-sm font-medium text-muted-foreground">Legal Documents</h4>
-                                    <div className="space-y-2">
-                                        {Object.entries(formData.legal_documents).length > 0 ? (
-                                            Object.entries(formData.legal_documents).map(([key, doc]) => (
-                                                <div key={key} className="flex items-center gap-2 text-sm">
-                                                    <Check className="w-4 h-4 text-success" />
-                                                    <span className="text-white capitalize">{key}:</span>
-                                                    <span className="text-muted-foreground">{doc?.name}</span>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-muted-foreground text-sm">No documents uploaded</p>
-                                        )}
-                                    </div>
+                                <div>
+                                    <p className={`text-lg font-semibold ${formData.offer_type === 'collateral' ? 'text-blue-300' : 'text-emerald-300'
+                                        }`}>
+                                        {formData.offer_type === 'collateral' ? 'Debt Offering (Collateral)' : 'Equity Offering (Sale)'}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                        {formData.offer_type === 'collateral'
+                                            ? 'Fixed interest payments with principal return at maturity'
+                                            : 'Ownership stake with variable dividends based on performance'
+                                        }
+                                    </p>
                                 </div>
                             </div>
 
-                            <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
-                                <p className="text-sm text-warning">
-                                    <strong>Note:</strong> After submission, your offer will be reviewed by platform administrators.
-                                    You will be notified once it's approved or if any changes are required.
-                                </p>
+                            {/* Key Metrics Summary */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Supply</p>
+                                    <p className="text-xl font-bold text-white mt-1">
+                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(parseFloat(formData.total_supply || '0'))}
+                                    </p>
+                                </div>
+                                {formData.offer_type === 'collateral' && (
+                                    <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Interest Rate</p>
+                                        <p className="text-xl font-bold text-emerald-400 mt-1">{formData.annual_interest_rate}% APY</p>
+                                    </div>
+                                )}
+                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Min Investment</p>
+                                    <p className="text-xl font-bold text-white mt-1">${formData.min_investment || '100'}</p>
+                                </div>
+                                <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Max Investment</p>
+                                    <p className="text-xl font-bold text-white mt-1">{formData.max_investment ? `$${formData.max_investment}` : '∞'}</p>
+                                </div>
+                            </div>
+
+                            {/* Detailed Sections */}
+                            <div className="space-y-4">
+                                {/* Basic Info */}
+                                <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                                    <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                                        <FileText className="w-4 h-4 text-primary" />
+                                        Basic Information
+                                    </h4>
+                                    <div className="grid gap-4">
+                                        <div className="flex justify-between items-start border-b border-white/5 pb-3">
+                                            <span className="text-sm text-muted-foreground">Offer Name</span>
+                                            <span className="text-sm text-white font-medium text-right">{formData.offer_name}</span>
+                                        </div>
+                                        <div className="flex justify-between items-start border-b border-white/5 pb-3">
+                                            <span className="text-sm text-muted-foreground">Asset Code</span>
+                                            <span className="text-sm text-white font-mono bg-white/5 px-2 py-0.5 rounded">{formData.asset_code}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-sm text-muted-foreground block mb-2">Description</span>
+                                            <p className="text-sm text-white/80 bg-white/5 p-3 rounded-lg">{formData.description}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Payment Schedule (for Collateral only) */}
+                                {formData.offer_type === 'collateral' && (
+                                    <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                                        <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                                            <Calendar className="w-4 h-4 text-primary" />
+                                            Payment Schedule
+                                        </h4>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm text-muted-foreground">Frequency</span>
+                                            <span className="text-sm text-primary font-medium capitalize">
+                                                {formData.payment_type.replace('_', '-')}
+                                                {formData.payment_type !== 'bullet' && ` (Day ${formData.payment_day})`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Documents */}
+                                <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                                    <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                                        <Upload className="w-4 h-4 text-primary" />
+                                        Legal Documents
+                                    </h4>
+                                    {Object.entries(formData.legal_documents).length > 0 ? (
+                                        <div className="space-y-2">
+                                            {Object.entries(formData.legal_documents).map(([key, doc]) => (
+                                                <div key={key} className="flex items-center gap-3 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                                                    <Check className="w-4 h-4 text-emerald-400" />
+                                                    <span className="text-sm text-white capitalize">{key}</span>
+                                                    <span className="text-xs text-muted-foreground ml-auto truncate max-w-[150px]">{doc?.name}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground italic">No documents uploaded (optional)</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Approval Notice */}
+                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                                <div className="text-sm">
+                                    <p className="text-amber-300 font-medium">Approval Required</p>
+                                    <p className="text-amber-200/70 mt-1">
+                                        Your offer will be reviewed by platform administrators before going live.
+                                    </p>
+                                </div>
                             </div>
                         </CardContent>
                     </>
                 )}
 
-                {/* Navigation Buttons */}
-                <div className="flex justify-between p-6 border-t border-white/5">
-                    <Button
-                        variant="ghost"
-                        onClick={handleBack}
-                        disabled={step === 1}
-                        className="text-muted-foreground hover:text-white"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Back
-                    </Button>
+                {/* Step 5 (internal) = Step 6 (display): Confirmation */}
+                {step === 5 && (
+                    <>
+                        <CardHeader className="pb-4">
+                            <CardTitle className="flex items-center gap-2 text-emerald-400">
+                                <Check className="w-6 h-6" />
+                                Offer Submitted Successfully
+                            </CardTitle>
+                            <CardDescription>Your offer has been submitted and is pending admin approval</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Success Banner */}
+                            <div className="p-6 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 text-center">
+                                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <Check className="w-8 h-8 text-emerald-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2">Thank You!</h3>
+                                <p className="text-muted-foreground">
+                                    Your offer "{formData.offer_name}" has been submitted for review.
+                                </p>
+                            </div>
 
-                    {step < totalSteps ? (
+                            {/* Submission Summary */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-semibold text-white">Submission Summary</h4>
+
+                                <div className="grid gap-3 p-4 rounded-xl bg-white/5 border border-white/10">
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Offer Name</span>
+                                        <span className="text-sm text-white font-medium">{formData.offer_name}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Asset Code</span>
+                                        <span className="text-sm text-white font-mono">{formData.asset_code}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Type</span>
+                                        <span className={`text-sm font-medium ${formData.offer_type === 'collateral' ? 'text-blue-400' : 'text-emerald-400'}`}>
+                                            {formData.offer_type === 'collateral' ? 'Debt (Collateral)' : 'Equity (Sale)'}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-sm text-muted-foreground">Total Supply</span>
+                                        <span className="text-sm text-white">
+                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(parseFloat(formData.total_supply || '0'))}
+                                        </span>
+                                    </div>
+                                    {formData.offer_type === 'collateral' && (
+                                        <div className="flex justify-between">
+                                            <span className="text-sm text-muted-foreground">Interest Rate</span>
+                                            <span className="text-sm text-emerald-400">{formData.annual_interest_rate}% APY</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* What's Next */}
+                            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                <h4 className="text-sm font-semibold text-blue-300 mb-2">What happens next?</h4>
+                                <ul className="space-y-2 text-sm text-blue-200/70">
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-blue-400 mt-0.5">1.</span>
+                                        Platform administrators will review your offer
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-blue-400 mt-0.5">2.</span>
+                                        You'll receive a notification once approved
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-blue-400 mt-0.5">3.</span>
+                                        Your offer will be listed on the marketplace for investors
+                                    </li>
+                                </ul>
+                            </div>
+
+                            {/* Action Button */}
+                            <Button
+                                onClick={() => navigate('/company/offers')}
+                                className="w-full bg-primary hover:bg-primary/90"
+                            >
+                                View My Offers
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                        </CardContent>
+                    </>
+                )}
+
+                {/* Navigation Buttons - Hide on confirmation step */}
+                {step < 5 && (
+                    <div className="flex justify-between p-6 border-t border-white/5">
                         <Button
-                            onClick={handleNext}
-                            disabled={!isStepValid()}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                            variant="ghost"
+                            onClick={handleBack}
+                            disabled={step === 1}
+                            className="text-muted-foreground hover:text-white"
                         >
-                            Next
-                            <ArrowRight className="w-4 h-4 ml-2" />
+                            <ArrowLeft className="w-4 h-4 mr-2" />
+                            Back
                         </Button>
-                    ) : (
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={isSubmitting}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                        >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                    Submitting...
-                                </>
-                            ) : (
-                                <>
-                                    <Check className="w-4 h-4 mr-2" />
-                                    Submit for Review
-                                </>
-                            )}
-                        </Button>
-                    )}
-                </div>
+
+                        {step < 4 ? (
+                            <Button
+                                onClick={handleNext}
+                                disabled={!isStepValid()}
+                                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                            >
+                                Next
+                                <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                        ) : (
+                            <Button
+                                onClick={handleSubmit}
+                                disabled={isSubmitting}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            >
+                                {isSubmitting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Submitting...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="w-4 h-4 mr-2" />
+                                        Submit for Review
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
+                )}
             </Card>
         </div>
     );

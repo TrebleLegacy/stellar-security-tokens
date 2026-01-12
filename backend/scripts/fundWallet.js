@@ -38,7 +38,7 @@ async function fundWallet(destinationAddress, amount) {
         console.log('\nAvailable options:');
         console.log('  - ISSUER_SECRET_KEY:', process.env.ISSUER_SECRET_KEY ? '✓ Set' : '✗ Not set');
         console.log('  - DISTRIBUTOR_SECRET_KEY:', process.env.DISTRIBUTOR_SECRET_KEY ? '✓ Set' : '✗ Not set');
-        console.log('  - DISTRIBUTION_SECRET_KEY:', process.env.DISTRIBUTION_SECRET_KEY ? '✓ Set' : '✗ Not set');
+        console.log('  - OPERATIONS_SECRET_KEY:', process.env.OPERATIONS_SECRET_KEY ? '✓ Set' : '✗ Not set');
         console.log('  - TREASURY_SECRET_KEY:', process.env.TREASURY_SECRET_KEY ? '✓ Set' : '✗ Not set');
         throw new Error('No treasury secret key configured');
     }

@@ -215,8 +215,8 @@ function updateEnvFile(accounts, assetCode, assetSupply) {
     'ISSUER_PUBLIC_KEY': accounts.issuer.publicKey,
     'DISTRIBUTOR_SECRET_KEY': accounts.distribution.secretKey,
     'DISTRIBUTOR_PUBLIC_KEY': accounts.distribution.publicKey,
-    'DISTRIBUTION_SECRET_KEY': accounts.distribution.secretKey,
-    'DISTRIBUTION_PUBLIC_KEY': accounts.distribution.publicKey,
+    'OPERATIONS_SECRET_KEY': accounts.operations.secretKey,
+    'OPERATIONS_PUBLIC_KEY': accounts.operations.publicKey,
     'TREASURY_SECRET_KEY': accounts.treasury.secretKey,
     'TREASURY_PUBLIC_KEY': accounts.treasury.publicKey,
     'ASSET_CODE': assetCode,
@@ -257,10 +257,10 @@ function printSummary(accounts, assetCode, assetSupply, transactionHash) {
   log(`   Chave Secreta: ${accounts.issuer.secretKey}`, 'green');
   log(`   Status: ✓ Financiada | ✓ Flags configuradas`, 'green');
 
-  log(`\n2️⃣  DISTRIBUTION ACCOUNT (Distribuidor)`, 'cyan');
-  log(`   Chave Pública: ${accounts.distribution.publicKey}`, 'green');
-  log(`   Chave Secreta: ${accounts.distribution.secretKey}`, 'green');
-  log(`   Status: ✓ Financiada | ✓ Tokens recebidos`, 'green');
+  log(`\n2️⃣  OPERATIONS ACCOUNT (Taxas/Gas)`, 'cyan');
+  log(`   Chave Pública: ${accounts.operations.publicKey}`, 'green');
+  log(`   Chave Secreta: ${accounts.operations.secretKey}`, 'green');
+  log(`   Status: ✓ Financiada`, 'green');
 
   log(`\n3️⃣  TREASURY ACCOUNT (Tesouraria)`, 'cyan');
   log(`   Chave Pública: ${accounts.treasury.publicKey}`, 'green');
@@ -299,7 +299,7 @@ async function main() {
     const issuer = await createAccount('Issuer');
     await sleep(1000);
 
-    const distribution = await createAccount('Distribution');
+    const operations = await createAccount('Operations');
     await sleep(1000);
 
     // 4. Configurações do Sistema
@@ -327,10 +327,10 @@ async function main() {
         publicKey: issuer.publicKey,
         secretKey: issuer.secretKey,
       },
-      distribution: {
-        keypair: distribution.keypair,
-        publicKey: distribution.publicKey,
-        secretKey: distribution.secretKey,
+      operations: {
+        keypair: operations.keypair,
+        publicKey: operations.publicKey,
+        secretKey: operations.secretKey,
       },
       treasury: {
         keypair: treasury.keypair,
@@ -345,7 +345,7 @@ async function main() {
     // Emitir tokens
     const issueResult = await issueToken(
       accounts.issuer.keypair,
-      accounts.distribution.keypair,
+      accounts.distributor.keypair,
       assetCode,
       assetSupply
     );

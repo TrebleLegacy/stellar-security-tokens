@@ -42,44 +42,38 @@ export const getNetworkPassphrase = () => {
   return network === 'testnet' ? Networks.TESTNET : Networks.PUBLIC;
 };
 
+import { keyManager } from '../services/KeyManager.js';
+
 /**
- * Obtém o keypair da conta emissora a partir das variáveis de ambiente
+ * Obtém o keypair da conta emissora usando o KeyManager
  * @returns {Keypair} Keypair da conta emissora
- * @throws {Error} Se ISSUER_SECRET_KEY não estiver configurada
  */
 export const getIssuerKeypair = () => {
-  const secretKey = process.env.ISSUER_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error('ISSUER_SECRET_KEY não configurada no .env');
-  }
-  return Keypair.fromSecret(secretKey);
+  return keyManager.getIssuerKeypair();
 };
 
 /**
- * Obtém o keypair da conta distribuidora a partir das variáveis de ambiente
- * Suporta tanto DISTRIBUTOR_SECRET_KEY quanto DISTRIBUTION_SECRET_KEY
+ * Obtém o keypair da conta distribuidora usando o KeyManager
  * @returns {Keypair} Keypair da conta distribuidora
- * @throws {Error} Se nenhuma das chaves estiver configurada
  */
 export const getDistributorKeypair = () => {
-  const secretKey = process.env.DISTRIBUTOR_SECRET_KEY || process.env.DISTRIBUTION_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error('DISTRIBUTOR_SECRET_KEY ou DISTRIBUTION_SECRET_KEY não configurada no .env');
-  }
-  return Keypair.fromSecret(secretKey);
+  return keyManager.getDistributorKeypair();
 };
 
 /**
- * Obtém o keypair da conta treasury a partir das variáveis de ambiente
+ * Obtém o keypair da conta treasury usando o KeyManager
  * @returns {Keypair} Keypair da conta treasury
- * @throws {Error} Se TREASURY_SECRET_KEY não estiver configurada
  */
 export const getTreasuryKeypair = () => {
-  const secretKey = process.env.TREASURY_SECRET_KEY;
-  if (!secretKey) {
-    throw new Error('TREASURY_SECRET_KEY não configurada no .env');
-  }
-  return Keypair.fromSecret(secretKey);
+  return keyManager.getTreasuryKeypair();
+};
+
+/**
+ * Obtém o keypair da conta de operações (Gas/Taxas) usando o KeyManager
+ * @returns {Keypair} Keypair da conta de operações
+ */
+export const getOperationsKeypair = () => {
+  return keyManager.getOperationsKeypair();
 };
 
 /**
@@ -205,10 +199,26 @@ const parseStellarErrorCodes = (codes) => {
  * @returns {Object} returns.resultCodes - Códigos de erro detalhados (se falhou)
  */
 export const signAndSubmitTransaction = async (transaction, keypair) => {
+  // 1. Sign the inner transaction (Business Logic Signature)
   transaction.sign(keypair);
 
+  // 2. Wrap in Fee Bump Transaction (Gas Station Logic)
+  // The 'Operations' wallet pays the fee, preventing the business wallets (Distributor/Issuer) from needing XLM.
+  const operationsKeypair = getOperationsKeypair();
+
+  // Create Fee Bump Transaction
+  const feeBumpTx = TransactionBuilder.buildFeeBumpTransaction(
+    getOperationsKeypair(),
+    BASE_FEE,
+    transaction,
+    getNetworkPassphrase()
+  );
+
+  // 3. Sign the outer Fee Bump Transaction (Gas Signature)
+  feeBumpTx.sign(operationsKeypair);
+
   try {
-    const result = await stellarServer.submitTransaction(transaction);
+    const result = await stellarServer.submitTransaction(feeBumpTx);
     return {
       success: true,
       hash: result.hash,
@@ -241,6 +251,7 @@ export default {
   getIssuerKeypair,
   getDistributorKeypair,
   getTreasuryKeypair,
+  getOperationsKeypair,
   createAsset,
   buildTransaction,
   signAndSubmitTransaction,

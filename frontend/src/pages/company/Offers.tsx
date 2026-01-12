@@ -37,12 +37,12 @@ export function Offers() {
 
     const statusOptions = [
         { value: 'all', label: 'All Status' },
-        { value: 'pending_review', label: 'Pending Review' },
-        { value: 'under_review', label: 'Under Review' },
-        { value: 'approved', label: 'Approved' },
-        { value: 'active', label: 'Active' },
-        { value: 'rejected', label: 'Rejected' },
-        { value: 'closed', label: 'Closed' },
+        { value: 'pending_review', label: '🟡 Under Review' },
+        { value: 'approved', label: '🔵 Approved' },
+        { value: 'active', label: '🟢 Active' },
+        { value: 'funding', label: '🟣 Funding' },
+        { value: 'rejected', label: '🔴 Declined' },
+        { value: 'closed', label: '⚫ Completed' },
     ];
 
     return (
@@ -175,35 +175,95 @@ export function Offers() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-    const getStatusStyles = () => {
+    const getStatusConfig = () => {
         switch (status) {
-            case 'active':
-                return 'bg-success/15 text-success';
-            case 'approved':
-                return 'bg-primary/15 text-primary';
             case 'pending_review':
+            case 'draft':
+                return {
+                    label: 'Under Review',
+                    bg: 'bg-amber-500/15',
+                    text: 'text-amber-400',
+                    border: 'border-amber-500/30',
+                    dot: 'bg-amber-400',
+                };
             case 'under_review':
-                return 'bg-warning/15 text-warning';
+                return {
+                    label: 'Under Review',
+                    bg: 'bg-amber-500/15',
+                    text: 'text-amber-400',
+                    border: 'border-amber-500/30',
+                    dot: 'bg-amber-400',
+                };
+            case 'approved':
+                return {
+                    label: 'Approved',
+                    bg: 'bg-blue-500/15',
+                    text: 'text-blue-400',
+                    border: 'border-blue-500/30',
+                    dot: 'bg-blue-400',
+                };
+            case 'active':
+                return {
+                    label: 'Active',
+                    bg: 'bg-emerald-500/15',
+                    text: 'text-emerald-400',
+                    border: 'border-emerald-500/30',
+                    dot: 'bg-emerald-400 animate-pulse',
+                };
+            case 'funding':
+            case 'in_progress':
+                return {
+                    label: 'Funding',
+                    bg: 'bg-purple-500/15',
+                    text: 'text-purple-400',
+                    border: 'border-purple-500/30',
+                    dot: 'bg-purple-400 animate-pulse',
+                };
             case 'rejected':
-                return 'bg-destructive/15 text-destructive';
+            case 'declined':
+                return {
+                    label: 'Declined',
+                    bg: 'bg-red-500/15',
+                    text: 'text-red-400',
+                    border: 'border-red-500/30',
+                    dot: 'bg-red-400',
+                };
             case 'closed':
-                return 'bg-muted/50 text-muted-foreground';
+            case 'completed':
+            case 'finished':
+                return {
+                    label: 'Completed',
+                    bg: 'bg-slate-500/15',
+                    text: 'text-slate-400',
+                    border: 'border-slate-500/30',
+                    dot: 'bg-slate-400',
+                };
+            case 'paused':
+                return {
+                    label: 'Paused',
+                    bg: 'bg-orange-500/15',
+                    text: 'text-orange-400',
+                    border: 'border-orange-500/30',
+                    dot: 'bg-orange-400',
+                };
             default:
-                return 'bg-muted/50 text-muted-foreground';
+                return {
+                    label: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    bg: 'bg-slate-500/15',
+                    text: 'text-slate-400',
+                    border: 'border-slate-500/30',
+                    dot: 'bg-slate-400',
+                };
         }
     };
 
-    const getStatusLabel = () => {
-        switch (status) {
-            case 'pending_review': return 'Pending';
-            case 'under_review': return 'Review';
-            default: return status.charAt(0).toUpperCase() + status.slice(1);
-        }
-    };
+    const config = getStatusConfig();
 
     return (
-        <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${getStatusStyles()}`}>
-            {getStatusLabel()}
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${config.bg} ${config.text} ${config.border}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+            {config.label}
         </span>
     );
 }
+

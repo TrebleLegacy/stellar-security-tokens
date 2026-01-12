@@ -36,6 +36,7 @@ import { SelectOfferType } from './pages/company/SelectOfferType';
 import { DefaultCases } from './pages/admin/DefaultCases';
 import { AdminSettings } from './pages/admin/Settings';
 import { Companies } from './pages/admin/Companies';
+import { AdminOffers } from './pages/admin/AdminOffers';
 
 function App() {
   return (
@@ -81,6 +82,7 @@ function App() {
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="users" element={<UserManagement />} />
           <Route path="companies" element={<Companies />} />
+          <Route path="offers" element={<AdminOffers />} />
           <Route path="wallets" element={<Wallets />} />
           <Route path="fees" element={<FeeConfig />} />
           <Route path="defaults" element={<DefaultCases />} />

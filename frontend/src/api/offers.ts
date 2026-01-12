@@ -16,6 +16,15 @@ export const offersApi = {
     return response.data;
   },
 
+  // Admin: get all offers across all companies
+  getAllAdmin: async (params?: {
+    status?: string;
+    company_id?: number;
+  }): Promise<ApiResponse<Offer[]>> => {
+    const response = await api.get('/admin/offers', { params });
+    return response.data;
+  },
+
   getCompanyOffers: async (): Promise<ApiResponse<Offer[]>> => {
     const response = await api.get('/companies/offers');
     return response.data;
