@@ -811,6 +811,195 @@ router.post('/companies/:id/reject', authenticateToken, requirePlatformAdmin, as
 
 /**
  * @swagger
+ * /api/platform-admins/companies/{id}/sponsor:
+ *   post:
+ *     summary: "[Admin] Sponsor company wallet with XLM"
+ *     description: Sends XLM from Treasury to company's smart wallet. Requires approved status.
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: string
+ *                 description: Amount of XLM to send (default 10)
+ *     responses:
+ *       200:
+ *         description: Wallet sponsored successfully
+ *       400:
+ *         description: Invalid request or company not eligible
+ *       404:
+ *         description: Company not found
+ */
+router.post('/companies/:id/sponsor', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount = '10' } = req.body;
+
+    // Validate amount
+    const xlmAmount = parseFloat(amount);
+    if (isNaN(xlmAmount) || xlmAmount <= 0 || xlmAmount > 10000) {
+      return res.status(400).json({
+        success: false,
+        error: 'Amount must be between 0 and 10000 XLM'
+      });
+    }
+
+    // Get company
+    const company = await prisma.company.findUnique({
+      where: { id: parseInt(id) },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        status: true,
+        stellarContractId: true,
+      }
+    });
+
+    if (!company) {
+      return res.status(404).json({ success: false, error: 'Company not found' });
+    }
+
+    if (company.status !== 'approved' && company.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot sponsor wallet: status is '${company.status}'. Must be 'approved' or 'active'.`
+      });
+    }
+
+    if (!company.stellarContractId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Company does not have a wallet yet. They must complete passkey registration first.'
+      });
+    }
+
+    console.log(`[Admin Sponsor Company] Sponsoring wallet for company ${company.id} (${company.name})`);
+    console.log(`[Admin Sponsor Company] Sending ${xlmAmount} XLM to ${company.stellarContractId}`);
+
+    // Get Treasury keypair (imported at bottom of file)
+    const { getTreasuryKeypair, getNetworkPassphrase } = await import('../config/stellar.js');
+    const treasuryKeypair = getTreasuryKeypair();
+    const networkPassphrase = getNetworkPassphrase();
+
+    // Get XLM SAC contract ID
+    const xlmSacContractId = process.env.XLM_SAC_CONTRACT_ID;
+    if (!xlmSacContractId) {
+      return res.status(500).json({
+        success: false,
+        error: 'XLM_SAC_CONTRACT_ID not configured. Cannot sponsor Soroban wallets.'
+      });
+    }
+
+    // Import required modules
+    const stellarSdk = await import('@stellar/stellar-sdk');
+    const { Contract, nativeToScVal, rpc, TransactionBuilder: TxBuilder } = stellarSdk;
+
+    // Create Soroban RPC server
+    const sorobanRpcUrl = process.env.SOROBAN_RPC_URL || 'https://soroban-testnet.stellar.org';
+    const sorobanServer = new rpc.Server(sorobanRpcUrl, { allowHttp: true });
+
+    // Load treasury account
+    const treasuryAccount = await sorobanServer.getAccount(treasuryKeypair.publicKey());
+
+    // Build SAC transfer transaction
+    const xlmSac = new Contract(xlmSacContractId);
+    const amountStroops = BigInt(Math.floor(xlmAmount * 10_000_000));
+
+    // Build the transfer operation
+    const transferOp = xlmSac.call(
+      'transfer',
+      nativeToScVal(treasuryKeypair.publicKey(), { type: 'address' }),
+      nativeToScVal(company.stellarContractId, { type: 'address' }),
+      nativeToScVal(amountStroops, { type: 'i128' })
+    );
+
+    // Build initial transaction
+    let tx = new TxBuilder(treasuryAccount, {
+      fee: '100000',
+      networkPassphrase
+    })
+      .addOperation(transferOp)
+      .setTimeout(30)
+      .build();
+
+    // Simulate the transaction
+    console.log('[Admin Sponsor Company] Simulating transaction...');
+    const simResult = await sorobanServer.simulateTransaction(tx);
+
+    if (rpc.Api.isSimulationError(simResult)) {
+      console.error('[Admin Sponsor Company] Simulation error:', simResult.error);
+      throw new Error(`Simulation failed: ${simResult.error}`);
+    }
+
+    // Prepare the transaction with simulation results
+    tx = rpc.assembleTransaction(tx, simResult).build();
+
+    // Sign the prepared transaction
+    tx.sign(treasuryKeypair);
+
+    // Submit via Soroban RPC
+    console.log('[Admin Sponsor Company] Submitting transaction...');
+    const sendResponse = await sorobanServer.sendTransaction(tx);
+
+    if (sendResponse.status === 'ERROR') {
+      throw new Error(sendResponse.errorResultXdr || 'Transaction submission failed');
+    }
+
+    // Poll for transaction result
+    let getResponse;
+    let attempts = 0;
+    while (attempts < 30) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      getResponse = await sorobanServer.getTransaction(sendResponse.hash);
+
+      if (getResponse.status !== 'NOT_FOUND') {
+        break;
+      }
+      attempts++;
+    }
+
+    if (!getResponse || getResponse.status !== 'SUCCESS') {
+      throw new Error(`Transaction failed: ${getResponse?.status || 'TIMEOUT'}`);
+    }
+
+    console.log(`[Admin Sponsor Company] Success! TX Hash: ${sendResponse.hash}`);
+
+    res.json({
+      success: true,
+      message: `Successfully sent ${xlmAmount} XLM to ${company.name}'s wallet`,
+      data: {
+        companyId: company.id,
+        companyName: company.name,
+        walletAddress: company.stellarContractId,
+        amountXLM: xlmAmount,
+        transactionHash: sendResponse.hash,
+        explorer: `https://stellar.expert/explorer/testnet/tx/${sendResponse.hash}`
+      }
+    });
+
+  } catch (error) {
+    console.error('[Admin Sponsor Company] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @swagger
  * /api/platform-admins/investors/{id}/details:
  *   get:
  *     summary: "[Admin] Get complete investor details"

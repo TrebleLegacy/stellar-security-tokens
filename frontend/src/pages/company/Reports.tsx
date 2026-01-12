@@ -8,14 +8,14 @@ export function Reports() {
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
-                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="p-4 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20">
+            <div className="p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
                 Failed to load reports: {error}
             </div>
         );
@@ -38,7 +38,7 @@ export function Reports() {
                 <Card className="glass-panel border-white/5 bg-white/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Supply</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-emerald-400" />
+                        <TrendingUp className="h-4 w-4 text-success" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">
@@ -51,7 +51,7 @@ export function Reports() {
                 <Card className="glass-panel border-white/5 bg-white/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Offers</CardTitle>
-                        <FileText className="h-4 w-4 text-teal-400" />
+                        <FileText className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{offers.length}</div>
@@ -62,7 +62,7 @@ export function Reports() {
                 <Card className="glass-panel border-white/5 bg-white/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Active Offers</CardTitle>
-                        <BarChart3 className="h-4 w-4 text-blue-400" />
+                        <BarChart3 className="h-4 w-4 text-primary" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{activeOffers}</div>
@@ -73,7 +73,7 @@ export function Reports() {
                 <Card className="glass-panel border-white/5 bg-white/5">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Investors</CardTitle>
-                        <Users className="h-4 w-4 text-purple-400" />
+                        <Users className="h-4 w-4 text-accent" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{stats.totalInvestors}</div>
@@ -89,14 +89,14 @@ export function Reports() {
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        <StatusBar label="Active" count={activeOffers} total={offers.length} color="bg-emerald-500" />
-                        <StatusBar label="Approved" count={approvedOffers} total={offers.length} color="bg-blue-500" />
-                        <StatusBar label="Pending Review" count={pendingOffers} total={offers.length} color="bg-yellow-500" />
+                        <StatusBar label="Active" count={activeOffers} total={offers.length} color="bg-success" />
+                        <StatusBar label="Approved" count={approvedOffers} total={offers.length} color="bg-primary" />
+                        <StatusBar label="Pending Review" count={pendingOffers} total={offers.length} color="bg-warning" />
                         <StatusBar
                             label="Closed/Rejected"
                             count={offers.filter(o => ['closed', 'rejected'].includes(o.status)).length}
                             total={offers.length}
-                            color="bg-gray-500"
+                            color="bg-muted-foreground"
                         />
                     </div>
                 </CardContent>
@@ -133,7 +133,7 @@ export function Reports() {
                                             </td>
                                             <td className="py-3 px-4 text-sm text-right">
                                                 {offer.annual_interest_rate ? (
-                                                    <span className="text-emerald-400">{offer.annual_interest_rate}%</span>
+                                                    <span className="text-success">{offer.annual_interest_rate}%</span>
                                                 ) : (
                                                     <span className="text-muted-foreground">-</span>
                                                 )}
@@ -184,18 +184,18 @@ function StatusBadge({ status }: { status: string }) {
     const getStatusStyles = () => {
         switch (status) {
             case 'active':
-                return 'bg-emerald-500/20 text-emerald-400';
+                return 'bg-success/15 text-success';
             case 'approved':
-                return 'bg-blue-500/20 text-blue-400';
+                return 'bg-primary/15 text-primary';
             case 'pending_review':
             case 'under_review':
-                return 'bg-yellow-500/20 text-yellow-400';
+                return 'bg-warning/15 text-warning';
             case 'rejected':
-                return 'bg-red-500/20 text-red-400';
+                return 'bg-destructive/15 text-destructive';
             case 'closed':
-                return 'bg-gray-500/20 text-gray-400';
+                return 'bg-muted/50 text-muted-foreground';
             default:
-                return 'bg-gray-500/20 text-gray-400';
+                return 'bg-muted/50 text-muted-foreground';
         }
     };
 

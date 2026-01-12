@@ -322,5 +322,92 @@ router.get('/admin/companies', requirePlatformAdmin, CompanyController.getAllCom
  */
 router.put('/admin/companies/:id/status', requirePlatformAdmin, CompanyController.updateCompanyStatus);
 
+// ============================================================================
+// COMPANY WALLET ROUTES
+// ============================================================================
+
+/**
+ * @swagger
+ * /api/companies/{companyId}/wallet-status:
+ *   get:
+ *     summary: Get company wallet status and balances
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Wallet status and balances
+ */
+router.get('/:companyId/wallet-status', requireCompanyUser, CompanyController.getWalletStatus);
+
+/**
+ * @swagger
+ * /api/companies/{companyId}/withdraw/propose:
+ *   post:
+ *     summary: Propose a withdrawal transaction
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: companyId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - destination
+ *               - amount
+ *               - assetCode
+ *             properties:
+ *               destination:
+ *                 type: string
+ *               amount:
+ *                 type: string
+ *               assetCode:
+ *                 type: string
+ *                 enum: [USDC, XLM]
+ *     responses:
+ *       200:
+ *         description: Transaction XDR ready for signing
+ */
+router.post('/:companyId/withdraw/propose', requireCompanyUser, CompanyController.proposeWithdrawal);
+
+/**
+ * @swagger
+ * /api/companies/withdraw/submit:
+ *   post:
+ *     summary: Submit a signed withdrawal transaction
+ *     tags: [Companies]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - signedXdr
+ *             properties:
+ *               signedXdr:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Transaction submitted successfully
+ */
+router.post('/withdraw/submit', requireCompanyUser, CompanyController.submitWithdrawal);
+
 export default router;
 

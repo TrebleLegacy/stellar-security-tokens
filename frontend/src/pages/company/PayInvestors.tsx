@@ -97,15 +97,15 @@ export function PayInvestors() {
         const status = (paymentDetails as PaymentDetails)?.paymentDueStatus;
         switch (status) {
             case 'current':
-                return <span className="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">Up to Date</span>;
+                return <span className="px-2 py-1 rounded-full bg-success/20 text-success text-xs">Up to Date</span>;
             case 'upcoming':
-                return <span className="px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs">Due Soon</span>;
+                return <span className="px-2 py-1 rounded-full bg-primary/20 text-primary text-xs">Due Soon</span>;
             case 'due':
-                return <span className="px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs">Due Today</span>;
+                return <span className="px-2 py-1 rounded-full bg-warning/20 text-warning text-xs">Due Today</span>;
             case 'overdue':
-                return <span className="px-2 py-1 rounded-full bg-red-500/20 text-red-400 text-xs">Overdue</span>;
+                return <span className="px-2 py-1 rounded-full bg-destructive/20 text-destructive text-xs">Overdue</span>;
             case 'defaulted':
-                return <span className="px-2 py-1 rounded-full bg-red-600/30 text-red-300 text-xs">Defaulted</span>;
+                return <span className="px-2 py-1 rounded-full bg-destructive/30 text-destructive text-xs">Defaulted</span>;
             default:
                 return null;
         }
@@ -114,7 +114,7 @@ export function PayInvestors() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
         );
     }
@@ -122,14 +122,14 @@ export function PayInvestors() {
     if (success) {
         return (
             <div className="max-w-2xl mx-auto space-y-6">
-                <Card className="glass-panel border-green-500/20 bg-green-500/5">
+                <Card className="glass-panel border-success/20 bg-success/5">
                     <CardContent className="p-8 text-center">
-                        <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-4" />
+                        <CheckCircle className="w-16 h-16 text-success mx-auto mb-4" />
                         <h2 className="text-2xl font-bold text-white mb-2">Payment Successful!</h2>
                         <p className="text-muted-foreground mb-6">
                             All investors have been paid successfully.
                         </p>
-                        <Button onClick={() => navigate('/company/offers')} className="bg-teal-600 hover:bg-teal-500">
+                        <Button onClick={() => navigate('/company/offers')} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                             Back to Offers
                         </Button>
                     </CardContent>
@@ -153,7 +153,7 @@ export function PayInvestors() {
             </div>
 
             {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400">
+                <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
                     <AlertTriangle className="w-4 h-4 inline mr-2" />
                     {error}
                 </div>
@@ -175,7 +175,7 @@ export function PayInvestors() {
                                 <DollarSign className="w-4 h-4" />
                                 Total Owed
                             </div>
-                            <p className="text-2xl font-bold text-teal-400">
+                            <p className="text-2xl font-bold text-success">
                                 ${totalOwed.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </p>
                         </div>
@@ -228,7 +228,7 @@ export function PayInvestors() {
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-teal-400 font-medium">
+                                            <p className="text-success font-medium">
                                                 ${('interestOwed' in investor ? investor.interestOwed : investor.totalPayout).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                             </p>
                                             <p className="text-xs text-muted-foreground">
@@ -247,13 +247,13 @@ export function PayInvestors() {
 
             {/* Consequences Warning */}
             {(paymentDetails as PaymentDetails)?.paymentDueStatus === 'overdue' && (
-                <Card className="glass-panel border-red-500/20 bg-red-500/5">
+                <Card className="glass-panel border-destructive/20 bg-destructive/5">
                     <CardContent className="p-4">
                         <div className="flex items-start gap-3">
-                            <AlertTriangle className="w-5 h-5 text-red-400 mt-0.5" />
+                            <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
                             <div>
-                                <h4 className="text-red-400 font-medium">Payment Overdue - Consequences</h4>
-                                <ul className="text-sm text-red-300/80 mt-2 space-y-1">
+                                <h4 className="text-destructive font-medium">Payment Overdue - Consequences</h4>
+                                <ul className="text-sm text-destructive/80 mt-2 space-y-1">
                                     <li>• Late fee: 0.1% per day accumulating</li>
                                     <li>• After 10 days: Collateral will be liquidated</li>
                                     <li>• Your company may be banned from creating new offers</li>
@@ -270,7 +270,7 @@ export function PayInvestors() {
                     <Button
                         onClick={handlePreparePayment}
                         disabled={submitting || totalOwed === 0}
-                        className="flex-1 bg-teal-600 hover:bg-teal-500 text-white py-6 text-lg"
+                        className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg"
                     >
                         {submitting ? (
                             <>
@@ -286,8 +286,8 @@ export function PayInvestors() {
                     </Button>
                 ) : (
                     <div className="flex-1 space-y-3">
-                        <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                            <p className="text-yellow-400 text-sm">
+                        <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+                            <p className="text-warning text-sm">
                                 Transaction prepared. Sign with your passkey to complete the payment.
                             </p>
                         </div>
@@ -302,7 +302,7 @@ export function PayInvestors() {
                             <Button
                                 onClick={handleSignAndSubmit}
                                 disabled={submitting}
-                                className="flex-1 bg-teal-600 hover:bg-teal-500 text-white"
+                                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
                             >
                                 {submitting ? (
                                     <>
