@@ -157,7 +157,7 @@ router.post('/passkey-login/discover', [
     if (user) {
       user = { ...user, userType: 'investor' };
     } else {
-      // Try company users
+      // Try company users (employees/representatives)
       user = await prisma.companyUser.findFirst({
         where: { passkeyCredentialId: credentialId },
         select: { id: true, name: true, email: true, role: true, companyId: true, stellarContractId: true }
@@ -166,6 +166,26 @@ router.post('/passkey-login/discover', [
 
       if (user) {
         user = { ...user, userType: 'company' };
+      } else {
+        // Try companies directly (for new company registration flow)
+        const company = await prisma.company.findFirst({
+          where: { passkeyCredentialId: credentialId },
+          select: { id: true, name: true, email: true, status: true, stellarContractId: true }
+        });
+        console.log('[Auth] Company lookup result:', company ? `Found (ID: ${company.id})` : 'Not found');
+
+        if (company) {
+          user = {
+            id: company.id,
+            name: company.name,
+            email: company.email,
+            status: company.status,
+            stellarContractId: company.stellarContractId,
+            companyId: company.id,
+            role: 'admin', // Company owner is admin
+            userType: 'company'
+          };
+        }
       }
     }
 

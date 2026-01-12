@@ -8,6 +8,7 @@ import { InvestmentMetricsController } from '../controllers/investmentMetricsCon
 import prisma from '../config/prisma.js';
 import { PasskeyWalletService } from '../services/passkeyWallet.service.js';
 import { WebAuthnService } from '../services/webauthn.service.js';
+import { EmailService } from '../services/email.service.js';
 
 const router = express.Router();
 
@@ -535,11 +536,18 @@ router.get('/investors', authenticateToken, requirePlatformAdmin, PlatformAdminC
  */
 router.get('/companies', authenticateToken, requirePlatformAdmin, async (req, res) => {
   try {
+    const { status } = req.query;
+
+    // Build where clause based on status filter
+    const where = status ? { status: status.toLowerCase() } : {};
+
     const companies = await prisma.company.findMany({
+      where,
       select: {
         id: true,
         name: true,
         cnpj: true,
+        email: true,
         status: true,
         stellarContractId: true,
         createdAt: true,
@@ -598,6 +606,7 @@ router.get('/companies/:id/details', authenticateToken, requirePlatformAdmin, as
         id: true,
         name: true,
         cnpj: true,
+        email: true,
         status: true,
         stellarContractId: true,
         createdAt: true,
@@ -643,6 +652,159 @@ router.get('/companies/:id/details', authenticateToken, requirePlatformAdmin, as
     });
   } catch (error) {
     console.error('[Company Details] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/platform-admins/companies/{id}/approve:
+ *   post:
+ *     summary: "[Admin] Approve a company"
+ *     description: Changes company status to 'approved'
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Company approved
+ *       404:
+ *         description: Company not found
+ */
+router.post('/companies/:id/approve', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const company = await prisma.company.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!company) {
+      return res.status(404).json({ success: false, error: 'Company not found' });
+    }
+
+    if (company.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot approve company: status is already '${company.status}'`
+      });
+    }
+
+    const updatedCompany = await prisma.company.update({
+      where: { id: parseInt(id) },
+      data: { status: 'approved' }
+    });
+
+    // Send approval email to company
+    try {
+      await EmailService.sendCompanyStatusUpdate(company.email, company.name, 'approved');
+      console.log(`[Admin] Approval email sent to ${company.email}`);
+    } catch (emailErr) {
+      console.error(`[Admin] Failed to send approval email:`, emailErr.message);
+      // Don't fail the approval if email fails
+    }
+
+    console.log(`[Admin] Company ${id} (${company.name}) approved by admin ${req.user.userId}`);
+
+    res.json({
+      success: true,
+      message: `Company '${company.name}' has been approved`,
+      data: updatedCompany
+    });
+  } catch (error) {
+    console.error('[Company Approve] Error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/platform-admins/companies/{id}/reject:
+ *   post:
+ *     summary: "[Admin] Reject a company"
+ *     description: Changes company status to 'rejected'
+ *     tags: [Platform Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - reason
+ *             properties:
+ *               reason:
+ *                 type: string
+ *                 description: Rejection reason
+ *     responses:
+ *       200:
+ *         description: Company rejected
+ *       400:
+ *         description: Reason not provided
+ *       404:
+ *         description: Company not found
+ */
+router.post('/companies/:id/reject', authenticateToken, requirePlatformAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ success: false, error: 'Rejection reason is required' });
+    }
+
+    const company = await prisma.company.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!company) {
+      return res.status(404).json({ success: false, error: 'Company not found' });
+    }
+
+    if (company.status !== 'pending') {
+      return res.status(400).json({
+        success: false,
+        error: `Cannot reject company: status is already '${company.status}'`
+      });
+    }
+
+    const updatedCompany = await prisma.company.update({
+      where: { id: parseInt(id) },
+      data: { status: 'rejected' }
+    });
+
+    // Send rejection email to company with reason
+    try {
+      await EmailService.sendCompanyStatusUpdate(company.email, company.name, 'rejected', reason);
+      console.log(`[Admin] Rejection email sent to ${company.email}`);
+    } catch (emailErr) {
+      console.error(`[Admin] Failed to send rejection email:`, emailErr.message);
+      // Don't fail the rejection if email fails
+    }
+
+    console.log(`[Admin] Company ${id} (${company.name}) rejected by admin ${req.user.userId}. Reason: ${reason}`);
+
+    res.json({
+      success: true,
+      message: `Company '${company.name}' has been rejected`,
+      data: updatedCompany
+    });
+  } catch (error) {
+    console.error('[Company Reject] Error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

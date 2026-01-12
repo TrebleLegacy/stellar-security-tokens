@@ -42,9 +42,7 @@ export function useCompany(): UseCompanyReturn {
                 setCompany(profileResponse.data);
 
                 // Fetch company offers
-                const offersResponse = await offersApi.getAll({
-                    company_id: profileResponse.data.id,
-                });
+                const offersResponse = await offersApi.getCompanyOffers();
 
                 if (offersResponse.success && offersResponse.data) {
                     const offersList = offersResponse.data;

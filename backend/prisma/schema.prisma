@@ -227,9 +227,10 @@ model InterestPayment {
 model Company {
   id                  Int           @id @default(autoincrement())
   name                String        @db.VarChar(255)
-  cnpj                String        @unique @db.VarChar(18)
+  cnpj                String?       @unique @db.VarChar(18)  // Optional - collected during KYC
   email               String        @unique @db.VarChar(255)
-  legalRepresentative String        @map("legal_representative") @db.VarChar(255)
+  emailVerified       Boolean       @default(false) @map("email_verified")
+  legalRepresentative String?       @map("legal_representative") @db.VarChar(255) // Optional - collected during KYC
   address             String?       @db.Text
   phone               String?       @db.VarChar(20)
   status              CompanyStatus @default(pending)

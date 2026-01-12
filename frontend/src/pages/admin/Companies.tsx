@@ -19,7 +19,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
-import { Loader2, Search, RefreshCw, Building2, MoreVertical, ExternalLink, Copy, Users, Wallet, FileText } from 'lucide-react';
+import { Loader2, Search, RefreshCw, Building2, MoreVertical, ExternalLink, Copy, Users, Wallet, FileText, CheckCircle, XCircle } from 'lucide-react';
 import api from '@/api/client';
 
 interface Company {
@@ -45,6 +45,15 @@ export function Companies() {
     const [companies, setCompanies] = useState<Company[]>([]);
     const [search, setSearch] = useState('');
     const [error, setError] = useState('');
+    const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'suspended' | 'rejected'>('all');
+    const [actionLoading, setActionLoading] = useState(false);
+
+    // Reject Modal State
+    const [rejectModal, setRejectModal] = useState<{ open: boolean; company: Company | null }>({
+        open: false,
+        company: null,
+    });
+    const [rejectReason, setRejectReason] = useState('');
 
     // Detail Modal
     const [detailModal, setDetailModal] = useState<{ open: boolean; company: CompanyDetails | null; loading: boolean }>({
@@ -55,18 +64,46 @@ export function Companies() {
 
     useEffect(() => {
         loadCompanies();
-    }, []);
+    }, [filter]);
 
     const loadCompanies = async () => {
         setLoading(true);
         setError('');
         try {
-            const response = await api.get('/platform-admins/companies');
+            const status = filter === 'all' ? undefined : filter;
+            const response = await api.get('/platform-admins/companies', { params: { status } });
             setCompanies(response.data.data || []);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to load companies');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleApprove = async (company: Company) => {
+        setActionLoading(true);
+        try {
+            await api.post(`/platform-admins/companies/${company.id}/approve`);
+            loadCompanies();
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to approve company');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleReject = async () => {
+        if (!rejectModal.company || !rejectReason.trim()) return;
+        setActionLoading(true);
+        try {
+            await api.post(`/platform-admins/companies/${rejectModal.company.id}/reject`, { reason: rejectReason });
+            setRejectModal({ open: false, company: null });
+            setRejectReason('');
+            loadCompanies();
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to reject company');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -109,32 +146,40 @@ export function Companies() {
 
     const filteredCompanies = companies.filter((c) =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.cnpj.includes(search)
+        (c.cnpj && c.cnpj.includes(search))
     );
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-white">Company Management</h1>
-                    <p className="text-muted-foreground">Manage registered companies and their offers</p>
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                <div className="flex gap-2">
+                    {(['all', 'pending', 'approved', 'suspended', 'rejected'] as const).map((f) => (
+                        <Button
+                            key={f}
+                            variant={filter === f ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFilter(f)}
+                            className={filter === f ? 'bg-red-600 hover:bg-red-700' : ''}
+                        >
+                            {f.charAt(0).toUpperCase() + f.slice(1)}
+                        </Button>
+                    ))}
                 </div>
-                <Button onClick={loadCompanies} variant="outline" size="sm" disabled={loading}>
-                    <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                    Refresh
-                </Button>
-            </div>
-
-            {/* Search */}
-            <div className="relative max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                    placeholder="Search by name or CNPJ..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-10 bg-white/5 border-white/10"
-                />
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-64">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search by name or CNPJ..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-9 bg-white/5 border-white/10"
+                        />
+                    </div>
+                    <Button variant="outline" size="icon" onClick={loadCompanies}>
+                        <RefreshCw className="w-4 h-4" />
+                    </Button>
+                </div>
             </div>
 
             {error && (
@@ -164,10 +209,10 @@ export function Companies() {
                                 <thead>
                                     <tr className="border-b border-white/10">
                                         <th className="text-left py-3 px-2 text-muted-foreground font-medium">Company</th>
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">CNPJ</th>
+                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">Email</th>
                                         <th className="text-left py-3 px-2 text-muted-foreground font-medium">Status</th>
                                         <th className="text-left py-3 px-2 text-muted-foreground font-medium">Offers</th>
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">Users</th>
+                                        <th className="text-right py-3 px-2 text-muted-foreground font-medium">Actions</th>
                                         <th className="py-3 px-2 text-muted-foreground font-medium w-10"></th>
                                     </tr>
                                 </thead>
@@ -175,10 +220,35 @@ export function Companies() {
                                     {filteredCompanies.map((company) => (
                                         <tr key={company.id} className="border-b border-white/5 hover:bg-white/5">
                                             <td className="py-3 px-2 text-white font-medium">{company.name}</td>
-                                            <td className="py-3 px-2 text-muted-foreground">{company.cnpj}</td>
+                                            <td className="py-3 px-2 text-muted-foreground">{(company as any).email || company.cnpj || '-'}</td>
                                             <td className="py-3 px-2">{getStatusBadge(company.status)}</td>
                                             <td className="py-3 px-2 text-white">{company.activeOffers}</td>
-                                            <td className="py-3 px-2 text-muted-foreground">{company.users?.length || 0}</td>
+                                            <td className="py-3 px-2 text-right">
+                                                {company.status === 'pending' && (
+                                                    <div className="flex gap-2 justify-end">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-emerald-500 text-emerald-500 hover:bg-emerald-500/10"
+                                                            onClick={() => handleApprove(company)}
+                                                            disabled={actionLoading}
+                                                        >
+                                                            <CheckCircle className="w-4 h-4 mr-1" />
+                                                            Approve
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="border-red-500 text-red-500 hover:bg-red-500/10"
+                                                            onClick={() => setRejectModal({ open: true, company })}
+                                                            disabled={actionLoading}
+                                                        >
+                                                            <XCircle className="w-4 h-4 mr-1" />
+                                                            Reject
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </td>
                                             <td className="py-3 px-2">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
@@ -328,6 +398,43 @@ export function Companies() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setDetailModal({ open: false, company: null, loading: false })}>
                             Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Reject Modal */}
+            <Dialog open={rejectModal.open} onOpenChange={(open) => setRejectModal({ open, company: rejectModal.company })}>
+                <DialogContent className="bg-slate-900 border-white/10">
+                    <DialogHeader>
+                        <DialogTitle>Reject Company</DialogTitle>
+                        <DialogDescription>
+                            Please provide a reason for rejecting {rejectModal.company?.name}.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="reason">Rejection Reason</Label>
+                            <Input
+                                id="reason"
+                                placeholder="e.g., Invalid documentation, incomplete KYC..."
+                                value={rejectReason}
+                                onChange={(e) => setRejectReason(e.target.value)}
+                                className="bg-white/5 border-white/10"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setRejectModal({ open: false, company: null })}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleReject}
+                            disabled={!rejectReason.trim() || actionLoading}
+                        >
+                            {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            Reject
                         </Button>
                     </DialogFooter>
                 </DialogContent>

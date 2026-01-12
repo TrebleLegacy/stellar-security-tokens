@@ -130,12 +130,14 @@ export const requireOwnData = (req, res, next) => {
  */
 export const requireCompanyUser = (req, res, next) => {
   authenticateToken(req, res, () => {
-    if (req.user.role !== 'company_user') {
-      return res.status(403).json({
-        success: false,
-        error: 'Access denied. Company user role required.',
-      });
+    // Check for either userType 'company' (new flow) or role 'company_user' (legacy/employee)
+    if (req.user.userType === 'company' || req.user.role === 'company_user') {
+      return next();
     }
-    next();
+
+    return res.status(403).json({
+      success: false,
+      error: 'Access denied. Company user role required.',
+    });
   });
 };

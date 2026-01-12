@@ -28,6 +28,15 @@ This document tracks items that need to be addressed **after** the initial Mainn
 - [ ] **Fiat On-Ramp**: Build the prompt/flow for users to deposit Fiat (PIX), which allows switching from "Sponsored Activation" to "Deposit-based Activation" in the future if desired.
 - [ ] **Smart Contract Verification**: Once deployed, verify the Source Code on Stellar Expert for transparency.
 
+## 3.1 Company Features
+- [ ] **Full Company KYC**: Current registration only requires company name. Implement full KYC flow to collect and verify:
+    - Tax ID (CNPJ/EIN) with validation
+    - Legal representative identity verification
+    - Articles of incorporation / business registration documents
+    - Proof of address
+    - Beneficial ownership disclosure
+- [ ] **Company Multisig Wallets** (Optional): Allow companies to add multiple signers to their smart wallet for enhanced security (e.g., 2-of-3 passkeys required for transactions). The Stellar Smart Wallet architecture already supports this natively.
+
 ## 4. Housekeeping
 - [ ] **Clean `.env`**: After verifying production, remove any lingering `TESTNET` variables from the production environment to prevent confusion.
 

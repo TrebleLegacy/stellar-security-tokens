@@ -9,7 +9,15 @@ export const offersApi = {
     limit?: number;
     offset?: number;
   }): Promise<ApiResponse<Offer[]>> => {
+    // Determine endpoint based on context or params
+    // If company_id is provided, it might be an admin or public view
+    // But for "my company offers", we should use getCompanyOffers
     const response = await api.get('/offers', { params });
+    return response.data;
+  },
+
+  getCompanyOffers: async (): Promise<ApiResponse<Offer[]>> => {
+    const response = await api.get('/companies/offers');
     return response.data;
   },
 
