@@ -132,7 +132,7 @@ export function Wallets() {
             )}
 
             {/* Wallet Overview */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {wallets.map((wallet) => (
                     <Card key={wallet.name} className="glass-panel border-white/5 bg-white/5">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -192,6 +192,7 @@ export function Wallets() {
                                     <option value="treasury">Treasury</option>
                                     <option value="issuer">Issuer</option>
                                     <option value="distributor">Distributor</option>
+                                    {/* Operations wallet intentionally excluded from manual transfers */}
                                 </select>
                             </div>
 

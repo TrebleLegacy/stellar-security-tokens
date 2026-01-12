@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet, AlertTriangle, Settings, Building2 } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet, AlertTriangle, Settings, Building2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -28,6 +28,7 @@ export function AdminLayout() {
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/admin/dashboard' },
         { id: 'users', label: 'Investors', icon: Users, path: '/admin/users' },
         { id: 'companies', label: 'Companies', icon: Building2, path: '/admin/companies' },
+        { id: 'offers', label: 'Offers', icon: FileText, path: '/admin/offers' },
         { id: 'wallets', label: 'Wallets', icon: Wallet, path: '/admin/wallets' },
         { id: 'fees', label: 'Fee Configuration', icon: DollarSign, path: '/admin/fees' },
         { id: 'defaults', label: 'Default Cases', icon: AlertTriangle, path: '/admin/defaults' },

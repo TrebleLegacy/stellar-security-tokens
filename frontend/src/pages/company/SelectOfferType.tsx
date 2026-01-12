@@ -24,7 +24,7 @@ export function SelectOfferType() {
                 </Button>
                 <div>
                     <h2 className="text-2xl font-bold text-white">Choose Offer Type</h2>
-                    <p className="text-muted-foreground">Select the type of financial instrument you want to create</p>
+                    <p className="text-muted-foreground">Step 1 of 5 — Select the type of financial instrument</p>
                 </div>
             </div>
 
