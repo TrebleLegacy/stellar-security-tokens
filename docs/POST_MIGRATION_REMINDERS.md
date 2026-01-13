@@ -36,6 +36,7 @@ This document tracks items that need to be addressed **after** the initial Mainn
     - Proof of address
     - Beneficial ownership disclosure
 - [ ] **Company Multisig Wallets** (Optional): Allow companies to add multiple signers to their smart wallet for enhanced security (e.g., 2-of-3 passkeys required for transactions). The Stellar Smart Wallet architecture already supports this natively.
+- [ ] **Company User Management**: Currently using auto-provisioning for direct company logins to satisfy DB constraints. Post-MVP: Implement proper User Management for companies (Add/Remove users) and consider refining DB schema to support direct entity actions.
 
 ## 4. Housekeeping
 - [ ] **Clean `.env`**: After verifying production, remove any lingering `TESTNET` variables from the production environment to prevent confusion.
