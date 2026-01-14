@@ -60,19 +60,20 @@ export function CreateOffer() {
     // Get offer type from URL params
     const offerType = searchParams.get('type') as 'collateral' | 'sale' | null;
 
-    // Track if we've restored the draft to prevent re-running
-    const [draftRestored, setDraftRestored] = useState(false);
+
 
     // Load saved draft from sessionStorage when offerType is available
     useEffect(() => {
-        if (draftRestored || !offerType) return;
+        if (!offerType) return;
 
         const savedDraft = sessionStorage.getItem(STORAGE_KEY);
+        let restored = false;
+
         if (savedDraft) {
             try {
                 const parsed: StoredDraft = JSON.parse(savedDraft);
-                // Only restore if the offer type matches
-                if (parsed.offerType === offerType) {
+                // Only restore if the offer type matches and step is valid (not success)
+                if (parsed.offerType === offerType && parsed.step < 5) {
                     setFormData(prev => ({
                         ...prev,
                         ...parsed.formData,
@@ -80,17 +81,28 @@ export function CreateOffer() {
                         legal_documents: {} // Files can't be persisted
                     }));
                     setStep(parsed.step);
+                    restored = true;
                 }
             } catch (e) {
                 console.error('Failed to parse saved draft:', e);
             }
         }
-        setDraftRestored(true);
-    }, [offerType, draftRestored]);
+
+        // If no draft was restored, reset to initial state with correct offer type
+        if (!restored) {
+            setFormData({
+                ...initialFormData,
+                offer_type: offerType,
+            });
+            setStep(1);
+        }
+
+
+    }, [offerType]);
 
     // Save draft to sessionStorage whenever formData or step changes
     useEffect(() => {
-        if (offerType) {
+        if (offerType && step < 5) {
             const { legal_documents, ...formDataWithoutFiles } = formData;
             const draft: StoredDraft = {
                 formData: formDataWithoutFiles,
@@ -122,6 +134,7 @@ export function CreateOffer() {
     // Step 5 (displayStep) = Review & Submit. The confirmation screen after is not a numbered step.
     const totalSteps = 5;
     const displayStep = step + 1;
+    const isSuccess = step === 5;
 
     const updateFormData = (updates: Partial<OfferFormData>) => {
         setFormData(prev => ({ ...prev, ...updates }));
@@ -221,12 +234,13 @@ export function CreateOffer() {
                         size="icon"
                         onClick={() => step > 1 ? setStep(step - 1) : navigate('/company/offers/new')}
                         className="text-muted-foreground hover:text-white"
+                        disabled={isSuccess}
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
                     <div>
                         <h2 className="text-2xl font-bold text-white">Create New Offer</h2>
-                        <p className="text-muted-foreground">Step {displayStep} of {totalSteps}</p>
+                        {!isSuccess && <p className="text-muted-foreground">Step {displayStep} of {totalSteps}</p>}
                     </div>
                 </div>
                 <Button
@@ -240,14 +254,16 @@ export function CreateOffer() {
             </div>
 
             {/* Progress Indicator */}
-            <div className="flex gap-2">
-                {Array.from({ length: totalSteps }, (_, i) => (
-                    <div
-                        key={i}
-                        className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= displayStep ? 'bg-primary' : 'bg-muted/20'}`}
-                    />
-                ))}
-            </div>
+            {!isSuccess && (
+                <div className="flex gap-2">
+                    {Array.from({ length: totalSteps }, (_, i) => (
+                        <div
+                            key={i}
+                            className={`h-1 flex-1 rounded-full transition-colors ${i + 1 <= displayStep ? 'bg-primary' : 'bg-muted/20'}`}
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* Form Content */}
             <Card className="glass-panel border-white/5 bg-white/5">
@@ -536,13 +552,14 @@ export function CreateOffer() {
                                 <p className="text-xs text-muted-foreground">
                                     Documents will be stored on IPFS for immutability and transparency
                                 </p>
-                                <button
-                                    type="button"
-                                    onClick={() => navigate('/company/ipfs-info')}
-                                    className="text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors"
+                                <a
+                                    href="/company/ipfs-info"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-primary hover:text-primary/80 underline underline-offset-2 transition-colors inline-block"
                                 >
                                     Learn more about IPFS and document privacy →
-                                </button>
+                                </a>
                             </div>
                         </CardContent>
                     </>
