@@ -375,13 +375,14 @@ export class OfferController {
       }
 
       // Verificar acesso (company_user só vê suas próprias ofertas)
-      if (req.user.role === 'company_user' && offer.companyId !== req.user.companyId) {
+      // Check both role === 'company_user' (legacy) and userType === 'company' (direct company login)
+      const isCompanyAccess = req.user.role === 'company_user' || req.user.userType === 'company';
+      if (isCompanyAccess && offer.companyId !== req.user.companyId) {
         return res.status(403).json({
           success: false,
           error: 'Access denied',
         });
       }
-
       res.json({
         success: true,
         data: OfferController.formatOfferForResponse(offer),
@@ -413,7 +414,9 @@ export class OfferController {
       }
 
       // Verificar acesso
-      if (offer.companyId !== req.user.companyId) {
+      const isCompanyAccess = req.user.role === 'company_user' || req.user.userType === 'company';
+      if (offer.companyId !== req.user.companyId && (!isCompanyAccess || offer.companyId !== req.user.companyId)) {
+        // Double check because req.user.companyId might be set for both
         return res.status(403).json({
           success: false,
           error: 'Access denied',
@@ -537,7 +540,8 @@ export class OfferController {
       }
 
       // Check ownership (skip for admin)
-      if (req.user.role === 'company_user' && offer.companyId !== req.user.companyId) {
+      const isCompanyAccess = req.user.role === 'company_user' || req.user.userType === 'company';
+      if (isCompanyAccess && offer.companyId !== req.user.companyId) {
         return res.status(403).json({
           success: false,
           error: 'Access denied',
@@ -616,7 +620,8 @@ export class OfferController {
       // Só retornar se estiver ativa ou se for admin/company_user
       if (offer.status !== 'active' &&
         req.user?.role !== 'platform_admin' &&
-        req.user?.role !== 'company_user') {
+        req.user?.role !== 'company_user' &&
+        req.user?.userType !== 'company') {
         return res.status(403).json({
           success: false,
           error: 'Offer is not active',
