@@ -64,7 +64,10 @@ export function Login() {
                     <CardContent className="space-y-6">
                         <Button
                             onClick={handleLogin}
-                            className="w-full h-14 text-white font-semibold shadow-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400"
+                            className={`w-full h-14 text-white font-semibold shadow-lg transition-all duration-300 ${userType === 'investor'
+                                    ? 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400'
+                                    : 'bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-500 hover:to-teal-400'
+                                }`}
                             disabled={isLoading}
                         >
                             <Fingerprint className="w-5 h-5 mr-2" />
