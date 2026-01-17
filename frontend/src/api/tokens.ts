@@ -29,5 +29,30 @@ export const tokensApi = {
     const response = await api.post('/tokens/distribute', data);
     return response.data;
   },
+
+  freeze: async (data: {
+    investorPublicKey: string;
+    assetCode: string;
+  }): Promise<ApiResponse> => {
+    const response = await api.post('/tokens/freeze', data);
+    return response.data;
+  },
+
+  unfreeze: async (data: {
+    investorPublicKey: string;
+    assetCode: string;
+  }): Promise<ApiResponse> => {
+    const response = await api.post('/tokens/unfreeze', data);
+    return response.data;
+  },
+
+  clawback: async (data: {
+    investorPublicKey: string;
+    assetCode: string;
+    amount: string;
+  }): Promise<ApiResponse> => {
+    const response = await api.post('/tokens/clawback', data);
+    return response.data;
+  },
 };
 

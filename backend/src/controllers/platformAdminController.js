@@ -1,4 +1,5 @@
 import { PlatformAdmin } from '../models/PlatformAdmin.js';
+import { StellarService } from '../services/stellar.service.js';
 import prisma from '../config/prisma.js';
 import { generateToken } from '../middleware/auth.js';
 import { EmailService } from '../services/email.service.js';
@@ -385,6 +386,17 @@ export class PlatformAdminController {
           updatedAt: new Date(),
         },
       });
+
+      // Automated Whitelisting: If investor has a smart wallet (stellarContractId), authorize all trustlines
+      if (updatedInvestor.stellarContractId) {
+        try {
+          console.log(`[KYC Approval] Triggering automated whitelisting for ${updatedInvestor.email} (${updatedInvestor.stellarContractId})`);
+          await StellarService.authorizeAllUserTrustlines(updatedInvestor.stellarContractId);
+        } catch (whitelistError) {
+          console.error(`[KYC Approval] Automated whitelisting failed for ${updatedInvestor.email}:`, whitelistError.message);
+          // We don't fail the approval if whitelisting fails, but we log it
+        }
+      }
 
 
 

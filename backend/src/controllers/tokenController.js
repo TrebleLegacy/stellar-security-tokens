@@ -181,3 +181,89 @@ export const getTokenBalance = async (req, res, next) => {
   }
 };
 
+export const freezeAccount = async (req, res, next) => {
+  try {
+    const { investorPublicKey, assetCode } = req.body;
+
+    if (!investorPublicKey || !assetCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'investorPublicKey and assetCode are required',
+      });
+    }
+
+    const result = await StellarService.freezeAccount(investorPublicKey, assetCode);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const unfreezeAccount = async (req, res, next) => {
+  try {
+    const { investorPublicKey, assetCode } = req.body;
+
+    if (!investorPublicKey || !assetCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'investorPublicKey and assetCode are required',
+      });
+    }
+
+    const result = await StellarService.unfreezeAccount(investorPublicKey, assetCode);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const clawbackTokens = async (req, res, next) => {
+  try {
+    const { investorPublicKey, assetCode, amount } = req.body;
+
+    if (!investorPublicKey || !assetCode || !amount) {
+      return res.status(400).json({
+        success: false,
+        error: 'investorPublicKey, assetCode, and amount are required',
+      });
+    }
+
+    const result = await StellarService.clawbackTokens(investorPublicKey, amount, assetCode);
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+export const listAssetHolders = async (req, res, next) => {
+  try {
+    const { assetCode } = req.params;
+
+    if (!assetCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'assetCode is required',
+      });
+    }
+
+    const holders = await StellarService.listAssetHolders(assetCode);
+
+    res.json({
+      success: true,
+      data: holders,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

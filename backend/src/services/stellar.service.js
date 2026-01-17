@@ -40,11 +40,39 @@ export class StellarService {
       try {
         const account = await stellarServer.loadAccount(issuerKeypair.publicKey());
         console.log('Issuer account already exists:', issuerKeypair.publicKey());
+
+        // Check if flags are set correctly
+        const flags = account.flags;
+        const expectedFlags = AuthRequiredFlag | AuthRevocableFlag | AuthClawbackEnabledFlag;
+
+        const currentFlagsValue =
+          (flags.auth_required ? AuthRequiredFlag : 0) |
+          (flags.auth_revocable ? AuthRevocableFlag : 0) |
+          (flags.auth_clawback_enabled ? AuthClawbackEnabledFlag : 0);
+
+        if ((currentFlagsValue & expectedFlags) !== expectedFlags) {
+          console.log('Issuer flags are missing. Setting them now...');
+          const operations = [
+            Operation.setOptions({
+              source: issuerKeypair.publicKey(),
+              setFlags: expectedFlags,
+            }),
+          ];
+          const transaction = await buildTransaction(issuerKeypair, operations);
+          await signAndSubmitTransaction(transaction, issuerKeypair);
+          console.log('Issuer flags updated successfully.');
+        }
+
         return {
           success: true,
           publicKey: issuerKeypair.publicKey(),
           secretKey: issuerKeypair.secret(),
           alreadyExists: true,
+          flags: {
+            authRequired: true, // We just ensured they are set
+            authRevocable: true,
+            authClawbackEnabled: true,
+          }
         };
       } catch (error) {
         if (error.status !== 404) {
@@ -506,6 +534,55 @@ export class StellarService {
   }
 
   /**
+   * Descongela conta do investidor restaurando a autorização da trustline
+   * Ativa a flag AUTHORIZED_FLAG
+   * @param {string} investorPublicKey - Chave pública do investidor (56 caracteres)
+   * @param {string} assetCode - Código do asset (REQUIRED)
+   * @returns {Promise<Object>} Resultado do descongelamento
+   */
+  static async unfreezeAccount(investorPublicKey, assetCode) {
+    if (!assetCode) {
+      throw new Error('assetCode is required');
+    }
+    try {
+      const issuerKeypair = getIssuerKeypair();
+
+      if (!investorPublicKey || investorPublicKey.length !== 56) {
+        throw new Error('Invalid investor public key');
+      }
+
+      const asset = createAsset(assetCode, issuerKeypair.publicKey());
+
+      const operations = [
+        Operation.setTrustLineFlags({
+          trustor: investorPublicKey,
+          asset: asset,
+          setFlags: 1, // AUTHORIZED_FLAG = 1
+        }),
+      ];
+
+      const transaction = await buildTransaction(issuerKeypair, operations);
+      const result = await signAndSubmitTransaction(transaction, issuerKeypair);
+
+      if (!result.success) {
+        throw new Error(`Failed to unfreeze account: ${result.error}`);
+      }
+
+      return {
+        success: true,
+        investorPublicKey,
+        assetCode,
+        transactionHash: result.hash,
+        ledger: result.ledger,
+        message: 'Account unfrozen successfully (trustline authorization restored)',
+      };
+    } catch (error) {
+      console.error('Error unfreezing account:', error);
+      throw new Error(`Account unfreeze failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Recupera tokens (clawback) do investidor
    * Retira tokens da conta do investidor e retorna para o emissor
    * Requer que o asset tenha AuthClawbackEnabledFlag habilitada
@@ -793,6 +870,92 @@ export class StellarService {
     } catch (error) {
       console.error('Error verifying USDC payment:', error);
       throw new Error(`Failed to verify USDC payment: ${error.message}`);
+    }
+  }
+
+  /**
+   * Lista todos os holders de um determinado asset
+   * Usa a API do Horizon para buscar contas com trustlines para o asset
+   * @param {string} assetCode - Código do asset
+   * @returns {Promise<Array>} Lista de holders e seus balances
+   */
+  static async listAssetHolders(assetCode) {
+    try {
+      const issuerKeypair = getIssuerKeypair();
+      const accounts = await stellarServer
+        .accounts()
+        .forAsset(`${assetCode}:${issuerKeypair.publicKey()}`)
+        .call();
+
+      return accounts.records.map(account => {
+        const balance = account.balances.find(
+          b => b.asset_code === assetCode && b.asset_issuer === issuerKeypair.publicKey()
+        );
+
+        return {
+          publicKey: account.account_id,
+          balance: balance.balance,
+          authorized: balance.is_authorized,
+          authorizedToMaintainLiabilities: balance.is_authorized_to_maintain_liabilities,
+          clawbackEnabled: balance.is_clawback_enabled,
+        };
+      });
+    } catch (error) {
+      console.error('Error listing asset holders:', error);
+      throw new Error(`Failed to list asset holders: ${error.message}`);
+    }
+  }
+
+  /**
+   * Automations: Authorize all project trustlines for a specific investor
+   * Usually called after KYC approval
+   * @param {string} investorPublicKey - Investor's public key
+   * @returns {Promise<Object>} Summary of authorizations
+   */
+  static async authorizeAllUserTrustlines(investorPublicKey) {
+    if (!investorPublicKey) throw new Error('investorPublicKey is required');
+
+    try {
+      const issuerKeypair = getIssuerKeypair();
+      const account = await stellarServer.loadAccount(investorPublicKey);
+
+      // Find all trustlines that are NOT authorized
+      const unauthorizedTrustlines = account.balances.filter(b =>
+        b.asset_type !== 'native' &&
+        b.asset_issuer === issuerKeypair.publicKey() &&
+        !b.is_authorized
+      );
+
+      if (unauthorizedTrustlines.length === 0) {
+        return { success: true, authorizedCount: 0, message: 'No trustlines to authorize' };
+      }
+
+      console.log(`[Whitelisting] Authorizing ${unauthorizedTrustlines.length} trustlines for ${investorPublicKey}`);
+
+      const operations = unauthorizedTrustlines.map(tl =>
+        Operation.setTrustLineFlags({
+          trustor: investorPublicKey,
+          asset: createAsset(tl.asset_code, tl.asset_issuer),
+          setFlags: 1, // AUTHORIZED_FLAG
+        })
+      );
+
+      const transaction = await buildTransaction(issuerKeypair, operations);
+      const result = await signAndSubmitTransaction(transaction, issuerKeypair);
+
+      if (!result.success) {
+        throw new Error(`Failed to authorize trustlines: ${result.error}`);
+      }
+
+      return {
+        success: true,
+        authorizedCount: unauthorizedTrustlines.length,
+        transactionHash: result.hash,
+        assets: unauthorizedTrustlines.map(tl => tl.asset_code)
+      };
+    } catch (error) {
+      console.error('Error in authorizeAllUserTrustlines:', error);
+      throw error;
     }
   }
 }

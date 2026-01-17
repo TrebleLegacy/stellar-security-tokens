@@ -152,9 +152,21 @@ export const seedTestData = async () => {
       },
     });
 
+    // Create platform admin for compliance tests
+    const admin = await prisma.platformAdmin.create({
+      data: {
+        name: 'Test Admin',
+        email: `admin-${timestamp}@example.com`,
+        role: 'admin',
+        isActive: true,
+        passwordHash: 'dummy-hash',
+      },
+    });
+
     return {
       investor,
       token,
+      admin,
     };
   } catch (error) {
     console.error('Error seeding test data:', error);
