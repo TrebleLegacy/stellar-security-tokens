@@ -84,3 +84,32 @@ openssl rand -hex 32
 # Stellar Keypairs (run for Issuer, Distributor, Treasury)
 node -e "const {Keypair} = require('@stellar/stellar-sdk'); const kp = Keypair.random(); console.log('SECRET=' + kp.secret()); console.log('PUBLIC=' + kp.publicKey());"
 ```
+
+---
+
+## 🔒 Security Audit (Before Launch)
+
+### Dependency Audit
+```bash
+cd backend && npm audit
+cd frontend && npm audit
+```
+
+- [ ] **No critical vulnerabilities** in production dependencies
+- [ ] **Review high severity issues** - ensure none are exploitable in our code paths
+- [ ] **Document exceptions** for non-exploitable transitive dependencies
+
+### Multisig Setup
+```bash
+cd backend
+npm run multisig:inspect  # Verify account configuration
+npm run multisig:setup    # Configure production signers
+```
+
+- [ ] **Treasury account** - 2-of-3 multisig with Ledger keys
+- [ ] **Issuer account** - Locked after initial token setup
+- [ ] **Master keys disabled** on all production accounts
+
+### Error Monitoring
+- [ ] **SENTRY_DSN** configured in backend `.env`
+- [ ] **VITE_SENTRY_DSN** configured in frontend `.env`
