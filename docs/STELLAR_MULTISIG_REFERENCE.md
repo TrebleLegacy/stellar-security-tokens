@@ -140,8 +140,34 @@ const transaction = new StellarSdk.TransactionBuilder(account, opts)
 
 ---
 
+## CLI Commands
+
+### Inspect Account Configuration
+```bash
+cd backend
+npm run multisig:inspect                    # Inspect all configured accounts
+npm run multisig:inspect -- -a GABC...      # Inspect specific account
+```
+
+### Setup Multisig
+```bash
+# Add 3 Ledger signers to treasury, require 2-of-3
+npm run multisig:setup -- -a treasury \
+  -s GABC... -s GDEF... -s GHIJ... \
+  -t 2
+
+# Lock issuer account after initial setup
+npm run multisig:setup -- -a issuer --lock
+
+# Dry run (preview only)
+npm run multisig:setup -- -a treasury -s GABC... -t 1 --dry-run
+```
+
+---
+
 ## References
 
-- [Signatures and Multisig](learn/fundamentals/transactions/signatures-multisig.md)
-- [Asset Access Control](tokens/control-asset-access.md)
-- [How to Issue an Asset](tokens/how-to-issue-an-asset.md)
+- [Signatures and Multisig](Stellar Docs .../learn/fundamentals/transactions/signatures-multisig.md)
+- [Asset Access Control](Stellar Docs .../tokens/control-asset-access.md)
+- [How to Issue an Asset](Stellar Docs .../tokens/how-to-issue-an-asset.md)
+
