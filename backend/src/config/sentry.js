@@ -83,21 +83,47 @@ export function initSentry() {
  * Express error handler middleware for Sentry
  * Add this AFTER all routes but BEFORE your custom error handler
  */
-export const sentryErrorHandler = Sentry.Handlers.errorHandler({
-    shouldHandleError(error) {
-        // Report all 4xx and 5xx errors
-        return error.status >= 400 || !error.status;
-    },
-});
+export function getSentryErrorHandler() {
+    if (!Sentry.Handlers) {
+        // Return no-op middleware if Sentry not available (e.g., in tests)
+        return (err, req, res, next) => next(err);
+    }
+    return Sentry.Handlers.errorHandler({
+        shouldHandleError(error) {
+            // Report all 4xx and 5xx errors
+            return error.status >= 400 || !error.status;
+        },
+    });
+}
 
 /**
  * Express request handler middleware for Sentry
  * Add this BEFORE all routes
  */
-export const sentryRequestHandler = Sentry.Handlers.requestHandler({
-    // Include user info in error reports
-    user: ['id', 'email', 'role'],
-});
+export function getSentryRequestHandler() {
+    if (!Sentry.Handlers) {
+        // Return no-op middleware if Sentry not available (e.g., in tests)
+        return (req, res, next) => next();
+    }
+    return Sentry.Handlers.requestHandler({
+        // Include user info in error reports
+        user: ['id', 'email', 'role'],
+    });
+}
+
+// Legacy exports for backward compatibility (lazy-initialized)
+let _errorHandler = null;
+let _requestHandler = null;
+
+export const sentryErrorHandler = (err, req, res, next) => {
+    if (!_errorHandler) _errorHandler = getSentryErrorHandler();
+    return _errorHandler(err, req, res, next);
+};
+
+export const sentryRequestHandler = (req, res, next) => {
+    if (!_requestHandler) _requestHandler = getSentryRequestHandler();
+    return _requestHandler(req, res, next);
+};
 
 /**
  * Capture an error manually
