@@ -39,6 +39,7 @@ import { DefaultCases } from './pages/admin/DefaultCases';
 import { AdminSettings } from './pages/admin/Settings';
 import { Companies } from './pages/admin/Companies';
 import { AdminOffers } from './pages/admin/AdminOffers';
+import { PendingTransactions } from './pages/admin/PendingTransactions';
 
 function App() {
   return (
@@ -87,6 +88,7 @@ function App() {
           <Route path="users" element={<UserManagement />} />
           <Route path="companies" element={<Companies />} />
           <Route path="offers" element={<AdminOffers />} />
+          <Route path="transactions" element={<PendingTransactions />} />
           <Route path="wallets" element={<Wallets />} />
           <Route path="fees" element={<FeeConfig />} />
           <Route path="defaults" element={<DefaultCases />} />
