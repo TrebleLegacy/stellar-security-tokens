@@ -79,18 +79,17 @@ app.get('/api-docs.json', (req, res) => {
 });
 
 // Serve stellar.toml for domain verification
-app.get('/.well-known/stellar.toml', (req, res) => {
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-
-    const issuerKey = process.env.STELLAR_ISSUER_PUBLIC_KEY || '';
-    const tomlContent = `ACCOUNTS=[
-"${issuerKey}"
-]
-
-VERSION="2.0.0"
-`;
-    res.send(tomlContent);
+import { TomlService } from './services/toml.service.js';
+app.get('/.well-known/stellar.toml', async (req, res) => {
+    try {
+        const tomlContent = await TomlService.generateToml();
+        res.setHeader('Content-Type', 'text/plain');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.send(tomlContent);
+    } catch (error) {
+        console.error('Error generating stellar.toml:', error);
+        res.status(500).send('# Error generating stellar.toml');
+    }
 });
 
 /**

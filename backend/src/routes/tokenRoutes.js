@@ -8,6 +8,10 @@ import {
   getTokenByAssetCode,
   distributeTokens,
   getTokenBalance,
+  freezeAccount,
+  unfreezeAccount,
+  clawbackTokens,
+  listAssetHolders,
 } from '../controllers/tokenController.js';
 
 const router = express.Router();
@@ -176,6 +180,64 @@ router.post('/distribute', requirePlatformAdmin, distributeTokenValidation, dist
  *         description: Balanço do token
  */
 router.get('/:assetCode/balance', getTokenBalance);
+
+/**
+ * @swagger
+ * /api/tokens/freeze:
+ *   post:
+ *     summary: Congelar conta de investidor
+ *     tags: [Tokens]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - investorPublicKey
+ *               - assetCode
+ *             properties:
+ *               investorPublicKey:
+ *                 type: string
+ *               assetCode:
+ *                 type: string
+ */
+router.post('/freeze', requirePlatformAdmin, freezeAccount);
+
+/**
+ * @swagger
+ * /api/tokens/unfreeze:
+ *   post:
+ *     summary: Descongelar conta de investidor
+ *     tags: [Tokens]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/unfreeze', requirePlatformAdmin, unfreezeAccount);
+
+/**
+ * @swagger
+ * /api/tokens/clawback:
+ *   post:
+ *     summary: Recuperar tokens (Clawback)
+ *     tags: [Tokens]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post('/clawback', requirePlatformAdmin, clawbackTokens);
+
+/**
+ * @swagger
+ * /api/tokens/{assetCode}/holders:
+ *   get:
+ *     summary: Listar holders de um token
+ *     tags: [Tokens]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/:assetCode/holders', requirePlatformAdmin, listAssetHolders);
 
 export default router;
 

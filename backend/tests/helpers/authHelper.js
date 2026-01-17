@@ -25,8 +25,8 @@ export const getAdminToken = (admin) => {
     return generateToken({
         userId: admin.id,
         email: admin.email,
-        role: admin.role, // e.g. 'super_admin'
-        userType: 'admin'
+        role: 'platform_admin',
+        userType: 'platform_admin'
     });
 };
 

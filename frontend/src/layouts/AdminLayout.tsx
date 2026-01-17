@@ -33,6 +33,7 @@ export function AdminLayout() {
         { id: 'wallets', label: 'Wallets', icon: Wallet, path: '/admin/wallets' },
         { id: 'fees', label: 'Fee Configuration', icon: DollarSign, path: '/admin/fees' },
         { id: 'defaults', label: 'Default Cases', icon: AlertTriangle, path: '/admin/defaults' },
+        { id: 'compliance', label: 'Token Compliance', icon: Shield, path: '/admin/compliance' },
         { id: 'settings', label: 'Settings', icon: Settings, path: '/admin/settings' },
     ];
 

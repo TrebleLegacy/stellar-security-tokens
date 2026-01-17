@@ -1,10 +1,10 @@
-
 import {
     getTreasuryKeypair,
     getIssuerKeypair,
     getDistributorKeypair,
     stellarServer,
     buildTransaction,
+    createAsset,
 } from '../config/stellar.js';
 import prisma from '../config/prisma.js';
 import { TransactionBuilder, Transaction, Networks as StellarNetworks, Operation, Asset } from '@stellar/stellar-sdk';
@@ -129,22 +129,49 @@ export const WalletController = {
                 transaction = rpc.assembleTransaction(tx, simResult).build();
 
             } else {
-                // Classic Payment (G...)
-                if (assetCode !== 'XLM') {
-                    return res.status(400).json({ error: 'Only XLM transfers supported currently' });
-                }
+                // Classic Operations
+                let operation;
 
-                const paymentOp = Operation.payment({
-                    destination: destination,
-                    asset: Asset.native(),
-                    amount: amount.toString(),
-                });
+                switch (req.body.operationType) {
+                    case 'freeze_account':
+                        operation = Operation.setTrustLineFlags({
+                            trustor: destination,
+                            asset: createAsset(assetCode, getIssuerKeypair().publicKey()),
+                            clearFlags: 1, // AUTHORIZED_FLAG = 1
+                        });
+                        break;
+                    case 'unfreeze_account':
+                        operation = Operation.setTrustLineFlags({
+                            trustor: destination,
+                            asset: createAsset(assetCode, getIssuerKeypair().publicKey()),
+                            setFlags: 1, // AUTHORIZED_FLAG = 1
+                        });
+                        break;
+                    case 'clawback':
+                        operation = Operation.clawback({
+                            asset: createAsset(assetCode, getIssuerKeypair().publicKey()),
+                            from: destination,
+                            amount: amount.toString(),
+                        });
+                        break;
+                    default:
+                        // Default to payment if no operationType is specified (backwards compatibility)
+                        if (assetCode !== 'XLM') {
+                            return res.status(400).json({ error: 'Only XLM transfers supported currently' });
+                        }
+
+                        operation = Operation.payment({
+                            destination: destination,
+                            asset: Asset.native(),
+                            amount: amount.toString(),
+                        });
+                }
 
                 transaction = new TransactionBuilder(sourceAccount, {
                     fee: '100', // Base fee
                     networkPassphrase: process.env.STELLAR_NETWORK === 'public' ? StellarNetworks.PUBLIC : StellarNetworks.TESTNET,
                 })
-                    .addOperation(paymentOp)
+                    .addOperation(operation)
                     .setTimeout(180)
                     .build();
             }
