@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import { initSentry, sentryRequestHandler, sentryErrorHandler } from './config/sentry.js';
 import investorRoutes from './routes/investorRoutes.js';
 import tokenRoutes from './routes/tokenRoutes.js';
 import investmentRoutes from './routes/investmentRoutes.js';
@@ -30,6 +31,9 @@ if (!process.env.JWT_SECRET) {
     dotenv.config();
 }
 
+// Initialize Sentry error monitoring (must be before app creation)
+initSentry();
+
 const app = express();
 
 // Trust first proxy (nginx) - needed for rate limiting behind reverse proxy
@@ -55,6 +59,11 @@ app.use(express.urlencoded({ extended: true }));
 
 // Apply global rate limiting to all routes (100 req/min per IP)
 app.use(globalLimiter);
+
+// Sentry request handler (must be first middleware after body parsing)
+if (process.env.SENTRY_DSN) {
+    app.use(sentryRequestHandler);
+}
 
 // Swagger documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
@@ -144,6 +153,12 @@ app.use('/api/admin/transactions', strictLimiter, adminTransactionRoutes);
 
 
 app.use(notFoundHandler);
+
+// Sentry error handler (must be before custom error handler)
+if (process.env.SENTRY_DSN) {
+    app.use(sentryErrorHandler);
+}
+
 app.use(errorHandler);
 
 export default app;
