@@ -399,7 +399,9 @@ export const ModelName = {
   SystemConfig: 'SystemConfig',
   FeeLog: 'FeeLog',
   MultiSigTransaction: 'MultiSigTransaction',
-  Notification: 'Notification'
+  Notification: 'Notification',
+  PaymentReminder: 'PaymentReminder',
+  CompanyPenalty: 'CompanyPenalty'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -415,7 +417,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "investor" | "token" | "tokenDistribution" | "interestPayment" | "company" | "companyUser" | "platformAdmin" | "offer" | "investment" | "investorWebauthnCredential" | "companyUserWebauthnCredential" | "platformAdminWebauthnCredential" | "systemConfig" | "feeLog" | "multiSigTransaction" | "notification"
+    modelProps: "investor" | "token" | "tokenDistribution" | "interestPayment" | "company" | "companyUser" | "platformAdmin" | "offer" | "investment" | "investorWebauthnCredential" | "companyUserWebauthnCredential" | "platformAdminWebauthnCredential" | "systemConfig" | "feeLog" | "multiSigTransaction" | "notification" | "paymentReminder" | "companyPenalty"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1603,6 +1605,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PaymentReminder: {
+      payload: Prisma.$PaymentReminderPayload<ExtArgs>
+      fields: Prisma.PaymentReminderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PaymentReminderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PaymentReminderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>
+        }
+        findFirst: {
+          args: Prisma.PaymentReminderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PaymentReminderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>
+        }
+        findMany: {
+          args: Prisma.PaymentReminderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>[]
+        }
+        create: {
+          args: Prisma.PaymentReminderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>
+        }
+        createMany: {
+          args: Prisma.PaymentReminderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PaymentReminderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>[]
+        }
+        delete: {
+          args: Prisma.PaymentReminderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>
+        }
+        update: {
+          args: Prisma.PaymentReminderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>
+        }
+        deleteMany: {
+          args: Prisma.PaymentReminderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PaymentReminderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PaymentReminderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>[]
+        }
+        upsert: {
+          args: Prisma.PaymentReminderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PaymentReminderPayload>
+        }
+        aggregate: {
+          args: Prisma.PaymentReminderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePaymentReminder>
+        }
+        groupBy: {
+          args: Prisma.PaymentReminderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentReminderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PaymentReminderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PaymentReminderCountAggregateOutputType> | number
+        }
+      }
+    }
+    CompanyPenalty: {
+      payload: Prisma.$CompanyPenaltyPayload<ExtArgs>
+      fields: Prisma.CompanyPenaltyFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CompanyPenaltyFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CompanyPenaltyFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>
+        }
+        findFirst: {
+          args: Prisma.CompanyPenaltyFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CompanyPenaltyFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>
+        }
+        findMany: {
+          args: Prisma.CompanyPenaltyFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>[]
+        }
+        create: {
+          args: Prisma.CompanyPenaltyCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>
+        }
+        createMany: {
+          args: Prisma.CompanyPenaltyCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CompanyPenaltyCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>[]
+        }
+        delete: {
+          args: Prisma.CompanyPenaltyDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>
+        }
+        update: {
+          args: Prisma.CompanyPenaltyUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>
+        }
+        deleteMany: {
+          args: Prisma.CompanyPenaltyDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CompanyPenaltyUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CompanyPenaltyUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>[]
+        }
+        upsert: {
+          args: Prisma.CompanyPenaltyUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CompanyPenaltyPayload>
+        }
+        aggregate: {
+          args: Prisma.CompanyPenaltyAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCompanyPenalty>
+        }
+        groupBy: {
+          args: Prisma.CompanyPenaltyGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CompanyPenaltyGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CompanyPenaltyCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CompanyPenaltyCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1727,6 +1877,7 @@ export const CompanyScalarFieldEnum = {
   name: 'name',
   cnpj: 'cnpj',
   email: 'email',
+  emailVerified: 'emailVerified',
   legalRepresentative: 'legalRepresentative',
   address: 'address',
   phone: 'phone',
@@ -1805,6 +1956,10 @@ export const OfferScalarFieldEnum = {
   maturityDate: 'maturityDate',
   bulletPaymentAmount: 'bulletPaymentAmount',
   paymentFrequency: 'paymentFrequency',
+  paymentDay: 'paymentDay',
+  nextPaymentDue: 'nextPaymentDue',
+  lastPaymentDate: 'lastPaymentDate',
+  paymentDueStatus: 'paymentDueStatus',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1899,14 +2054,21 @@ export type FeeLogScalarFieldEnum = (typeof FeeLogScalarFieldEnum)[keyof typeof 
 
 export const MultiSigTransactionScalarFieldEnum = {
   id: 'id',
+  operationType: 'operationType',
   xdr: 'xdr',
+  networkPassphrase: 'networkPassphrase',
   description: 'description',
   status: 'status',
+  requiredSigners: 'requiredSigners',
+  thresholdRequired: 'thresholdRequired',
+  collectedSignatures: 'collectedSignatures',
   initiatorId: 'initiatorId',
-  signatures: 'signatures',
-  network: 'network',
-  thresholdMet: 'thresholdMet',
-  hash: 'hash',
+  initiatorType: 'initiatorType',
+  metadata: 'metadata',
+  expiresAt: 'expiresAt',
+  submittedAt: 'submittedAt',
+  txHash: 'txHash',
+  ledger: 'ledger',
   errorMessage: 'errorMessage',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -1928,6 +2090,40 @@ export const NotificationScalarFieldEnum = {
 } as const
 
 export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const PaymentReminderScalarFieldEnum = {
+  id: 'id',
+  offerId: 'offerId',
+  companyId: 'companyId',
+  reminderType: 'reminderType',
+  dueDate: 'dueDate',
+  amountDue: 'amountDue',
+  sentAt: 'sentAt',
+  sentVia: 'sentVia',
+  acknowledged: 'acknowledged',
+  acknowledgedAt: 'acknowledgedAt'
+} as const
+
+export type PaymentReminderScalarFieldEnum = (typeof PaymentReminderScalarFieldEnum)[keyof typeof PaymentReminderScalarFieldEnum]
+
+
+export const CompanyPenaltyScalarFieldEnum = {
+  id: 'id',
+  companyId: 'companyId',
+  offerId: 'offerId',
+  penaltyType: 'penaltyType',
+  description: 'description',
+  amount: 'amount',
+  percentageRate: 'percentageRate',
+  daysLate: 'daysLate',
+  status: 'status',
+  enforcedAt: 'enforcedAt',
+  paidAt: 'paidAt',
+  createdAt: 'createdAt'
+} as const
+
+export type CompanyPenaltyScalarFieldEnum = (typeof CompanyPenaltyScalarFieldEnum)[keyof typeof CompanyPenaltyScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2194,6 +2390,20 @@ export type ListEnumOfferStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$
 
 
 /**
+ * Reference to a field of type 'PaymentDueStatus'
+ */
+export type EnumPaymentDueStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentDueStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'PaymentDueStatus[]'
+ */
+export type ListEnumPaymentDueStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'PaymentDueStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'InvestmentStatus'
  */
 export type EnumInvestmentStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InvestmentStatus'>
@@ -2218,6 +2428,20 @@ export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 
  * Reference to a field of type 'BigInt[]'
  */
 export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+    
+
+
+/**
+ * Reference to a field of type 'MultiSigOperationType'
+ */
+export type EnumMultiSigOperationTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MultiSigOperationType'>
+    
+
+
+/**
+ * Reference to a field of type 'MultiSigOperationType[]'
+ */
+export type ListEnumMultiSigOperationTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MultiSigOperationType[]'>
     
 
 
@@ -2359,6 +2583,8 @@ export type GlobalOmitConfig = {
   feeLog?: Prisma.FeeLogOmit
   multiSigTransaction?: Prisma.MultiSigTransactionOmit
   notification?: Prisma.NotificationOmit
+  paymentReminder?: Prisma.PaymentReminderOmit
+  companyPenalty?: Prisma.CompanyPenaltyOmit
 }
 
 /* Types for Logging */

@@ -5,6 +5,7 @@ WORKDIR /app
 
 # Argumento de build para URL da API
 ARG VITE_API_URL=/api
+ARG VITE_ENABLE_TEST_LOGIN=false
 
 # Copiar arquivos de dependências
 COPY package*.json ./
@@ -19,6 +20,7 @@ COPY frontend/ ./frontend/
 # Build da aplicação
 WORKDIR /app/frontend
 ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_ENABLE_TEST_LOGIN=${VITE_ENABLE_TEST_LOGIN}
 RUN npm run build
 
 # Stage 2: Nginx para servir arquivos estáticos

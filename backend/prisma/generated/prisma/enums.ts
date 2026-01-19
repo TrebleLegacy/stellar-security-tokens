@@ -44,7 +44,8 @@ export const PaymentType = {
   monthly: 'monthly',
   bullet: 'bullet',
   quarterly: 'quarterly',
-  semi_annual: 'semi_annual'
+  semi_annual: 'semi_annual',
+  annual: 'annual'
 } as const
 
 export type PaymentType = (typeof PaymentType)[keyof typeof PaymentType]
@@ -65,6 +66,17 @@ export const PaymentStatus = {
 } as const
 
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus]
+
+
+export const PaymentDueStatus = {
+  current: 'current',
+  upcoming: 'upcoming',
+  due: 'due',
+  overdue: 'overdue',
+  defaulted: 'defaulted'
+} as const
+
+export type PaymentDueStatus = (typeof PaymentDueStatus)[keyof typeof PaymentDueStatus]
 
 
 export const InvestmentStatus = {
@@ -106,9 +118,27 @@ export type PlatformAdminRole = (typeof PlatformAdminRole)[keyof typeof Platform
 
 export const MultiSigTxStatus = {
   pending: 'pending',
+  partially_signed: 'partially_signed',
+  ready: 'ready',
+  submitted: 'submitted',
   executed: 'executed',
   rejected: 'rejected',
-  failed: 'failed'
+  failed: 'failed',
+  expired: 'expired'
 } as const
 
 export type MultiSigTxStatus = (typeof MultiSigTxStatus)[keyof typeof MultiSigTxStatus]
+
+
+export const MultiSigOperationType = {
+  token_issue: 'token_issue',
+  token_distribute: 'token_distribute',
+  freeze_account: 'freeze_account',
+  clawback: 'clawback',
+  treasury_payment: 'treasury_payment',
+  trustline_auth: 'trustline_auth',
+  account_setup: 'account_setup',
+  other: 'other'
+} as const
+
+export type MultiSigOperationType = (typeof MultiSigOperationType)[keyof typeof MultiSigOperationType]

@@ -1,5 +1,6 @@
 
 import { PasskeyKit } from 'passkey-kit';
+import { authStorage } from '@/utils/authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -163,6 +164,44 @@ export class PasskeyClient {
      * Sign a transaction with the user's Passkey
      */
     async signTransaction(xdr: string): Promise<string> {
+        // 1. Check if we are in development and using a test account
+        const isDev = import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_LOGIN === 'true';
+
+        // Check both investor and company user storage
+        const user = authStorage.getUser<any>('investor') || authStorage.getUser<any>('company');
+        const token = authStorage.getToken('investor') || authStorage.getToken('company');
+
+        const isTestAccount = user?.stellarPublicKey?.startsWith('G');
+
+        if (isDev && isTestAccount && token) {
+            console.log('[Passkey] Test account detected, signing via backend...');
+            try {
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${this.baseUrl}/wallets/test-sign`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        xdr,
+                        publicKey: user.stellarPublicKey
+                    }),
+                });
+
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Backend test-signing failed');
+                }
+
+                return data.signedXdr;
+            } catch (error) {
+                console.error('[Passkey] Backend signing error:', error);
+                throw error;
+            }
+        }
+
+        // 2. Normal Passkey signing
         await this.init();
         if (!this.kit) throw new Error('PasskeyKit not initialized');
 
