@@ -20,7 +20,15 @@ const sorobanRpcUrl = process.env.SOROBAN_RPC_URL || (
     : 'https://soroban-rpc.mainnet.stellar.org'
 );
 
+console.log(`[StellarConfig] Using Horizon URL: ${horizonUrl} (${network})`);
 export const stellarServer = new Horizon.Server(horizonUrl);
+
+/**
+ * Creates a fresh Horizon.Server instance.
+ * Use this after transaction submission to avoid connection state issues.
+ * @returns {Horizon.Server} Fresh Horizon server instance
+ */
+export const createFreshServer = () => new Horizon.Server(horizonUrl);
 
 /**
  * Get the Soroban RPC URL for smart contract interactions
@@ -97,7 +105,18 @@ export const createAsset = (code, issuerPublicKey) => {
  */
 export const buildTransaction = async (sourceKeypair, operations, options = {}) => {
   const sourceAccount = await stellarServer.loadAccount(sourceKeypair.publicKey());
+  return buildTransactionWithAccount(sourceAccount, operations, options);
+};
 
+/**
+ * Build a transaction using an already-loaded account (avoids redundant loadAccount calls)
+ * @param {AccountResponse} sourceAccount - Already loaded Stellar account
+ * @param {Operation[]} operations - Array of Stellar operations
+ * @param {Object} [options] - Additional options
+ * @param {string|Memo} [options.memo] - Memo for the transaction
+ * @returns {Transaction} Transaction ready for signing
+ */
+export const buildTransactionWithAccount = (sourceAccount, operations, options = {}) => {
   const transaction = new TransactionBuilder(sourceAccount, {
     fee: BASE_FEE,
     networkPassphrase: getNetworkPassphrase(),
@@ -261,6 +280,7 @@ const parseStellarErrorCodes = (codes) => {
  * Assina e submete uma transação Stellar para a rede
  * @param {Transaction} transaction - Transação a ser assinada e submetida
  * @param {Keypair} keypair - Keypair para assinar a transação
+ * @param {Horizon.Server} [server] - Optional server instance (uses default if not provided)
  * @returns {Promise<Object>} Resultado da submissão com hash, ledger e status
  * @returns {boolean} returns.success - Indica se a transação foi bem-sucedida
  * @returns {string} returns.hash - Hash da transação (se sucesso)
@@ -269,7 +289,7 @@ const parseStellarErrorCodes = (codes) => {
  * @returns {string} returns.userFriendlyError - Mensagem de erro amigável (se falhou)
  * @returns {Object} returns.resultCodes - Códigos de erro detalhados (se falhou)
  */
-export const signAndSubmitTransaction = async (transaction, keypair) => {
+export const signAndSubmitTransaction = async (transaction, keypair, server = null) => {
   // 1. Sign the inner transaction (Business Logic Signature)
   transaction.sign(keypair);
 
@@ -288,8 +308,11 @@ export const signAndSubmitTransaction = async (transaction, keypair) => {
   // 3. Sign the outer Fee Bump Transaction (Gas Signature)
   feeBumpTx.sign(operationsKeypair);
 
+  // Use provided server or fall back to default
+  const targetServer = server || stellarServer;
+
   try {
-    const result = await stellarServer.submitTransaction(feeBumpTx);
+    const result = await targetServer.submitTransaction(feeBumpTx);
     return {
       success: true,
       hash: result.hash,
@@ -297,8 +320,8 @@ export const signAndSubmitTransaction = async (transaction, keypair) => {
       result: result,
     };
   } catch (error) {
-    console.error('Transaction submission error:', error);
     if (error.response && error.response.data) {
+      console.dir(error.response.data, { depth: null });
       const errorResult = error.response.data.extras?.result_codes;
       const errorMessage = error.response.data.detail || error.message;
       const parsedCodes = parseStellarErrorCodes(errorResult);
@@ -318,6 +341,7 @@ export const signAndSubmitTransaction = async (transaction, keypair) => {
 
 export default {
   stellarServer,
+  createFreshServer,
   getNetworkPassphrase,
   getIssuerKeypair,
   getDistributorKeypair,
@@ -325,6 +349,7 @@ export default {
   getOperationsKeypair,
   createAsset,
   buildTransaction,
+  buildTransactionWithAccount,
   buildUnsignedTransaction,
   submitSignedTransaction,
   signAndSubmitTransaction,

@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-01-18T21:41:44.874Z",
+  "expiresIn": "30 days",
+  "investor": {
+    "id": 1,
+    "email": "test-investor@stellar-tokens.local",
+    "userType": "investor",
+    "role": "investor",
+    "stellarPublicKey": "GCZOSRIMOBMXGUPXELFXKDD6ZFQQQTVQYOVRWOHM4V645VOM7GIQDEIR",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoidGVzdC1pbnZlc3RvckBzdGVsbGFyLXRva2Vucy5sb2NhbCIsInVzZXJUeXBlIjoiaW52ZXN0b3IiLCJyb2xlIjoiaW52ZXN0b3IiLCJpYXQiOjE3Njg3NzI1MDQsImV4cCI6MTc3MTM2NDUwNH0.Zv0OgBf0QwiQw7pvYMAk49VA4m8yRKbFCBF-LA7GFyU"
+  },
+  "company": {
+    "userId": 2,
+    "companyId": 1,
+    "email": "admin-test-company@stellar-tokens.local",
+    "userType": "company",
+    "role": "admin",
+    "stellarPublicKey": "GC6P4TEU23V24JK25P3NVPIHQOR3J7KC4Y5AD2RB6TR7H52DK7YRLC5W",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImVtYWlsIjoiYWRtaW4tdGVzdC1jb21wYW55QHN0ZWxsYXItdG9rZW5zLmxvY2FsIiwidXNlclR5cGUiOiJjb21wYW55Iiwicm9sZSI6ImFkbWluIiwiY29tcGFueUlkIjoxLCJpYXQiOjE3Njg3NzI1MDQsImV4cCI6MTc3MTM2NDUwNH0.7xPkI6wXKbmT9CkrHoqdu4hC84OBikEDRF7VWhnXRqg"
+  },
+  "admin": {
+    "id": 1,
+    "email": "admin@stellar-tokens.local",
+    "userType": "platform_admin",
+    "role": "super_admin",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImVtYWlsIjoiYWRtaW5Ac3RlbGxhci10b2tlbnMubG9jYWwiLCJ1c2VyVHlwZSI6InBsYXRmb3JtX2FkbWluIiwicm9sZSI6InN1cGVyX2FkbWluIiwiaWF0IjoxNzY4NzcyNTA0LCJleHAiOjE3NzEzNjQ1MDR9.8pPd7TsRGHcArsO_OMKSPY4W3yxCzcwUh6Ui61i84pg"
+  }
+}

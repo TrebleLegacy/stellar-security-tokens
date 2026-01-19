@@ -39,6 +39,7 @@ export type CompanyMinAggregateOutputType = {
   name: string | null
   cnpj: string | null
   email: string | null
+  emailVerified: boolean | null
   legalRepresentative: string | null
   address: string | null
   phone: string | null
@@ -57,6 +58,7 @@ export type CompanyMaxAggregateOutputType = {
   name: string | null
   cnpj: string | null
   email: string | null
+  emailVerified: boolean | null
   legalRepresentative: string | null
   address: string | null
   phone: string | null
@@ -75,6 +77,7 @@ export type CompanyCountAggregateOutputType = {
   name: number
   cnpj: number
   email: number
+  emailVerified: number
   legalRepresentative: number
   address: number
   phone: number
@@ -104,6 +107,7 @@ export type CompanyMinAggregateInputType = {
   name?: true
   cnpj?: true
   email?: true
+  emailVerified?: true
   legalRepresentative?: true
   address?: true
   phone?: true
@@ -122,6 +126,7 @@ export type CompanyMaxAggregateInputType = {
   name?: true
   cnpj?: true
   email?: true
+  emailVerified?: true
   legalRepresentative?: true
   address?: true
   phone?: true
@@ -140,6 +145,7 @@ export type CompanyCountAggregateInputType = {
   name?: true
   cnpj?: true
   email?: true
+  emailVerified?: true
   legalRepresentative?: true
   address?: true
   phone?: true
@@ -244,9 +250,10 @@ export type CompanyGroupByArgs<ExtArgs extends runtime.Types.Extensions.Internal
 export type CompanyGroupByOutputType = {
   id: number
   name: string
-  cnpj: string
+  cnpj: string | null
   email: string
-  legalRepresentative: string
+  emailVerified: boolean
+  legalRepresentative: string | null
   address: string | null
   phone: string | null
   status: $Enums.CompanyStatus
@@ -286,9 +293,10 @@ export type CompanyWhereInput = {
   NOT?: Prisma.CompanyWhereInput | Prisma.CompanyWhereInput[]
   id?: Prisma.IntFilter<"Company"> | number
   name?: Prisma.StringFilter<"Company"> | string
-  cnpj?: Prisma.StringFilter<"Company"> | string
+  cnpj?: Prisma.StringNullableFilter<"Company"> | string | null
   email?: Prisma.StringFilter<"Company"> | string
-  legalRepresentative?: Prisma.StringFilter<"Company"> | string
+  emailVerified?: Prisma.BoolFilter<"Company"> | boolean
+  legalRepresentative?: Prisma.StringNullableFilter<"Company"> | string | null
   address?: Prisma.StringNullableFilter<"Company"> | string | null
   phone?: Prisma.StringNullableFilter<"Company"> | string | null
   status?: Prisma.EnumCompanyStatusFilter<"Company"> | $Enums.CompanyStatus
@@ -302,14 +310,17 @@ export type CompanyWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Company"> | Date | string
   users?: Prisma.CompanyUserListRelationFilter
   offers?: Prisma.OfferListRelationFilter
+  reminders?: Prisma.PaymentReminderListRelationFilter
+  penalties?: Prisma.CompanyPenaltyListRelationFilter
 }
 
 export type CompanyOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
-  cnpj?: Prisma.SortOrder
+  cnpj?: Prisma.SortOrderInput | Prisma.SortOrder
   email?: Prisma.SortOrder
-  legalRepresentative?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  legalRepresentative?: Prisma.SortOrderInput | Prisma.SortOrder
   address?: Prisma.SortOrderInput | Prisma.SortOrder
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -323,6 +334,8 @@ export type CompanyOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   users?: Prisma.CompanyUserOrderByRelationAggregateInput
   offers?: Prisma.OfferOrderByRelationAggregateInput
+  reminders?: Prisma.PaymentReminderOrderByRelationAggregateInput
+  penalties?: Prisma.CompanyPenaltyOrderByRelationAggregateInput
 }
 
 export type CompanyWhereUniqueInput = Prisma.AtLeast<{
@@ -333,7 +346,8 @@ export type CompanyWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.CompanyWhereInput[]
   NOT?: Prisma.CompanyWhereInput | Prisma.CompanyWhereInput[]
   name?: Prisma.StringFilter<"Company"> | string
-  legalRepresentative?: Prisma.StringFilter<"Company"> | string
+  emailVerified?: Prisma.BoolFilter<"Company"> | boolean
+  legalRepresentative?: Prisma.StringNullableFilter<"Company"> | string | null
   address?: Prisma.StringNullableFilter<"Company"> | string | null
   phone?: Prisma.StringNullableFilter<"Company"> | string | null
   status?: Prisma.EnumCompanyStatusFilter<"Company"> | $Enums.CompanyStatus
@@ -347,14 +361,17 @@ export type CompanyWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Company"> | Date | string
   users?: Prisma.CompanyUserListRelationFilter
   offers?: Prisma.OfferListRelationFilter
+  reminders?: Prisma.PaymentReminderListRelationFilter
+  penalties?: Prisma.CompanyPenaltyListRelationFilter
 }, "id" | "cnpj" | "email">
 
 export type CompanyOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
-  cnpj?: Prisma.SortOrder
+  cnpj?: Prisma.SortOrderInput | Prisma.SortOrder
   email?: Prisma.SortOrder
-  legalRepresentative?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
+  legalRepresentative?: Prisma.SortOrderInput | Prisma.SortOrder
   address?: Prisma.SortOrderInput | Prisma.SortOrder
   phone?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
@@ -379,9 +396,10 @@ export type CompanyScalarWhereWithAggregatesInput = {
   NOT?: Prisma.CompanyScalarWhereWithAggregatesInput | Prisma.CompanyScalarWhereWithAggregatesInput[]
   id?: Prisma.IntWithAggregatesFilter<"Company"> | number
   name?: Prisma.StringWithAggregatesFilter<"Company"> | string
-  cnpj?: Prisma.StringWithAggregatesFilter<"Company"> | string
+  cnpj?: Prisma.StringNullableWithAggregatesFilter<"Company"> | string | null
   email?: Prisma.StringWithAggregatesFilter<"Company"> | string
-  legalRepresentative?: Prisma.StringWithAggregatesFilter<"Company"> | string
+  emailVerified?: Prisma.BoolWithAggregatesFilter<"Company"> | boolean
+  legalRepresentative?: Prisma.StringNullableWithAggregatesFilter<"Company"> | string | null
   address?: Prisma.StringNullableWithAggregatesFilter<"Company"> | string | null
   phone?: Prisma.StringNullableWithAggregatesFilter<"Company"> | string | null
   status?: Prisma.EnumCompanyStatusWithAggregatesFilter<"Company"> | $Enums.CompanyStatus
@@ -397,9 +415,10 @@ export type CompanyScalarWhereWithAggregatesInput = {
 
 export type CompanyCreateInput = {
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -413,14 +432,17 @@ export type CompanyCreateInput = {
   updatedAt?: Date | string
   users?: Prisma.CompanyUserCreateNestedManyWithoutCompanyInput
   offers?: Prisma.OfferCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyCreateNestedManyWithoutCompanyInput
 }
 
 export type CompanyUncheckedCreateInput = {
   id?: number
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -434,13 +456,16 @@ export type CompanyUncheckedCreateInput = {
   updatedAt?: Date | string
   users?: Prisma.CompanyUserUncheckedCreateNestedManyWithoutCompanyInput
   offers?: Prisma.OfferUncheckedCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyUncheckedCreateNestedManyWithoutCompanyInput
 }
 
 export type CompanyUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -454,14 +479,17 @@ export type CompanyUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   users?: Prisma.CompanyUserUpdateManyWithoutCompanyNestedInput
   offers?: Prisma.OfferUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUpdateManyWithoutCompanyNestedInput
 }
 
 export type CompanyUncheckedUpdateInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -475,14 +503,17 @@ export type CompanyUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   users?: Prisma.CompanyUserUncheckedUpdateManyWithoutCompanyNestedInput
   offers?: Prisma.OfferUncheckedUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUncheckedUpdateManyWithoutCompanyNestedInput
 }
 
 export type CompanyCreateManyInput = {
   id?: number
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -498,9 +529,10 @@ export type CompanyCreateManyInput = {
 
 export type CompanyUpdateManyMutationInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -517,9 +549,10 @@ export type CompanyUpdateManyMutationInput = {
 export type CompanyUncheckedUpdateManyInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -538,6 +571,7 @@ export type CompanyCountOrderByAggregateInput = {
   name?: Prisma.SortOrder
   cnpj?: Prisma.SortOrder
   email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
   legalRepresentative?: Prisma.SortOrder
   address?: Prisma.SortOrder
   phone?: Prisma.SortOrder
@@ -561,6 +595,7 @@ export type CompanyMaxOrderByAggregateInput = {
   name?: Prisma.SortOrder
   cnpj?: Prisma.SortOrder
   email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
   legalRepresentative?: Prisma.SortOrder
   address?: Prisma.SortOrder
   phone?: Prisma.SortOrder
@@ -579,6 +614,7 @@ export type CompanyMinOrderByAggregateInput = {
   name?: Prisma.SortOrder
   cnpj?: Prisma.SortOrder
   email?: Prisma.SortOrder
+  emailVerified?: Prisma.SortOrder
   legalRepresentative?: Prisma.SortOrder
   address?: Prisma.SortOrder
   phone?: Prisma.SortOrder
@@ -633,11 +669,40 @@ export type CompanyUpdateOneRequiredWithoutOffersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.CompanyUpdateToOneWithWhereWithoutOffersInput, Prisma.CompanyUpdateWithoutOffersInput>, Prisma.CompanyUncheckedUpdateWithoutOffersInput>
 }
 
+export type CompanyCreateNestedOneWithoutRemindersInput = {
+  create?: Prisma.XOR<Prisma.CompanyCreateWithoutRemindersInput, Prisma.CompanyUncheckedCreateWithoutRemindersInput>
+  connectOrCreate?: Prisma.CompanyCreateOrConnectWithoutRemindersInput
+  connect?: Prisma.CompanyWhereUniqueInput
+}
+
+export type CompanyUpdateOneRequiredWithoutRemindersNestedInput = {
+  create?: Prisma.XOR<Prisma.CompanyCreateWithoutRemindersInput, Prisma.CompanyUncheckedCreateWithoutRemindersInput>
+  connectOrCreate?: Prisma.CompanyCreateOrConnectWithoutRemindersInput
+  upsert?: Prisma.CompanyUpsertWithoutRemindersInput
+  connect?: Prisma.CompanyWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CompanyUpdateToOneWithWhereWithoutRemindersInput, Prisma.CompanyUpdateWithoutRemindersInput>, Prisma.CompanyUncheckedUpdateWithoutRemindersInput>
+}
+
+export type CompanyCreateNestedOneWithoutPenaltiesInput = {
+  create?: Prisma.XOR<Prisma.CompanyCreateWithoutPenaltiesInput, Prisma.CompanyUncheckedCreateWithoutPenaltiesInput>
+  connectOrCreate?: Prisma.CompanyCreateOrConnectWithoutPenaltiesInput
+  connect?: Prisma.CompanyWhereUniqueInput
+}
+
+export type CompanyUpdateOneRequiredWithoutPenaltiesNestedInput = {
+  create?: Prisma.XOR<Prisma.CompanyCreateWithoutPenaltiesInput, Prisma.CompanyUncheckedCreateWithoutPenaltiesInput>
+  connectOrCreate?: Prisma.CompanyCreateOrConnectWithoutPenaltiesInput
+  upsert?: Prisma.CompanyUpsertWithoutPenaltiesInput
+  connect?: Prisma.CompanyWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.CompanyUpdateToOneWithWhereWithoutPenaltiesInput, Prisma.CompanyUpdateWithoutPenaltiesInput>, Prisma.CompanyUncheckedUpdateWithoutPenaltiesInput>
+}
+
 export type CompanyCreateWithoutUsersInput = {
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -650,14 +715,17 @@ export type CompanyCreateWithoutUsersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   offers?: Prisma.OfferCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyCreateNestedManyWithoutCompanyInput
 }
 
 export type CompanyUncheckedCreateWithoutUsersInput = {
   id?: number
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -670,6 +738,8 @@ export type CompanyUncheckedCreateWithoutUsersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   offers?: Prisma.OfferUncheckedCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyUncheckedCreateNestedManyWithoutCompanyInput
 }
 
 export type CompanyCreateOrConnectWithoutUsersInput = {
@@ -690,9 +760,10 @@ export type CompanyUpdateToOneWithWhereWithoutUsersInput = {
 
 export type CompanyUpdateWithoutUsersInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -705,14 +776,17 @@ export type CompanyUpdateWithoutUsersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   offers?: Prisma.OfferUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUpdateManyWithoutCompanyNestedInput
 }
 
 export type CompanyUncheckedUpdateWithoutUsersInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -725,13 +799,16 @@ export type CompanyUncheckedUpdateWithoutUsersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   offers?: Prisma.OfferUncheckedUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUncheckedUpdateManyWithoutCompanyNestedInput
 }
 
 export type CompanyCreateWithoutOffersInput = {
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -744,14 +821,17 @@ export type CompanyCreateWithoutOffersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   users?: Prisma.CompanyUserCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyCreateNestedManyWithoutCompanyInput
 }
 
 export type CompanyUncheckedCreateWithoutOffersInput = {
   id?: number
   name: string
-  cnpj: string
+  cnpj?: string | null
   email: string
-  legalRepresentative: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
   address?: string | null
   phone?: string | null
   status?: $Enums.CompanyStatus
@@ -764,6 +844,8 @@ export type CompanyUncheckedCreateWithoutOffersInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   users?: Prisma.CompanyUserUncheckedCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyUncheckedCreateNestedManyWithoutCompanyInput
 }
 
 export type CompanyCreateOrConnectWithoutOffersInput = {
@@ -784,9 +866,10 @@ export type CompanyUpdateToOneWithWhereWithoutOffersInput = {
 
 export type CompanyUpdateWithoutOffersInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -799,14 +882,17 @@ export type CompanyUpdateWithoutOffersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   users?: Prisma.CompanyUserUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUpdateManyWithoutCompanyNestedInput
 }
 
 export type CompanyUncheckedUpdateWithoutOffersInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
   name?: Prisma.StringFieldUpdateOperationsInput | string
-  cnpj?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   email?: Prisma.StringFieldUpdateOperationsInput | string
-  legalRepresentative?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
@@ -819,6 +905,220 @@ export type CompanyUncheckedUpdateWithoutOffersInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   users?: Prisma.CompanyUserUncheckedUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUncheckedUpdateManyWithoutCompanyNestedInput
+}
+
+export type CompanyCreateWithoutRemindersInput = {
+  name: string
+  cnpj?: string | null
+  email: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
+  address?: string | null
+  phone?: string | null
+  status?: $Enums.CompanyStatus
+  kycStatus?: $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: string | null
+  stellarContractId?: string | null
+  passkeyCredentialId?: string | null
+  passkeyPublicKey?: runtime.Bytes | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  users?: Prisma.CompanyUserCreateNestedManyWithoutCompanyInput
+  offers?: Prisma.OfferCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyCreateNestedManyWithoutCompanyInput
+}
+
+export type CompanyUncheckedCreateWithoutRemindersInput = {
+  id?: number
+  name: string
+  cnpj?: string | null
+  email: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
+  address?: string | null
+  phone?: string | null
+  status?: $Enums.CompanyStatus
+  kycStatus?: $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: string | null
+  stellarContractId?: string | null
+  passkeyCredentialId?: string | null
+  passkeyPublicKey?: runtime.Bytes | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  users?: Prisma.CompanyUserUncheckedCreateNestedManyWithoutCompanyInput
+  offers?: Prisma.OfferUncheckedCreateNestedManyWithoutCompanyInput
+  penalties?: Prisma.CompanyPenaltyUncheckedCreateNestedManyWithoutCompanyInput
+}
+
+export type CompanyCreateOrConnectWithoutRemindersInput = {
+  where: Prisma.CompanyWhereUniqueInput
+  create: Prisma.XOR<Prisma.CompanyCreateWithoutRemindersInput, Prisma.CompanyUncheckedCreateWithoutRemindersInput>
+}
+
+export type CompanyUpsertWithoutRemindersInput = {
+  update: Prisma.XOR<Prisma.CompanyUpdateWithoutRemindersInput, Prisma.CompanyUncheckedUpdateWithoutRemindersInput>
+  create: Prisma.XOR<Prisma.CompanyCreateWithoutRemindersInput, Prisma.CompanyUncheckedCreateWithoutRemindersInput>
+  where?: Prisma.CompanyWhereInput
+}
+
+export type CompanyUpdateToOneWithWhereWithoutRemindersInput = {
+  where?: Prisma.CompanyWhereInput
+  data: Prisma.XOR<Prisma.CompanyUpdateWithoutRemindersInput, Prisma.CompanyUncheckedUpdateWithoutRemindersInput>
+}
+
+export type CompanyUpdateWithoutRemindersInput = {
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
+  kycStatus?: Prisma.EnumKYCStatusFieldUpdateOperationsInput | $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stellarContractId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyCredentialId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyPublicKey?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  users?: Prisma.CompanyUserUpdateManyWithoutCompanyNestedInput
+  offers?: Prisma.OfferUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUpdateManyWithoutCompanyNestedInput
+}
+
+export type CompanyUncheckedUpdateWithoutRemindersInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
+  kycStatus?: Prisma.EnumKYCStatusFieldUpdateOperationsInput | $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stellarContractId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyCredentialId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyPublicKey?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  users?: Prisma.CompanyUserUncheckedUpdateManyWithoutCompanyNestedInput
+  offers?: Prisma.OfferUncheckedUpdateManyWithoutCompanyNestedInput
+  penalties?: Prisma.CompanyPenaltyUncheckedUpdateManyWithoutCompanyNestedInput
+}
+
+export type CompanyCreateWithoutPenaltiesInput = {
+  name: string
+  cnpj?: string | null
+  email: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
+  address?: string | null
+  phone?: string | null
+  status?: $Enums.CompanyStatus
+  kycStatus?: $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: string | null
+  stellarContractId?: string | null
+  passkeyCredentialId?: string | null
+  passkeyPublicKey?: runtime.Bytes | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  users?: Prisma.CompanyUserCreateNestedManyWithoutCompanyInput
+  offers?: Prisma.OfferCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutCompanyInput
+}
+
+export type CompanyUncheckedCreateWithoutPenaltiesInput = {
+  id?: number
+  name: string
+  cnpj?: string | null
+  email: string
+  emailVerified?: boolean
+  legalRepresentative?: string | null
+  address?: string | null
+  phone?: string | null
+  status?: $Enums.CompanyStatus
+  kycStatus?: $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: string | null
+  stellarContractId?: string | null
+  passkeyCredentialId?: string | null
+  passkeyPublicKey?: runtime.Bytes | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  users?: Prisma.CompanyUserUncheckedCreateNestedManyWithoutCompanyInput
+  offers?: Prisma.OfferUncheckedCreateNestedManyWithoutCompanyInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutCompanyInput
+}
+
+export type CompanyCreateOrConnectWithoutPenaltiesInput = {
+  where: Prisma.CompanyWhereUniqueInput
+  create: Prisma.XOR<Prisma.CompanyCreateWithoutPenaltiesInput, Prisma.CompanyUncheckedCreateWithoutPenaltiesInput>
+}
+
+export type CompanyUpsertWithoutPenaltiesInput = {
+  update: Prisma.XOR<Prisma.CompanyUpdateWithoutPenaltiesInput, Prisma.CompanyUncheckedUpdateWithoutPenaltiesInput>
+  create: Prisma.XOR<Prisma.CompanyCreateWithoutPenaltiesInput, Prisma.CompanyUncheckedCreateWithoutPenaltiesInput>
+  where?: Prisma.CompanyWhereInput
+}
+
+export type CompanyUpdateToOneWithWhereWithoutPenaltiesInput = {
+  where?: Prisma.CompanyWhereInput
+  data: Prisma.XOR<Prisma.CompanyUpdateWithoutPenaltiesInput, Prisma.CompanyUncheckedUpdateWithoutPenaltiesInput>
+}
+
+export type CompanyUpdateWithoutPenaltiesInput = {
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
+  kycStatus?: Prisma.EnumKYCStatusFieldUpdateOperationsInput | $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stellarContractId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyCredentialId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyPublicKey?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  users?: Prisma.CompanyUserUpdateManyWithoutCompanyNestedInput
+  offers?: Prisma.OfferUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutCompanyNestedInput
+}
+
+export type CompanyUncheckedUpdateWithoutPenaltiesInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  cnpj?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  legalRepresentative?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  address?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  phone?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumCompanyStatusFieldUpdateOperationsInput | $Enums.CompanyStatus
+  kycStatus?: Prisma.EnumKYCStatusFieldUpdateOperationsInput | $Enums.KYCStatus
+  kycDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  stellarPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  stellarContractId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyCredentialId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  passkeyPublicKey?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  users?: Prisma.CompanyUserUncheckedUpdateManyWithoutCompanyNestedInput
+  offers?: Prisma.OfferUncheckedUpdateManyWithoutCompanyNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutCompanyNestedInput
 }
 
 
@@ -829,11 +1129,15 @@ export type CompanyUncheckedUpdateWithoutOffersInput = {
 export type CompanyCountOutputType = {
   users: number
   offers: number
+  reminders: number
+  penalties: number
 }
 
 export type CompanyCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   users?: boolean | CompanyCountOutputTypeCountUsersArgs
   offers?: boolean | CompanyCountOutputTypeCountOffersArgs
+  reminders?: boolean | CompanyCountOutputTypeCountRemindersArgs
+  penalties?: boolean | CompanyCountOutputTypeCountPenaltiesArgs
 }
 
 /**
@@ -860,12 +1164,27 @@ export type CompanyCountOutputTypeCountOffersArgs<ExtArgs extends runtime.Types.
   where?: Prisma.OfferWhereInput
 }
 
+/**
+ * CompanyCountOutputType without action
+ */
+export type CompanyCountOutputTypeCountRemindersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PaymentReminderWhereInput
+}
+
+/**
+ * CompanyCountOutputType without action
+ */
+export type CompanyCountOutputTypeCountPenaltiesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.CompanyPenaltyWhereInput
+}
+
 
 export type CompanySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   name?: boolean
   cnpj?: boolean
   email?: boolean
+  emailVerified?: boolean
   legalRepresentative?: boolean
   address?: boolean
   phone?: boolean
@@ -880,6 +1199,8 @@ export type CompanySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   updatedAt?: boolean
   users?: boolean | Prisma.Company$usersArgs<ExtArgs>
   offers?: boolean | Prisma.Company$offersArgs<ExtArgs>
+  reminders?: boolean | Prisma.Company$remindersArgs<ExtArgs>
+  penalties?: boolean | Prisma.Company$penaltiesArgs<ExtArgs>
   _count?: boolean | Prisma.CompanyCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["company"]>
 
@@ -888,6 +1209,7 @@ export type CompanySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   name?: boolean
   cnpj?: boolean
   email?: boolean
+  emailVerified?: boolean
   legalRepresentative?: boolean
   address?: boolean
   phone?: boolean
@@ -907,6 +1229,7 @@ export type CompanySelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   name?: boolean
   cnpj?: boolean
   email?: boolean
+  emailVerified?: boolean
   legalRepresentative?: boolean
   address?: boolean
   phone?: boolean
@@ -926,6 +1249,7 @@ export type CompanySelectScalar = {
   name?: boolean
   cnpj?: boolean
   email?: boolean
+  emailVerified?: boolean
   legalRepresentative?: boolean
   address?: boolean
   phone?: boolean
@@ -940,10 +1264,12 @@ export type CompanySelectScalar = {
   updatedAt?: boolean
 }
 
-export type CompanyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "cnpj" | "email" | "legalRepresentative" | "address" | "phone" | "status" | "kycStatus" | "kycDocuments" | "stellarPublicKey" | "stellarContractId" | "passkeyCredentialId" | "passkeyPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["company"]>
+export type CompanyOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "cnpj" | "email" | "emailVerified" | "legalRepresentative" | "address" | "phone" | "status" | "kycStatus" | "kycDocuments" | "stellarPublicKey" | "stellarContractId" | "passkeyCredentialId" | "passkeyPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["company"]>
 export type CompanyInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   users?: boolean | Prisma.Company$usersArgs<ExtArgs>
   offers?: boolean | Prisma.Company$offersArgs<ExtArgs>
+  reminders?: boolean | Prisma.Company$remindersArgs<ExtArgs>
+  penalties?: boolean | Prisma.Company$penaltiesArgs<ExtArgs>
   _count?: boolean | Prisma.CompanyCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type CompanyIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -954,13 +1280,16 @@ export type $CompanyPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
   objects: {
     users: Prisma.$CompanyUserPayload<ExtArgs>[]
     offers: Prisma.$OfferPayload<ExtArgs>[]
+    reminders: Prisma.$PaymentReminderPayload<ExtArgs>[]
+    penalties: Prisma.$CompanyPenaltyPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
     name: string
-    cnpj: string
+    cnpj: string | null
     email: string
-    legalRepresentative: string
+    emailVerified: boolean
+    legalRepresentative: string | null
     address: string | null
     phone: string | null
     status: $Enums.CompanyStatus
@@ -1368,6 +1697,8 @@ export interface Prisma__CompanyClient<T, Null = never, ExtArgs extends runtime.
   readonly [Symbol.toStringTag]: "PrismaPromise"
   users<T extends Prisma.Company$usersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Company$usersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CompanyUserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   offers<T extends Prisma.Company$offersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Company$offersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OfferPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reminders<T extends Prisma.Company$remindersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Company$remindersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentReminderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  penalties<T extends Prisma.Company$penaltiesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Company$penaltiesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$CompanyPenaltyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1401,6 +1732,7 @@ export interface CompanyFieldRefs {
   readonly name: Prisma.FieldRef<"Company", 'String'>
   readonly cnpj: Prisma.FieldRef<"Company", 'String'>
   readonly email: Prisma.FieldRef<"Company", 'String'>
+  readonly emailVerified: Prisma.FieldRef<"Company", 'Boolean'>
   readonly legalRepresentative: Prisma.FieldRef<"Company", 'String'>
   readonly address: Prisma.FieldRef<"Company", 'String'>
   readonly phone: Prisma.FieldRef<"Company", 'String'>
@@ -1846,6 +2178,54 @@ export type Company$offersArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.OfferScalarFieldEnum | Prisma.OfferScalarFieldEnum[]
+}
+
+/**
+ * Company.reminders
+ */
+export type Company$remindersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PaymentReminder
+   */
+  select?: Prisma.PaymentReminderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PaymentReminder
+   */
+  omit?: Prisma.PaymentReminderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PaymentReminderInclude<ExtArgs> | null
+  where?: Prisma.PaymentReminderWhereInput
+  orderBy?: Prisma.PaymentReminderOrderByWithRelationInput | Prisma.PaymentReminderOrderByWithRelationInput[]
+  cursor?: Prisma.PaymentReminderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PaymentReminderScalarFieldEnum | Prisma.PaymentReminderScalarFieldEnum[]
+}
+
+/**
+ * Company.penalties
+ */
+export type Company$penaltiesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the CompanyPenalty
+   */
+  select?: Prisma.CompanyPenaltySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the CompanyPenalty
+   */
+  omit?: Prisma.CompanyPenaltyOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.CompanyPenaltyInclude<ExtArgs> | null
+  where?: Prisma.CompanyPenaltyWhereInput
+  orderBy?: Prisma.CompanyPenaltyOrderByWithRelationInput | Prisma.CompanyPenaltyOrderByWithRelationInput[]
+  cursor?: Prisma.CompanyPenaltyWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.CompanyPenaltyScalarFieldEnum | Prisma.CompanyPenaltyScalarFieldEnum[]
 }
 
 /**

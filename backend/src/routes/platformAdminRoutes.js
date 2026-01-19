@@ -1029,7 +1029,6 @@ router.get('/investors/:id/details', authenticateToken, requirePlatformAdmin, as
         id: true,
         name: true,
         email: true,
-        phone: true,
         document: true,
         kycStatus: true,
         emailVerified: true,

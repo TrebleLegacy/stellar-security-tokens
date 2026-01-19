@@ -66,7 +66,9 @@ export const ModelName = {
   SystemConfig: 'SystemConfig',
   FeeLog: 'FeeLog',
   MultiSigTransaction: 'MultiSigTransaction',
-  Notification: 'Notification'
+  Notification: 'Notification',
+  PaymentReminder: 'PaymentReminder',
+  CompanyPenalty: 'CompanyPenalty'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -170,6 +172,7 @@ export const CompanyScalarFieldEnum = {
   name: 'name',
   cnpj: 'cnpj',
   email: 'email',
+  emailVerified: 'emailVerified',
   legalRepresentative: 'legalRepresentative',
   address: 'address',
   phone: 'phone',
@@ -248,6 +251,10 @@ export const OfferScalarFieldEnum = {
   maturityDate: 'maturityDate',
   bulletPaymentAmount: 'bulletPaymentAmount',
   paymentFrequency: 'paymentFrequency',
+  paymentDay: 'paymentDay',
+  nextPaymentDue: 'nextPaymentDue',
+  lastPaymentDate: 'lastPaymentDate',
+  paymentDueStatus: 'paymentDueStatus',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -342,14 +349,21 @@ export type FeeLogScalarFieldEnum = (typeof FeeLogScalarFieldEnum)[keyof typeof 
 
 export const MultiSigTransactionScalarFieldEnum = {
   id: 'id',
+  operationType: 'operationType',
   xdr: 'xdr',
+  networkPassphrase: 'networkPassphrase',
   description: 'description',
   status: 'status',
+  requiredSigners: 'requiredSigners',
+  thresholdRequired: 'thresholdRequired',
+  collectedSignatures: 'collectedSignatures',
   initiatorId: 'initiatorId',
-  signatures: 'signatures',
-  network: 'network',
-  thresholdMet: 'thresholdMet',
-  hash: 'hash',
+  initiatorType: 'initiatorType',
+  metadata: 'metadata',
+  expiresAt: 'expiresAt',
+  submittedAt: 'submittedAt',
+  txHash: 'txHash',
+  ledger: 'ledger',
   errorMessage: 'errorMessage',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -371,6 +385,40 @@ export const NotificationScalarFieldEnum = {
 } as const
 
 export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
+
+
+export const PaymentReminderScalarFieldEnum = {
+  id: 'id',
+  offerId: 'offerId',
+  companyId: 'companyId',
+  reminderType: 'reminderType',
+  dueDate: 'dueDate',
+  amountDue: 'amountDue',
+  sentAt: 'sentAt',
+  sentVia: 'sentVia',
+  acknowledged: 'acknowledged',
+  acknowledgedAt: 'acknowledgedAt'
+} as const
+
+export type PaymentReminderScalarFieldEnum = (typeof PaymentReminderScalarFieldEnum)[keyof typeof PaymentReminderScalarFieldEnum]
+
+
+export const CompanyPenaltyScalarFieldEnum = {
+  id: 'id',
+  companyId: 'companyId',
+  offerId: 'offerId',
+  penaltyType: 'penaltyType',
+  description: 'description',
+  amount: 'amount',
+  percentageRate: 'percentageRate',
+  daysLate: 'daysLate',
+  status: 'status',
+  enforcedAt: 'enforcedAt',
+  paidAt: 'paidAt',
+  createdAt: 'createdAt'
+} as const
+
+export type CompanyPenaltyScalarFieldEnum = (typeof CompanyPenaltyScalarFieldEnum)[keyof typeof CompanyPenaltyScalarFieldEnum]
 
 
 export const SortOrder = {

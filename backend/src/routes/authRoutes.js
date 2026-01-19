@@ -232,4 +232,116 @@ router.post('/passkey-login/discover', [
   }
 });
 
+/**
+ * @swagger
+ * /api/auth/test-login:
+ *   post:
+ *     summary: Login de teste (Apenas Desenvolvimento)
+ *     description: Permite login direto com contas de teste pré-semeadas sem passkey.
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userType
+ *             properties:
+ *               userType:
+ *                 type: string
+ *                 enum: [investor, company]
+ *     responses:
+ *       200:
+ *         description: Login bem-sucedido
+ *       403:
+ *         description: Acesso negado (não está em modo desenvolvimento)
+ *       404:
+ *         description: Usuário de teste não encontrado
+ */
+router.post('/test-login', async (req, res, next) => {
+  try {
+    // Critical Guard: Only allow in development
+    if (process.env.NODE_ENV !== 'development' && process.env.ENABLE_DEV_LOGIN !== 'true') {
+      return res.status(403).json({
+        success: false,
+        error: 'Test login is only available in development mode',
+      });
+    }
+
+    const { userType } = req.body;
+    let user = null;
+
+    if (userType === 'investor') {
+      user = await prisma.investor.findUnique({
+        where: { email: 'test-investor@stellar-tokens.local' },
+        select: { id: true, name: true, email: true, kycStatus: true, stellarContractId: true }
+      });
+      if (user) user.userType = 'investor';
+    } else if (userType === 'company') {
+      user = await prisma.companyUser.findUnique({
+        where: { email: 'admin-test-company@stellar-tokens.local' },
+        select: { id: true, name: true, email: true, role: true, companyId: true, stellarContractId: true }
+      });
+      if (user) user.userType = 'company';
+    } else if (userType === 'admin') {
+      user = await prisma.platformAdmin.findUnique({
+        where: { email: 'admin@stellar-tokens.local' },
+        select: { id: true, name: true, email: true, role: true, isActive: true }
+      });
+      if (user) {
+        user.userType = 'platform_admin';
+        if (!user.isActive) {
+          return res.status(401).json({ success: false, error: 'Admin account is inactive' });
+        }
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: 'Test account not found. Please run seed script.',
+      });
+    }
+
+    // Generate JWT token
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      userType: user.userType,
+      role: user.userType === 'investor' ? 'investor' : user.role,
+      ...(user.userType === 'company' ? { companyId: user.companyId } : {})
+    });
+
+    const userData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      stellarContractId: user.stellarContractId,
+      stellarPublicKey: user.stellarContractId, // Compatibility
+      userType: user.userType
+    };
+
+    if (user.userType === 'investor') {
+      userData.kycStatus = user.kycStatus;
+    } else {
+      userData.role = user.role;
+      userData.companyId = user.companyId;
+    }
+
+    console.log(`[Auth] TEST LOGIN SUCCESS: ${user.email} (${user.userType})`);
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        user: userData,
+        userType: user.userType
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

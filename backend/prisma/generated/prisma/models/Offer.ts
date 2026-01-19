@@ -37,6 +37,7 @@ export type OfferAvgAggregateOutputType = {
   reviewedBy: number | null
   bulletPaymentAmount: runtime.Decimal | null
   paymentFrequency: number | null
+  paymentDay: number | null
 }
 
 export type OfferSumAggregateOutputType = {
@@ -50,6 +51,7 @@ export type OfferSumAggregateOutputType = {
   reviewedBy: number | null
   bulletPaymentAmount: runtime.Decimal | null
   paymentFrequency: number | null
+  paymentDay: number | null
 }
 
 export type OfferMinAggregateOutputType = {
@@ -75,6 +77,10 @@ export type OfferMinAggregateOutputType = {
   maturityDate: Date | null
   bulletPaymentAmount: runtime.Decimal | null
   paymentFrequency: number | null
+  paymentDay: number | null
+  nextPaymentDue: Date | null
+  lastPaymentDate: Date | null
+  paymentDueStatus: $Enums.PaymentDueStatus | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -102,6 +108,10 @@ export type OfferMaxAggregateOutputType = {
   maturityDate: Date | null
   bulletPaymentAmount: runtime.Decimal | null
   paymentFrequency: number | null
+  paymentDay: number | null
+  nextPaymentDue: Date | null
+  lastPaymentDate: Date | null
+  paymentDueStatus: $Enums.PaymentDueStatus | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -131,6 +141,10 @@ export type OfferCountAggregateOutputType = {
   maturityDate: number
   bulletPaymentAmount: number
   paymentFrequency: number
+  paymentDay: number
+  nextPaymentDue: number
+  lastPaymentDate: number
+  paymentDueStatus: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -148,6 +162,7 @@ export type OfferAvgAggregateInputType = {
   reviewedBy?: true
   bulletPaymentAmount?: true
   paymentFrequency?: true
+  paymentDay?: true
 }
 
 export type OfferSumAggregateInputType = {
@@ -161,6 +176,7 @@ export type OfferSumAggregateInputType = {
   reviewedBy?: true
   bulletPaymentAmount?: true
   paymentFrequency?: true
+  paymentDay?: true
 }
 
 export type OfferMinAggregateInputType = {
@@ -186,6 +202,10 @@ export type OfferMinAggregateInputType = {
   maturityDate?: true
   bulletPaymentAmount?: true
   paymentFrequency?: true
+  paymentDay?: true
+  nextPaymentDue?: true
+  lastPaymentDate?: true
+  paymentDueStatus?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -213,6 +233,10 @@ export type OfferMaxAggregateInputType = {
   maturityDate?: true
   bulletPaymentAmount?: true
   paymentFrequency?: true
+  paymentDay?: true
+  nextPaymentDue?: true
+  lastPaymentDate?: true
+  paymentDueStatus?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -242,6 +266,10 @@ export type OfferCountAggregateInputType = {
   maturityDate?: true
   bulletPaymentAmount?: true
   paymentFrequency?: true
+  paymentDay?: true
+  nextPaymentDue?: true
+  lastPaymentDate?: true
+  paymentDueStatus?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -358,6 +386,10 @@ export type OfferGroupByOutputType = {
   maturityDate: Date | null
   bulletPaymentAmount: runtime.Decimal | null
   paymentFrequency: number
+  paymentDay: number
+  nextPaymentDue: Date | null
+  lastPaymentDate: Date | null
+  paymentDueStatus: $Enums.PaymentDueStatus
   createdAt: Date
   updatedAt: Date
   _count: OfferCountAggregateOutputType | null
@@ -410,6 +442,10 @@ export type OfferWhereInput = {
   maturityDate?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
   bulletPaymentAmount?: Prisma.DecimalNullableFilter<"Offer"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFilter<"Offer"> | number
+  paymentDay?: Prisma.IntFilter<"Offer"> | number
+  nextPaymentDue?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
+  lastPaymentDate?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFilter<"Offer"> | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFilter<"Offer"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Offer"> | Date | string
   company?: Prisma.XOR<Prisma.CompanyScalarRelationFilter, Prisma.CompanyWhereInput>
@@ -419,6 +455,7 @@ export type OfferWhereInput = {
   distributions?: Prisma.TokenDistributionListRelationFilter
   interestPayments?: Prisma.InterestPaymentListRelationFilter
   investments?: Prisma.InvestmentListRelationFilter
+  reminders?: Prisma.PaymentReminderListRelationFilter
 }
 
 export type OfferOrderByWithRelationInput = {
@@ -446,6 +483,10 @@ export type OfferOrderByWithRelationInput = {
   maturityDate?: Prisma.SortOrderInput | Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
+  nextPaymentDue?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastPaymentDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentDueStatus?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   company?: Prisma.CompanyOrderByWithRelationInput
@@ -455,6 +496,7 @@ export type OfferOrderByWithRelationInput = {
   distributions?: Prisma.TokenDistributionOrderByRelationAggregateInput
   interestPayments?: Prisma.InterestPaymentOrderByRelationAggregateInput
   investments?: Prisma.InvestmentOrderByRelationAggregateInput
+  reminders?: Prisma.PaymentReminderOrderByRelationAggregateInput
 }
 
 export type OfferWhereUniqueInput = Prisma.AtLeast<{
@@ -485,6 +527,10 @@ export type OfferWhereUniqueInput = Prisma.AtLeast<{
   maturityDate?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
   bulletPaymentAmount?: Prisma.DecimalNullableFilter<"Offer"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFilter<"Offer"> | number
+  paymentDay?: Prisma.IntFilter<"Offer"> | number
+  nextPaymentDue?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
+  lastPaymentDate?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFilter<"Offer"> | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFilter<"Offer"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Offer"> | Date | string
   company?: Prisma.XOR<Prisma.CompanyScalarRelationFilter, Prisma.CompanyWhereInput>
@@ -494,6 +540,7 @@ export type OfferWhereUniqueInput = Prisma.AtLeast<{
   distributions?: Prisma.TokenDistributionListRelationFilter
   interestPayments?: Prisma.InterestPaymentListRelationFilter
   investments?: Prisma.InvestmentListRelationFilter
+  reminders?: Prisma.PaymentReminderListRelationFilter
 }, "id" | "assetCode">
 
 export type OfferOrderByWithAggregationInput = {
@@ -521,6 +568,10 @@ export type OfferOrderByWithAggregationInput = {
   maturityDate?: Prisma.SortOrderInput | Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
+  nextPaymentDue?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastPaymentDate?: Prisma.SortOrderInput | Prisma.SortOrder
+  paymentDueStatus?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.OfferCountOrderByAggregateInput
@@ -558,6 +609,10 @@ export type OfferScalarWhereWithAggregatesInput = {
   maturityDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Offer"> | Date | string | null
   bulletPaymentAmount?: Prisma.DecimalNullableWithAggregatesFilter<"Offer"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntWithAggregatesFilter<"Offer"> | number
+  paymentDay?: Prisma.IntWithAggregatesFilter<"Offer"> | number
+  nextPaymentDue?: Prisma.DateTimeNullableWithAggregatesFilter<"Offer"> | Date | string | null
+  lastPaymentDate?: Prisma.DateTimeNullableWithAggregatesFilter<"Offer"> | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusWithAggregatesFilter<"Offer"> | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Offer"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Offer"> | Date | string
 }
@@ -583,6 +638,10 @@ export type OfferCreateInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -592,6 +651,7 @@ export type OfferCreateInput = {
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateInput = {
@@ -619,12 +679,17 @@ export type OfferUncheckedCreateInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUpdateInput = {
@@ -648,6 +713,10 @@ export type OfferUpdateInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -657,6 +726,7 @@ export type OfferUpdateInput = {
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateInput = {
@@ -684,12 +754,17 @@ export type OfferUncheckedUpdateInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferCreateManyInput = {
@@ -717,6 +792,10 @@ export type OfferCreateManyInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -742,6 +821,10 @@ export type OfferUpdateManyMutationInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -771,6 +854,10 @@ export type OfferUncheckedUpdateManyInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -815,6 +902,10 @@ export type OfferCountOrderByAggregateInput = {
   maturityDate?: Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
+  nextPaymentDue?: Prisma.SortOrder
+  lastPaymentDate?: Prisma.SortOrder
+  paymentDueStatus?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -830,6 +921,7 @@ export type OfferAvgOrderByAggregateInput = {
   reviewedBy?: Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
 }
 
 export type OfferMaxOrderByAggregateInput = {
@@ -855,6 +947,10 @@ export type OfferMaxOrderByAggregateInput = {
   maturityDate?: Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
+  nextPaymentDue?: Prisma.SortOrder
+  lastPaymentDate?: Prisma.SortOrder
+  paymentDueStatus?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -882,6 +978,10 @@ export type OfferMinOrderByAggregateInput = {
   maturityDate?: Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
+  nextPaymentDue?: Prisma.SortOrder
+  lastPaymentDate?: Prisma.SortOrder
+  paymentDueStatus?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -897,6 +997,12 @@ export type OfferSumOrderByAggregateInput = {
   reviewedBy?: Prisma.SortOrder
   bulletPaymentAmount?: Prisma.SortOrder
   paymentFrequency?: Prisma.SortOrder
+  paymentDay?: Prisma.SortOrder
+}
+
+export type OfferScalarRelationFilter = {
+  is?: Prisma.OfferWhereInput
+  isNot?: Prisma.OfferWhereInput
 }
 
 export type OfferCreateNestedOneWithoutTokensInput = {
@@ -1081,6 +1187,10 @@ export type EnumOfferStatusFieldUpdateOperationsInput = {
   set?: $Enums.OfferStatus
 }
 
+export type EnumPaymentDueStatusFieldUpdateOperationsInput = {
+  set?: $Enums.PaymentDueStatus
+}
+
 export type OfferCreateNestedOneWithoutInvestmentsInput = {
   create?: Prisma.XOR<Prisma.OfferCreateWithoutInvestmentsInput, Prisma.OfferUncheckedCreateWithoutInvestmentsInput>
   connectOrCreate?: Prisma.OfferCreateOrConnectWithoutInvestmentsInput
@@ -1095,6 +1205,20 @@ export type OfferUpdateOneWithoutInvestmentsNestedInput = {
   delete?: Prisma.OfferWhereInput | boolean
   connect?: Prisma.OfferWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OfferUpdateToOneWithWhereWithoutInvestmentsInput, Prisma.OfferUpdateWithoutInvestmentsInput>, Prisma.OfferUncheckedUpdateWithoutInvestmentsInput>
+}
+
+export type OfferCreateNestedOneWithoutRemindersInput = {
+  create?: Prisma.XOR<Prisma.OfferCreateWithoutRemindersInput, Prisma.OfferUncheckedCreateWithoutRemindersInput>
+  connectOrCreate?: Prisma.OfferCreateOrConnectWithoutRemindersInput
+  connect?: Prisma.OfferWhereUniqueInput
+}
+
+export type OfferUpdateOneRequiredWithoutRemindersNestedInput = {
+  create?: Prisma.XOR<Prisma.OfferCreateWithoutRemindersInput, Prisma.OfferUncheckedCreateWithoutRemindersInput>
+  connectOrCreate?: Prisma.OfferCreateOrConnectWithoutRemindersInput
+  upsert?: Prisma.OfferUpsertWithoutRemindersInput
+  connect?: Prisma.OfferWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OfferUpdateToOneWithWhereWithoutRemindersInput, Prisma.OfferUpdateWithoutRemindersInput>, Prisma.OfferUncheckedUpdateWithoutRemindersInput>
 }
 
 export type OfferCreateWithoutTokensInput = {
@@ -1118,6 +1242,10 @@ export type OfferCreateWithoutTokensInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -1126,6 +1254,7 @@ export type OfferCreateWithoutTokensInput = {
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutTokensInput = {
@@ -1153,11 +1282,16 @@ export type OfferUncheckedCreateWithoutTokensInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutTokensInput = {
@@ -1197,6 +1331,10 @@ export type OfferUpdateWithoutTokensInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -1205,6 +1343,7 @@ export type OfferUpdateWithoutTokensInput = {
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutTokensInput = {
@@ -1232,11 +1371,16 @@ export type OfferUncheckedUpdateWithoutTokensInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferCreateWithoutDistributionsInput = {
@@ -1260,6 +1404,10 @@ export type OfferCreateWithoutDistributionsInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -1268,6 +1416,7 @@ export type OfferCreateWithoutDistributionsInput = {
   tokens?: Prisma.TokenCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutDistributionsInput = {
@@ -1295,11 +1444,16 @@ export type OfferUncheckedCreateWithoutDistributionsInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutDistributionsInput = {
@@ -1339,6 +1493,10 @@ export type OfferUpdateWithoutDistributionsInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -1347,6 +1505,7 @@ export type OfferUpdateWithoutDistributionsInput = {
   tokens?: Prisma.TokenUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutDistributionsInput = {
@@ -1374,11 +1533,16 @@ export type OfferUncheckedUpdateWithoutDistributionsInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferCreateWithoutInterestPaymentsInput = {
@@ -1402,6 +1566,10 @@ export type OfferCreateWithoutInterestPaymentsInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -1410,6 +1578,7 @@ export type OfferCreateWithoutInterestPaymentsInput = {
   tokens?: Prisma.TokenCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutInterestPaymentsInput = {
@@ -1437,11 +1606,16 @@ export type OfferUncheckedCreateWithoutInterestPaymentsInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutInterestPaymentsInput = {
@@ -1481,6 +1655,10 @@ export type OfferUpdateWithoutInterestPaymentsInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -1489,6 +1667,7 @@ export type OfferUpdateWithoutInterestPaymentsInput = {
   tokens?: Prisma.TokenUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutInterestPaymentsInput = {
@@ -1516,11 +1695,16 @@ export type OfferUncheckedUpdateWithoutInterestPaymentsInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferCreateWithoutCompanyInput = {
@@ -1544,6 +1728,10 @@ export type OfferCreateWithoutCompanyInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   requester: Prisma.CompanyUserCreateNestedOneWithoutOffersInput
@@ -1552,6 +1740,7 @@ export type OfferCreateWithoutCompanyInput = {
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutCompanyInput = {
@@ -1578,12 +1767,17 @@ export type OfferUncheckedCreateWithoutCompanyInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutCompanyInput = {
@@ -1640,6 +1834,10 @@ export type OfferScalarWhereInput = {
   maturityDate?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
   bulletPaymentAmount?: Prisma.DecimalNullableFilter<"Offer"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFilter<"Offer"> | number
+  paymentDay?: Prisma.IntFilter<"Offer"> | number
+  nextPaymentDue?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
+  lastPaymentDate?: Prisma.DateTimeNullableFilter<"Offer"> | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFilter<"Offer"> | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFilter<"Offer"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Offer"> | Date | string
 }
@@ -1665,6 +1863,10 @@ export type OfferCreateWithoutRequesterInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -1673,6 +1875,7 @@ export type OfferCreateWithoutRequesterInput = {
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutRequesterInput = {
@@ -1699,12 +1902,17 @@ export type OfferUncheckedCreateWithoutRequesterInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutRequesterInput = {
@@ -1754,6 +1962,10 @@ export type OfferCreateWithoutReviewerInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -1762,6 +1974,7 @@ export type OfferCreateWithoutReviewerInput = {
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutReviewerInput = {
@@ -1788,12 +2001,17 @@ export type OfferUncheckedCreateWithoutReviewerInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
   investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutReviewerInput = {
@@ -1843,6 +2061,10 @@ export type OfferCreateWithoutInvestmentsInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   company: Prisma.CompanyCreateNestedOneWithoutOffersInput
@@ -1851,6 +2073,7 @@ export type OfferCreateWithoutInvestmentsInput = {
   tokens?: Prisma.TokenCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderCreateNestedManyWithoutOfferInput
 }
 
 export type OfferUncheckedCreateWithoutInvestmentsInput = {
@@ -1878,11 +2101,16 @@ export type OfferUncheckedCreateWithoutInvestmentsInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
   distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
   interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
+  reminders?: Prisma.PaymentReminderUncheckedCreateNestedManyWithoutOfferInput
 }
 
 export type OfferCreateOrConnectWithoutInvestmentsInput = {
@@ -1922,6 +2150,10 @@ export type OfferUpdateWithoutInvestmentsInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -1930,6 +2162,7 @@ export type OfferUpdateWithoutInvestmentsInput = {
   tokens?: Prisma.TokenUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutInvestmentsInput = {
@@ -1957,11 +2190,178 @@ export type OfferUncheckedUpdateWithoutInvestmentsInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
+}
+
+export type OfferCreateWithoutRemindersInput = {
+  assetCode: string
+  offerName: string
+  description: string
+  collateralType?: string | null
+  collateralDescription?: string | null
+  collateralValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  collateralLTV?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalSupply: runtime.Decimal | runtime.DecimalJsLike | number | string
+  annualInterestRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  offerType: $Enums.OfferType
+  offerRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: $Enums.OfferStatus
+  rejectionReason?: string | null
+  reviewedAt?: Date | string | null
+  legalDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  dueDiligenceNotes?: string | null
+  paymentType?: $Enums.PaymentType
+  maturityDate?: Date | string | null
+  bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  company: Prisma.CompanyCreateNestedOneWithoutOffersInput
+  requester: Prisma.CompanyUserCreateNestedOneWithoutOffersInput
+  reviewer?: Prisma.PlatformAdminCreateNestedOneWithoutReviewedOffersInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutOfferInput
+  distributions?: Prisma.TokenDistributionCreateNestedManyWithoutOfferInput
+  interestPayments?: Prisma.InterestPaymentCreateNestedManyWithoutOfferInput
+  investments?: Prisma.InvestmentCreateNestedManyWithoutOfferInput
+}
+
+export type OfferUncheckedCreateWithoutRemindersInput = {
+  id?: number
+  companyId: number
+  requestedBy: number
+  assetCode: string
+  offerName: string
+  description: string
+  collateralType?: string | null
+  collateralDescription?: string | null
+  collateralValue?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  collateralLTV?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalSupply: runtime.Decimal | runtime.DecimalJsLike | number | string
+  annualInterestRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  offerType: $Enums.OfferType
+  offerRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: $Enums.OfferStatus
+  rejectionReason?: string | null
+  reviewedBy?: number | null
+  reviewedAt?: Date | string | null
+  legalDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  dueDiligenceNotes?: string | null
+  paymentType?: $Enums.PaymentType
+  maturityDate?: Date | string | null
+  bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutOfferInput
+  distributions?: Prisma.TokenDistributionUncheckedCreateNestedManyWithoutOfferInput
+  interestPayments?: Prisma.InterestPaymentUncheckedCreateNestedManyWithoutOfferInput
+  investments?: Prisma.InvestmentUncheckedCreateNestedManyWithoutOfferInput
+}
+
+export type OfferCreateOrConnectWithoutRemindersInput = {
+  where: Prisma.OfferWhereUniqueInput
+  create: Prisma.XOR<Prisma.OfferCreateWithoutRemindersInput, Prisma.OfferUncheckedCreateWithoutRemindersInput>
+}
+
+export type OfferUpsertWithoutRemindersInput = {
+  update: Prisma.XOR<Prisma.OfferUpdateWithoutRemindersInput, Prisma.OfferUncheckedUpdateWithoutRemindersInput>
+  create: Prisma.XOR<Prisma.OfferCreateWithoutRemindersInput, Prisma.OfferUncheckedCreateWithoutRemindersInput>
+  where?: Prisma.OfferWhereInput
+}
+
+export type OfferUpdateToOneWithWhereWithoutRemindersInput = {
+  where?: Prisma.OfferWhereInput
+  data: Prisma.XOR<Prisma.OfferUpdateWithoutRemindersInput, Prisma.OfferUncheckedUpdateWithoutRemindersInput>
+}
+
+export type OfferUpdateWithoutRemindersInput = {
+  assetCode?: Prisma.StringFieldUpdateOperationsInput | string
+  offerName?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  collateralType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  collateralDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  collateralValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  collateralLTV?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalSupply?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  annualInterestRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  offerType?: Prisma.EnumOfferTypeFieldUpdateOperationsInput | $Enums.OfferType
+  offerRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumOfferStatusFieldUpdateOperationsInput | $Enums.OfferStatus
+  rejectionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  legalDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  dueDiligenceNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
+  maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
+  requester?: Prisma.CompanyUserUpdateOneRequiredWithoutOffersNestedInput
+  reviewer?: Prisma.PlatformAdminUpdateOneWithoutReviewedOffersNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutOfferNestedInput
+  distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
+  interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
+  investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+}
+
+export type OfferUncheckedUpdateWithoutRemindersInput = {
+  id?: Prisma.IntFieldUpdateOperationsInput | number
+  companyId?: Prisma.IntFieldUpdateOperationsInput | number
+  requestedBy?: Prisma.IntFieldUpdateOperationsInput | number
+  assetCode?: Prisma.StringFieldUpdateOperationsInput | string
+  offerName?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  collateralType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  collateralDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  collateralValue?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  collateralLTV?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  totalSupply?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  annualInterestRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  offerType?: Prisma.EnumOfferTypeFieldUpdateOperationsInput | $Enums.OfferType
+  offerRules?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  status?: Prisma.EnumOfferStatusFieldUpdateOperationsInput | $Enums.OfferStatus
+  rejectionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  reviewedBy?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  reviewedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  legalDocuments?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  dueDiligenceNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  paymentType?: Prisma.EnumPaymentTypeFieldUpdateOperationsInput | $Enums.PaymentType
+  maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
+  distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
+  interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
+  investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferCreateManyCompanyInput = {
@@ -1988,6 +2388,10 @@ export type OfferCreateManyCompanyInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2013,6 +2417,10 @@ export type OfferUpdateWithoutCompanyInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   requester?: Prisma.CompanyUserUpdateOneRequiredWithoutOffersNestedInput
@@ -2021,6 +2429,7 @@ export type OfferUpdateWithoutCompanyInput = {
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutCompanyInput = {
@@ -2047,12 +2456,17 @@ export type OfferUncheckedUpdateWithoutCompanyInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateManyWithoutCompanyInput = {
@@ -2079,6 +2493,10 @@ export type OfferUncheckedUpdateManyWithoutCompanyInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2107,6 +2525,10 @@ export type OfferCreateManyRequesterInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2132,6 +2554,10 @@ export type OfferUpdateWithoutRequesterInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -2140,6 +2566,7 @@ export type OfferUpdateWithoutRequesterInput = {
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutRequesterInput = {
@@ -2166,12 +2593,17 @@ export type OfferUncheckedUpdateWithoutRequesterInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateManyWithoutRequesterInput = {
@@ -2198,6 +2630,10 @@ export type OfferUncheckedUpdateManyWithoutRequesterInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2226,6 +2662,10 @@ export type OfferCreateManyReviewerInput = {
   maturityDate?: Date | string | null
   bulletPaymentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: number
+  paymentDay?: number
+  nextPaymentDue?: Date | string | null
+  lastPaymentDate?: Date | string | null
+  paymentDueStatus?: $Enums.PaymentDueStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2251,6 +2691,10 @@ export type OfferUpdateWithoutReviewerInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   company?: Prisma.CompanyUpdateOneRequiredWithoutOffersNestedInput
@@ -2259,6 +2703,7 @@ export type OfferUpdateWithoutReviewerInput = {
   distributions?: Prisma.TokenDistributionUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateWithoutReviewerInput = {
@@ -2285,12 +2730,17 @@ export type OfferUncheckedUpdateWithoutReviewerInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutOfferNestedInput
   distributions?: Prisma.TokenDistributionUncheckedUpdateManyWithoutOfferNestedInput
   interestPayments?: Prisma.InterestPaymentUncheckedUpdateManyWithoutOfferNestedInput
   investments?: Prisma.InvestmentUncheckedUpdateManyWithoutOfferNestedInput
+  reminders?: Prisma.PaymentReminderUncheckedUpdateManyWithoutOfferNestedInput
 }
 
 export type OfferUncheckedUpdateManyWithoutReviewerInput = {
@@ -2317,6 +2767,10 @@ export type OfferUncheckedUpdateManyWithoutReviewerInput = {
   maturityDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   bulletPaymentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   paymentFrequency?: Prisma.IntFieldUpdateOperationsInput | number
+  paymentDay?: Prisma.IntFieldUpdateOperationsInput | number
+  nextPaymentDue?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastPaymentDate?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paymentDueStatus?: Prisma.EnumPaymentDueStatusFieldUpdateOperationsInput | $Enums.PaymentDueStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2331,6 +2785,7 @@ export type OfferCountOutputType = {
   distributions: number
   interestPayments: number
   investments: number
+  reminders: number
 }
 
 export type OfferCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2338,6 +2793,7 @@ export type OfferCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   distributions?: boolean | OfferCountOutputTypeCountDistributionsArgs
   interestPayments?: boolean | OfferCountOutputTypeCountInterestPaymentsArgs
   investments?: boolean | OfferCountOutputTypeCountInvestmentsArgs
+  reminders?: boolean | OfferCountOutputTypeCountRemindersArgs
 }
 
 /**
@@ -2378,6 +2834,13 @@ export type OfferCountOutputTypeCountInvestmentsArgs<ExtArgs extends runtime.Typ
   where?: Prisma.InvestmentWhereInput
 }
 
+/**
+ * OfferCountOutputType without action
+ */
+export type OfferCountOutputTypeCountRemindersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PaymentReminderWhereInput
+}
+
 
 export type OfferSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2404,6 +2867,10 @@ export type OfferSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   maturityDate?: boolean
   bulletPaymentAmount?: boolean
   paymentFrequency?: boolean
+  paymentDay?: boolean
+  nextPaymentDue?: boolean
+  lastPaymentDate?: boolean
+  paymentDueStatus?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
@@ -2413,6 +2880,7 @@ export type OfferSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   distributions?: boolean | Prisma.Offer$distributionsArgs<ExtArgs>
   interestPayments?: boolean | Prisma.Offer$interestPaymentsArgs<ExtArgs>
   investments?: boolean | Prisma.Offer$investmentsArgs<ExtArgs>
+  reminders?: boolean | Prisma.Offer$remindersArgs<ExtArgs>
   _count?: boolean | Prisma.OfferCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["offer"]>
 
@@ -2441,6 +2909,10 @@ export type OfferSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   maturityDate?: boolean
   bulletPaymentAmount?: boolean
   paymentFrequency?: boolean
+  paymentDay?: boolean
+  nextPaymentDue?: boolean
+  lastPaymentDate?: boolean
+  paymentDueStatus?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
@@ -2473,6 +2945,10 @@ export type OfferSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   maturityDate?: boolean
   bulletPaymentAmount?: boolean
   paymentFrequency?: boolean
+  paymentDay?: boolean
+  nextPaymentDue?: boolean
+  lastPaymentDate?: boolean
+  paymentDueStatus?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
@@ -2505,11 +2981,15 @@ export type OfferSelectScalar = {
   maturityDate?: boolean
   bulletPaymentAmount?: boolean
   paymentFrequency?: boolean
+  paymentDay?: boolean
+  nextPaymentDue?: boolean
+  lastPaymentDate?: boolean
+  paymentDueStatus?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OfferOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "companyId" | "requestedBy" | "assetCode" | "offerName" | "description" | "collateralType" | "collateralDescription" | "collateralValue" | "collateralLTV" | "totalSupply" | "annualInterestRate" | "offerType" | "offerRules" | "status" | "rejectionReason" | "reviewedBy" | "reviewedAt" | "legalDocuments" | "dueDiligenceNotes" | "paymentType" | "maturityDate" | "bulletPaymentAmount" | "paymentFrequency" | "createdAt" | "updatedAt", ExtArgs["result"]["offer"]>
+export type OfferOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "companyId" | "requestedBy" | "assetCode" | "offerName" | "description" | "collateralType" | "collateralDescription" | "collateralValue" | "collateralLTV" | "totalSupply" | "annualInterestRate" | "offerType" | "offerRules" | "status" | "rejectionReason" | "reviewedBy" | "reviewedAt" | "legalDocuments" | "dueDiligenceNotes" | "paymentType" | "maturityDate" | "bulletPaymentAmount" | "paymentFrequency" | "paymentDay" | "nextPaymentDue" | "lastPaymentDate" | "paymentDueStatus" | "createdAt" | "updatedAt", ExtArgs["result"]["offer"]>
 export type OfferInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   company?: boolean | Prisma.CompanyDefaultArgs<ExtArgs>
   requester?: boolean | Prisma.CompanyUserDefaultArgs<ExtArgs>
@@ -2518,6 +2998,7 @@ export type OfferInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   distributions?: boolean | Prisma.Offer$distributionsArgs<ExtArgs>
   interestPayments?: boolean | Prisma.Offer$interestPaymentsArgs<ExtArgs>
   investments?: boolean | Prisma.Offer$investmentsArgs<ExtArgs>
+  reminders?: boolean | Prisma.Offer$remindersArgs<ExtArgs>
   _count?: boolean | Prisma.OfferCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OfferIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2541,6 +3022,7 @@ export type $OfferPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     distributions: Prisma.$TokenDistributionPayload<ExtArgs>[]
     interestPayments: Prisma.$InterestPaymentPayload<ExtArgs>[]
     investments: Prisma.$InvestmentPayload<ExtArgs>[]
+    reminders: Prisma.$PaymentReminderPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
@@ -2567,6 +3049,10 @@ export type $OfferPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     maturityDate: Date | null
     bulletPaymentAmount: runtime.Decimal | null
     paymentFrequency: number
+    paymentDay: number
+    nextPaymentDue: Date | null
+    lastPaymentDate: Date | null
+    paymentDueStatus: $Enums.PaymentDueStatus
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["offer"]>
@@ -2970,6 +3456,7 @@ export interface Prisma__OfferClient<T, Null = never, ExtArgs extends runtime.Ty
   distributions<T extends Prisma.Offer$distributionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Offer$distributionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenDistributionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   interestPayments<T extends Prisma.Offer$interestPaymentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Offer$interestPaymentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InterestPaymentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   investments<T extends Prisma.Offer$investmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Offer$investmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InvestmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  reminders<T extends Prisma.Offer$remindersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Offer$remindersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PaymentReminderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3023,6 +3510,10 @@ export interface OfferFieldRefs {
   readonly maturityDate: Prisma.FieldRef<"Offer", 'DateTime'>
   readonly bulletPaymentAmount: Prisma.FieldRef<"Offer", 'Decimal'>
   readonly paymentFrequency: Prisma.FieldRef<"Offer", 'Int'>
+  readonly paymentDay: Prisma.FieldRef<"Offer", 'Int'>
+  readonly nextPaymentDue: Prisma.FieldRef<"Offer", 'DateTime'>
+  readonly lastPaymentDate: Prisma.FieldRef<"Offer", 'DateTime'>
+  readonly paymentDueStatus: Prisma.FieldRef<"Offer", 'PaymentDueStatus'>
   readonly createdAt: Prisma.FieldRef<"Offer", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Offer", 'DateTime'>
 }
@@ -3533,6 +4024,30 @@ export type Offer$investmentsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.InvestmentScalarFieldEnum | Prisma.InvestmentScalarFieldEnum[]
+}
+
+/**
+ * Offer.reminders
+ */
+export type Offer$remindersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PaymentReminder
+   */
+  select?: Prisma.PaymentReminderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PaymentReminder
+   */
+  omit?: Prisma.PaymentReminderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PaymentReminderInclude<ExtArgs> | null
+  where?: Prisma.PaymentReminderWhereInput
+  orderBy?: Prisma.PaymentReminderOrderByWithRelationInput | Prisma.PaymentReminderOrderByWithRelationInput[]
+  cursor?: Prisma.PaymentReminderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PaymentReminderScalarFieldEnum | Prisma.PaymentReminderScalarFieldEnum[]
 }
 
 /**

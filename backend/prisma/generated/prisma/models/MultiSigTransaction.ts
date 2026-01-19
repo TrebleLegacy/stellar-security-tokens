@@ -28,23 +28,32 @@ export type AggregateMultiSigTransaction = {
 
 export type MultiSigTransactionAvgAggregateOutputType = {
   id: number | null
+  thresholdRequired: number | null
   initiatorId: number | null
+  ledger: number | null
 }
 
 export type MultiSigTransactionSumAggregateOutputType = {
   id: number | null
+  thresholdRequired: number | null
   initiatorId: number | null
+  ledger: number | null
 }
 
 export type MultiSigTransactionMinAggregateOutputType = {
   id: number | null
+  operationType: $Enums.MultiSigOperationType | null
   xdr: string | null
+  networkPassphrase: string | null
   description: string | null
   status: $Enums.MultiSigTxStatus | null
+  thresholdRequired: number | null
   initiatorId: number | null
-  network: string | null
-  thresholdMet: boolean | null
-  hash: string | null
+  initiatorType: string | null
+  expiresAt: Date | null
+  submittedAt: Date | null
+  txHash: string | null
+  ledger: number | null
   errorMessage: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -52,13 +61,18 @@ export type MultiSigTransactionMinAggregateOutputType = {
 
 export type MultiSigTransactionMaxAggregateOutputType = {
   id: number | null
+  operationType: $Enums.MultiSigOperationType | null
   xdr: string | null
+  networkPassphrase: string | null
   description: string | null
   status: $Enums.MultiSigTxStatus | null
+  thresholdRequired: number | null
   initiatorId: number | null
-  network: string | null
-  thresholdMet: boolean | null
-  hash: string | null
+  initiatorType: string | null
+  expiresAt: Date | null
+  submittedAt: Date | null
+  txHash: string | null
+  ledger: number | null
   errorMessage: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -66,14 +80,21 @@ export type MultiSigTransactionMaxAggregateOutputType = {
 
 export type MultiSigTransactionCountAggregateOutputType = {
   id: number
+  operationType: number
   xdr: number
+  networkPassphrase: number
   description: number
   status: number
+  requiredSigners: number
+  thresholdRequired: number
+  collectedSignatures: number
   initiatorId: number
-  signatures: number
-  network: number
-  thresholdMet: number
-  hash: number
+  initiatorType: number
+  metadata: number
+  expiresAt: number
+  submittedAt: number
+  txHash: number
+  ledger: number
   errorMessage: number
   createdAt: number
   updatedAt: number
@@ -83,23 +104,32 @@ export type MultiSigTransactionCountAggregateOutputType = {
 
 export type MultiSigTransactionAvgAggregateInputType = {
   id?: true
+  thresholdRequired?: true
   initiatorId?: true
+  ledger?: true
 }
 
 export type MultiSigTransactionSumAggregateInputType = {
   id?: true
+  thresholdRequired?: true
   initiatorId?: true
+  ledger?: true
 }
 
 export type MultiSigTransactionMinAggregateInputType = {
   id?: true
+  operationType?: true
   xdr?: true
+  networkPassphrase?: true
   description?: true
   status?: true
+  thresholdRequired?: true
   initiatorId?: true
-  network?: true
-  thresholdMet?: true
-  hash?: true
+  initiatorType?: true
+  expiresAt?: true
+  submittedAt?: true
+  txHash?: true
+  ledger?: true
   errorMessage?: true
   createdAt?: true
   updatedAt?: true
@@ -107,13 +137,18 @@ export type MultiSigTransactionMinAggregateInputType = {
 
 export type MultiSigTransactionMaxAggregateInputType = {
   id?: true
+  operationType?: true
   xdr?: true
+  networkPassphrase?: true
   description?: true
   status?: true
+  thresholdRequired?: true
   initiatorId?: true
-  network?: true
-  thresholdMet?: true
-  hash?: true
+  initiatorType?: true
+  expiresAt?: true
+  submittedAt?: true
+  txHash?: true
+  ledger?: true
   errorMessage?: true
   createdAt?: true
   updatedAt?: true
@@ -121,14 +156,21 @@ export type MultiSigTransactionMaxAggregateInputType = {
 
 export type MultiSigTransactionCountAggregateInputType = {
   id?: true
+  operationType?: true
   xdr?: true
+  networkPassphrase?: true
   description?: true
   status?: true
+  requiredSigners?: true
+  thresholdRequired?: true
+  collectedSignatures?: true
   initiatorId?: true
-  signatures?: true
-  network?: true
-  thresholdMet?: true
-  hash?: true
+  initiatorType?: true
+  metadata?: true
+  expiresAt?: true
+  submittedAt?: true
+  txHash?: true
+  ledger?: true
   errorMessage?: true
   createdAt?: true
   updatedAt?: true
@@ -223,14 +265,21 @@ export type MultiSigTransactionGroupByArgs<ExtArgs extends runtime.Types.Extensi
 
 export type MultiSigTransactionGroupByOutputType = {
   id: number
+  operationType: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description: string | null
   status: $Enums.MultiSigTxStatus
+  requiredSigners: string[]
+  thresholdRequired: number
+  collectedSignatures: runtime.JsonValue
   initiatorId: number | null
-  signatures: runtime.JsonValue
-  network: string
-  thresholdMet: boolean
-  hash: string | null
+  initiatorType: string | null
+  metadata: runtime.JsonValue
+  expiresAt: Date
+  submittedAt: Date | null
+  txHash: string | null
+  ledger: number | null
   errorMessage: string | null
   createdAt: Date
   updatedAt: Date
@@ -261,14 +310,21 @@ export type MultiSigTransactionWhereInput = {
   OR?: Prisma.MultiSigTransactionWhereInput[]
   NOT?: Prisma.MultiSigTransactionWhereInput | Prisma.MultiSigTransactionWhereInput[]
   id?: Prisma.IntFilter<"MultiSigTransaction"> | number
+  operationType?: Prisma.EnumMultiSigOperationTypeFilter<"MultiSigTransaction"> | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFilter<"MultiSigTransaction"> | string
+  networkPassphrase?: Prisma.StringFilter<"MultiSigTransaction"> | string
   description?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
   status?: Prisma.EnumMultiSigTxStatusFilter<"MultiSigTransaction"> | $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.StringNullableListFilter<"MultiSigTransaction">
+  thresholdRequired?: Prisma.IntFilter<"MultiSigTransaction"> | number
+  collectedSignatures?: Prisma.JsonFilter<"MultiSigTransaction">
   initiatorId?: Prisma.IntNullableFilter<"MultiSigTransaction"> | number | null
-  signatures?: Prisma.JsonFilter<"MultiSigTransaction">
-  network?: Prisma.StringFilter<"MultiSigTransaction"> | string
-  thresholdMet?: Prisma.BoolFilter<"MultiSigTransaction"> | boolean
-  hash?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  initiatorType?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  metadata?: Prisma.JsonFilter<"MultiSigTransaction">
+  expiresAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
+  submittedAt?: Prisma.DateTimeNullableFilter<"MultiSigTransaction"> | Date | string | null
+  txHash?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  ledger?: Prisma.IntNullableFilter<"MultiSigTransaction"> | number | null
   errorMessage?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
@@ -277,14 +333,21 @@ export type MultiSigTransactionWhereInput = {
 
 export type MultiSigTransactionOrderByWithRelationInput = {
   id?: Prisma.SortOrder
+  operationType?: Prisma.SortOrder
   xdr?: Prisma.SortOrder
+  networkPassphrase?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
+  requiredSigners?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
+  collectedSignatures?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrderInput | Prisma.SortOrder
-  signatures?: Prisma.SortOrder
-  network?: Prisma.SortOrder
-  thresholdMet?: Prisma.SortOrder
-  hash?: Prisma.SortOrderInput | Prisma.SortOrder
+  initiatorType?: Prisma.SortOrderInput | Prisma.SortOrder
+  metadata?: Prisma.SortOrder
+  expiresAt?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  txHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  ledger?: Prisma.SortOrderInput | Prisma.SortOrder
   errorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -296,14 +359,21 @@ export type MultiSigTransactionWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.MultiSigTransactionWhereInput | Prisma.MultiSigTransactionWhereInput[]
   OR?: Prisma.MultiSigTransactionWhereInput[]
   NOT?: Prisma.MultiSigTransactionWhereInput | Prisma.MultiSigTransactionWhereInput[]
+  operationType?: Prisma.EnumMultiSigOperationTypeFilter<"MultiSigTransaction"> | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFilter<"MultiSigTransaction"> | string
+  networkPassphrase?: Prisma.StringFilter<"MultiSigTransaction"> | string
   description?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
   status?: Prisma.EnumMultiSigTxStatusFilter<"MultiSigTransaction"> | $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.StringNullableListFilter<"MultiSigTransaction">
+  thresholdRequired?: Prisma.IntFilter<"MultiSigTransaction"> | number
+  collectedSignatures?: Prisma.JsonFilter<"MultiSigTransaction">
   initiatorId?: Prisma.IntNullableFilter<"MultiSigTransaction"> | number | null
-  signatures?: Prisma.JsonFilter<"MultiSigTransaction">
-  network?: Prisma.StringFilter<"MultiSigTransaction"> | string
-  thresholdMet?: Prisma.BoolFilter<"MultiSigTransaction"> | boolean
-  hash?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  initiatorType?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  metadata?: Prisma.JsonFilter<"MultiSigTransaction">
+  expiresAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
+  submittedAt?: Prisma.DateTimeNullableFilter<"MultiSigTransaction"> | Date | string | null
+  txHash?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  ledger?: Prisma.IntNullableFilter<"MultiSigTransaction"> | number | null
   errorMessage?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
@@ -312,14 +382,21 @@ export type MultiSigTransactionWhereUniqueInput = Prisma.AtLeast<{
 
 export type MultiSigTransactionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
+  operationType?: Prisma.SortOrder
   xdr?: Prisma.SortOrder
+  networkPassphrase?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
+  requiredSigners?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
+  collectedSignatures?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrderInput | Prisma.SortOrder
-  signatures?: Prisma.SortOrder
-  network?: Prisma.SortOrder
-  thresholdMet?: Prisma.SortOrder
-  hash?: Prisma.SortOrderInput | Prisma.SortOrder
+  initiatorType?: Prisma.SortOrderInput | Prisma.SortOrder
+  metadata?: Prisma.SortOrder
+  expiresAt?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  txHash?: Prisma.SortOrderInput | Prisma.SortOrder
+  ledger?: Prisma.SortOrderInput | Prisma.SortOrder
   errorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -335,27 +412,41 @@ export type MultiSigTransactionScalarWhereWithAggregatesInput = {
   OR?: Prisma.MultiSigTransactionScalarWhereWithAggregatesInput[]
   NOT?: Prisma.MultiSigTransactionScalarWhereWithAggregatesInput | Prisma.MultiSigTransactionScalarWhereWithAggregatesInput[]
   id?: Prisma.IntWithAggregatesFilter<"MultiSigTransaction"> | number
+  operationType?: Prisma.EnumMultiSigOperationTypeWithAggregatesFilter<"MultiSigTransaction"> | $Enums.MultiSigOperationType
   xdr?: Prisma.StringWithAggregatesFilter<"MultiSigTransaction"> | string
+  networkPassphrase?: Prisma.StringWithAggregatesFilter<"MultiSigTransaction"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"MultiSigTransaction"> | string | null
   status?: Prisma.EnumMultiSigTxStatusWithAggregatesFilter<"MultiSigTransaction"> | $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.StringNullableListFilter<"MultiSigTransaction">
+  thresholdRequired?: Prisma.IntWithAggregatesFilter<"MultiSigTransaction"> | number
+  collectedSignatures?: Prisma.JsonWithAggregatesFilter<"MultiSigTransaction">
   initiatorId?: Prisma.IntNullableWithAggregatesFilter<"MultiSigTransaction"> | number | null
-  signatures?: Prisma.JsonWithAggregatesFilter<"MultiSigTransaction">
-  network?: Prisma.StringWithAggregatesFilter<"MultiSigTransaction"> | string
-  thresholdMet?: Prisma.BoolWithAggregatesFilter<"MultiSigTransaction"> | boolean
-  hash?: Prisma.StringNullableWithAggregatesFilter<"MultiSigTransaction"> | string | null
+  initiatorType?: Prisma.StringNullableWithAggregatesFilter<"MultiSigTransaction"> | string | null
+  metadata?: Prisma.JsonWithAggregatesFilter<"MultiSigTransaction">
+  expiresAt?: Prisma.DateTimeWithAggregatesFilter<"MultiSigTransaction"> | Date | string
+  submittedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MultiSigTransaction"> | Date | string | null
+  txHash?: Prisma.StringNullableWithAggregatesFilter<"MultiSigTransaction"> | string | null
+  ledger?: Prisma.IntNullableWithAggregatesFilter<"MultiSigTransaction"> | number | null
   errorMessage?: Prisma.StringNullableWithAggregatesFilter<"MultiSigTransaction"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MultiSigTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"MultiSigTransaction"> | Date | string
 }
 
 export type MultiSigTransactionCreateInput = {
+  operationType?: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description?: string | null
   status?: $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: string
-  thresholdMet?: boolean
-  hash?: string | null
+  requiredSigners?: Prisma.MultiSigTransactionCreaterequiredSignersInput | string[]
+  thresholdRequired?: number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt: Date | string
+  submittedAt?: Date | string | null
+  txHash?: string | null
+  ledger?: number | null
   errorMessage?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -364,27 +455,41 @@ export type MultiSigTransactionCreateInput = {
 
 export type MultiSigTransactionUncheckedCreateInput = {
   id?: number
+  operationType?: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description?: string | null
   status?: $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.MultiSigTransactionCreaterequiredSignersInput | string[]
+  thresholdRequired?: number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   initiatorId?: number | null
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: string
-  thresholdMet?: boolean
-  hash?: string | null
+  initiatorType?: string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt: Date | string
+  submittedAt?: Date | string | null
+  txHash?: string | null
+  ledger?: number | null
   errorMessage?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type MultiSigTransactionUpdateInput = {
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -393,14 +498,21 @@ export type MultiSigTransactionUpdateInput = {
 
 export type MultiSigTransactionUncheckedUpdateInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   initiatorId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -408,27 +520,41 @@ export type MultiSigTransactionUncheckedUpdateInput = {
 
 export type MultiSigTransactionCreateManyInput = {
   id?: number
+  operationType?: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description?: string | null
   status?: $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.MultiSigTransactionCreaterequiredSignersInput | string[]
+  thresholdRequired?: number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   initiatorId?: number | null
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: string
-  thresholdMet?: boolean
-  hash?: string | null
+  initiatorType?: string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt: Date | string
+  submittedAt?: Date | string | null
+  txHash?: string | null
+  ledger?: number | null
   errorMessage?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type MultiSigTransactionUpdateManyMutationInput = {
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -436,14 +562,21 @@ export type MultiSigTransactionUpdateManyMutationInput = {
 
 export type MultiSigTransactionUncheckedUpdateManyInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   initiatorId?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -459,16 +592,31 @@ export type MultiSigTransactionOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type StringNullableListFilter<$PrismaModel = never> = {
+  equals?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
+  has?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
+  hasEvery?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  hasSome?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
+  isEmpty?: boolean
+}
+
 export type MultiSigTransactionCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  operationType?: Prisma.SortOrder
   xdr?: Prisma.SortOrder
+  networkPassphrase?: Prisma.SortOrder
   description?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  requiredSigners?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
+  collectedSignatures?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrder
-  signatures?: Prisma.SortOrder
-  network?: Prisma.SortOrder
-  thresholdMet?: Prisma.SortOrder
-  hash?: Prisma.SortOrder
+  initiatorType?: Prisma.SortOrder
+  metadata?: Prisma.SortOrder
+  expiresAt?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrder
+  txHash?: Prisma.SortOrder
+  ledger?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -476,18 +624,25 @@ export type MultiSigTransactionCountOrderByAggregateInput = {
 
 export type MultiSigTransactionAvgOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrder
+  ledger?: Prisma.SortOrder
 }
 
 export type MultiSigTransactionMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  operationType?: Prisma.SortOrder
   xdr?: Prisma.SortOrder
+  networkPassphrase?: Prisma.SortOrder
   description?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrder
-  network?: Prisma.SortOrder
-  thresholdMet?: Prisma.SortOrder
-  hash?: Prisma.SortOrder
+  initiatorType?: Prisma.SortOrder
+  expiresAt?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrder
+  txHash?: Prisma.SortOrder
+  ledger?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -495,13 +650,18 @@ export type MultiSigTransactionMaxOrderByAggregateInput = {
 
 export type MultiSigTransactionMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  operationType?: Prisma.SortOrder
   xdr?: Prisma.SortOrder
+  networkPassphrase?: Prisma.SortOrder
   description?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrder
-  network?: Prisma.SortOrder
-  thresholdMet?: Prisma.SortOrder
-  hash?: Prisma.SortOrder
+  initiatorType?: Prisma.SortOrder
+  expiresAt?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrder
+  txHash?: Prisma.SortOrder
+  ledger?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -509,7 +669,9 @@ export type MultiSigTransactionMinOrderByAggregateInput = {
 
 export type MultiSigTransactionSumOrderByAggregateInput = {
   id?: Prisma.SortOrder
+  thresholdRequired?: Prisma.SortOrder
   initiatorId?: Prisma.SortOrder
+  ledger?: Prisma.SortOrder
 }
 
 export type MultiSigTransactionCreateNestedManyWithoutInitiatorInput = {
@@ -554,18 +716,38 @@ export type MultiSigTransactionUncheckedUpdateManyWithoutInitiatorNestedInput = 
   deleteMany?: Prisma.MultiSigTransactionScalarWhereInput | Prisma.MultiSigTransactionScalarWhereInput[]
 }
 
+export type MultiSigTransactionCreaterequiredSignersInput = {
+  set: string[]
+}
+
+export type EnumMultiSigOperationTypeFieldUpdateOperationsInput = {
+  set?: $Enums.MultiSigOperationType
+}
+
 export type EnumMultiSigTxStatusFieldUpdateOperationsInput = {
   set?: $Enums.MultiSigTxStatus
 }
 
+export type MultiSigTransactionUpdaterequiredSignersInput = {
+  set?: string[]
+  push?: string | string[]
+}
+
 export type MultiSigTransactionCreateWithoutInitiatorInput = {
+  operationType?: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description?: string | null
   status?: $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: string
-  thresholdMet?: boolean
-  hash?: string | null
+  requiredSigners?: Prisma.MultiSigTransactionCreaterequiredSignersInput | string[]
+  thresholdRequired?: number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt: Date | string
+  submittedAt?: Date | string | null
+  txHash?: string | null
+  ledger?: number | null
   errorMessage?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -573,13 +755,20 @@ export type MultiSigTransactionCreateWithoutInitiatorInput = {
 
 export type MultiSigTransactionUncheckedCreateWithoutInitiatorInput = {
   id?: number
+  operationType?: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description?: string | null
   status?: $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: string
-  thresholdMet?: boolean
-  hash?: string | null
+  requiredSigners?: Prisma.MultiSigTransactionCreaterequiredSignersInput | string[]
+  thresholdRequired?: number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt: Date | string
+  submittedAt?: Date | string | null
+  txHash?: string | null
+  ledger?: number | null
   errorMessage?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -616,14 +805,21 @@ export type MultiSigTransactionScalarWhereInput = {
   OR?: Prisma.MultiSigTransactionScalarWhereInput[]
   NOT?: Prisma.MultiSigTransactionScalarWhereInput | Prisma.MultiSigTransactionScalarWhereInput[]
   id?: Prisma.IntFilter<"MultiSigTransaction"> | number
+  operationType?: Prisma.EnumMultiSigOperationTypeFilter<"MultiSigTransaction"> | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFilter<"MultiSigTransaction"> | string
+  networkPassphrase?: Prisma.StringFilter<"MultiSigTransaction"> | string
   description?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
   status?: Prisma.EnumMultiSigTxStatusFilter<"MultiSigTransaction"> | $Enums.MultiSigTxStatus
+  requiredSigners?: Prisma.StringNullableListFilter<"MultiSigTransaction">
+  thresholdRequired?: Prisma.IntFilter<"MultiSigTransaction"> | number
+  collectedSignatures?: Prisma.JsonFilter<"MultiSigTransaction">
   initiatorId?: Prisma.IntNullableFilter<"MultiSigTransaction"> | number | null
-  signatures?: Prisma.JsonFilter<"MultiSigTransaction">
-  network?: Prisma.StringFilter<"MultiSigTransaction"> | string
-  thresholdMet?: Prisma.BoolFilter<"MultiSigTransaction"> | boolean
-  hash?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  initiatorType?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  metadata?: Prisma.JsonFilter<"MultiSigTransaction">
+  expiresAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
+  submittedAt?: Prisma.DateTimeNullableFilter<"MultiSigTransaction"> | Date | string | null
+  txHash?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
+  ledger?: Prisma.IntNullableFilter<"MultiSigTransaction"> | number | null
   errorMessage?: Prisma.StringNullableFilter<"MultiSigTransaction"> | string | null
   createdAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MultiSigTransaction"> | Date | string
@@ -631,26 +827,40 @@ export type MultiSigTransactionScalarWhereInput = {
 
 export type MultiSigTransactionCreateManyInitiatorInput = {
   id?: number
+  operationType?: $Enums.MultiSigOperationType
   xdr: string
+  networkPassphrase: string
   description?: string | null
   status?: $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: string
-  thresholdMet?: boolean
-  hash?: string | null
+  requiredSigners?: Prisma.MultiSigTransactionCreaterequiredSignersInput | string[]
+  thresholdRequired?: number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt: Date | string
+  submittedAt?: Date | string | null
+  txHash?: string | null
+  ledger?: number | null
   errorMessage?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
 
 export type MultiSigTransactionUpdateWithoutInitiatorInput = {
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -658,13 +868,20 @@ export type MultiSigTransactionUpdateWithoutInitiatorInput = {
 
 export type MultiSigTransactionUncheckedUpdateWithoutInitiatorInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -672,13 +889,20 @@ export type MultiSigTransactionUncheckedUpdateWithoutInitiatorInput = {
 
 export type MultiSigTransactionUncheckedUpdateManyWithoutInitiatorInput = {
   id?: Prisma.IntFieldUpdateOperationsInput | number
+  operationType?: Prisma.EnumMultiSigOperationTypeFieldUpdateOperationsInput | $Enums.MultiSigOperationType
   xdr?: Prisma.StringFieldUpdateOperationsInput | string
+  networkPassphrase?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   status?: Prisma.EnumMultiSigTxStatusFieldUpdateOperationsInput | $Enums.MultiSigTxStatus
-  signatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
-  network?: Prisma.StringFieldUpdateOperationsInput | string
-  thresholdMet?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  hash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requiredSigners?: Prisma.MultiSigTransactionUpdaterequiredSignersInput | string[]
+  thresholdRequired?: Prisma.IntFieldUpdateOperationsInput | number
+  collectedSignatures?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  initiatorType?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metadata?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  expiresAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  txHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ledger?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -688,14 +912,21 @@ export type MultiSigTransactionUncheckedUpdateManyWithoutInitiatorInput = {
 
 export type MultiSigTransactionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
+  operationType?: boolean
   xdr?: boolean
+  networkPassphrase?: boolean
   description?: boolean
   status?: boolean
+  requiredSigners?: boolean
+  thresholdRequired?: boolean
+  collectedSignatures?: boolean
   initiatorId?: boolean
-  signatures?: boolean
-  network?: boolean
-  thresholdMet?: boolean
-  hash?: boolean
+  initiatorType?: boolean
+  metadata?: boolean
+  expiresAt?: boolean
+  submittedAt?: boolean
+  txHash?: boolean
+  ledger?: boolean
   errorMessage?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -704,14 +935,21 @@ export type MultiSigTransactionSelect<ExtArgs extends runtime.Types.Extensions.I
 
 export type MultiSigTransactionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
+  operationType?: boolean
   xdr?: boolean
+  networkPassphrase?: boolean
   description?: boolean
   status?: boolean
+  requiredSigners?: boolean
+  thresholdRequired?: boolean
+  collectedSignatures?: boolean
   initiatorId?: boolean
-  signatures?: boolean
-  network?: boolean
-  thresholdMet?: boolean
-  hash?: boolean
+  initiatorType?: boolean
+  metadata?: boolean
+  expiresAt?: boolean
+  submittedAt?: boolean
+  txHash?: boolean
+  ledger?: boolean
   errorMessage?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -720,14 +958,21 @@ export type MultiSigTransactionSelectCreateManyAndReturn<ExtArgs extends runtime
 
 export type MultiSigTransactionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
+  operationType?: boolean
   xdr?: boolean
+  networkPassphrase?: boolean
   description?: boolean
   status?: boolean
+  requiredSigners?: boolean
+  thresholdRequired?: boolean
+  collectedSignatures?: boolean
   initiatorId?: boolean
-  signatures?: boolean
-  network?: boolean
-  thresholdMet?: boolean
-  hash?: boolean
+  initiatorType?: boolean
+  metadata?: boolean
+  expiresAt?: boolean
+  submittedAt?: boolean
+  txHash?: boolean
+  ledger?: boolean
   errorMessage?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -736,20 +981,27 @@ export type MultiSigTransactionSelectUpdateManyAndReturn<ExtArgs extends runtime
 
 export type MultiSigTransactionSelectScalar = {
   id?: boolean
+  operationType?: boolean
   xdr?: boolean
+  networkPassphrase?: boolean
   description?: boolean
   status?: boolean
+  requiredSigners?: boolean
+  thresholdRequired?: boolean
+  collectedSignatures?: boolean
   initiatorId?: boolean
-  signatures?: boolean
-  network?: boolean
-  thresholdMet?: boolean
-  hash?: boolean
+  initiatorType?: boolean
+  metadata?: boolean
+  expiresAt?: boolean
+  submittedAt?: boolean
+  txHash?: boolean
+  ledger?: boolean
   errorMessage?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type MultiSigTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "xdr" | "description" | "status" | "initiatorId" | "signatures" | "network" | "thresholdMet" | "hash" | "errorMessage" | "createdAt" | "updatedAt", ExtArgs["result"]["multiSigTransaction"]>
+export type MultiSigTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "operationType" | "xdr" | "networkPassphrase" | "description" | "status" | "requiredSigners" | "thresholdRequired" | "collectedSignatures" | "initiatorId" | "initiatorType" | "metadata" | "expiresAt" | "submittedAt" | "txHash" | "ledger" | "errorMessage" | "createdAt" | "updatedAt", ExtArgs["result"]["multiSigTransaction"]>
 export type MultiSigTransactionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   initiator?: boolean | Prisma.MultiSigTransaction$initiatorArgs<ExtArgs>
 }
@@ -767,14 +1019,21 @@ export type $MultiSigTransactionPayload<ExtArgs extends runtime.Types.Extensions
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: number
+    operationType: $Enums.MultiSigOperationType
     xdr: string
+    networkPassphrase: string
     description: string | null
     status: $Enums.MultiSigTxStatus
+    requiredSigners: string[]
+    thresholdRequired: number
+    collectedSignatures: runtime.JsonValue
     initiatorId: number | null
-    signatures: runtime.JsonValue
-    network: string
-    thresholdMet: boolean
-    hash: string | null
+    initiatorType: string | null
+    metadata: runtime.JsonValue
+    expiresAt: Date
+    submittedAt: Date | null
+    txHash: string | null
+    ledger: number | null
     errorMessage: string | null
     createdAt: Date
     updatedAt: Date
@@ -1203,14 +1462,21 @@ export interface Prisma__MultiSigTransactionClient<T, Null = never, ExtArgs exte
  */
 export interface MultiSigTransactionFieldRefs {
   readonly id: Prisma.FieldRef<"MultiSigTransaction", 'Int'>
+  readonly operationType: Prisma.FieldRef<"MultiSigTransaction", 'MultiSigOperationType'>
   readonly xdr: Prisma.FieldRef<"MultiSigTransaction", 'String'>
+  readonly networkPassphrase: Prisma.FieldRef<"MultiSigTransaction", 'String'>
   readonly description: Prisma.FieldRef<"MultiSigTransaction", 'String'>
   readonly status: Prisma.FieldRef<"MultiSigTransaction", 'MultiSigTxStatus'>
+  readonly requiredSigners: Prisma.FieldRef<"MultiSigTransaction", 'String[]'>
+  readonly thresholdRequired: Prisma.FieldRef<"MultiSigTransaction", 'Int'>
+  readonly collectedSignatures: Prisma.FieldRef<"MultiSigTransaction", 'Json'>
   readonly initiatorId: Prisma.FieldRef<"MultiSigTransaction", 'Int'>
-  readonly signatures: Prisma.FieldRef<"MultiSigTransaction", 'Json'>
-  readonly network: Prisma.FieldRef<"MultiSigTransaction", 'String'>
-  readonly thresholdMet: Prisma.FieldRef<"MultiSigTransaction", 'Boolean'>
-  readonly hash: Prisma.FieldRef<"MultiSigTransaction", 'String'>
+  readonly initiatorType: Prisma.FieldRef<"MultiSigTransaction", 'String'>
+  readonly metadata: Prisma.FieldRef<"MultiSigTransaction", 'Json'>
+  readonly expiresAt: Prisma.FieldRef<"MultiSigTransaction", 'DateTime'>
+  readonly submittedAt: Prisma.FieldRef<"MultiSigTransaction", 'DateTime'>
+  readonly txHash: Prisma.FieldRef<"MultiSigTransaction", 'String'>
+  readonly ledger: Prisma.FieldRef<"MultiSigTransaction", 'Int'>
   readonly errorMessage: Prisma.FieldRef<"MultiSigTransaction", 'String'>
   readonly createdAt: Prisma.FieldRef<"MultiSigTransaction", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"MultiSigTransaction", 'DateTime'>

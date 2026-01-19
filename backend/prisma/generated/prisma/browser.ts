@@ -97,3 +97,13 @@ export type MultiSigTransaction = Prisma.MultiSigTransactionModel
  * 
  */
 export type Notification = Prisma.NotificationModel
+/**
+ * Model PaymentReminder
+ * 
+ */
+export type PaymentReminder = Prisma.PaymentReminderModel
+/**
+ * Model CompanyPenalty
+ * 
+ */
+export type CompanyPenalty = Prisma.CompanyPenaltyModel

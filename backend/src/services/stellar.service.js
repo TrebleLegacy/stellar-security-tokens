@@ -1,9 +1,11 @@
 import {
   stellarServer,
+  createFreshServer,
   getIssuerKeypair,
   getDistributorKeypair,
   createAsset,
   buildTransaction,
+  buildTransactionWithAccount,
   signAndSubmitTransaction,
   getNetworkPassphrase,
   getTreasuryKeypair,
@@ -315,13 +317,72 @@ export class StellarService {
 
       const asset = createAsset(code, issuerKeypair.publicKey());
 
-      const operations = [
+      // 1. Check if distributor has trustline
+      const trustline = distributorAccount.balances.find(
+        (b) => b.asset_code === code && b.asset_issuer === issuerKeypair.publicKey()
+      );
+
+      // 2. If no trustline, create it using already-loaded account
+      if (!trustline) {
+        console.log(`[StellarService] Creating trustline for distributor (${distributorKeypair.publicKey()}) for asset ${code}`);
+        try {
+          const trustOp = Operation.changeTrust({
+            asset: asset,
+            source: distributorKeypair.publicKey(),
+          });
+          // Use buildTransactionWithAccount to avoid re-loading the account
+          const trustTx = buildTransactionWithAccount(distributorAccount, [trustOp]);
+          const trustResult = await signAndSubmitTransaction(trustTx, distributorKeypair);
+          if (!trustResult.success) {
+            console.error(`[StellarService] Trustline creation failed:`, trustResult);
+            throw new Error(`Failed to create distributor trustline: ${trustResult.userFriendlyError || trustResult.error}`);
+          }
+          console.log(`[StellarService] Trustline created successfully: ${trustResult.hash}`);
+          // Wait for ledger close
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } catch (trustError) {
+          console.error(`[StellarService] Error during trustline creation:`, trustError);
+          throw new Error(`Trustline creation error: ${trustError.message}`);
+        }
+      }
+
+      // 3. Check if trustline needs authorization (if issuer has AuthRequiredFlag)
+      const needsAuth = issuerAccount.flags.auth_required;
+
+      // Use fresh server instances after transaction submission to avoid connection state issues
+      const freshServer = createFreshServer();
+
+      // Re-load distributor account to check current trustline status
+      const updatedDistributorAccount = await freshServer.loadAccount(distributorKeypair.publicKey());
+
+      const currentTrust = updatedDistributorAccount.balances.find(
+        (b) => b.asset_code === code && b.asset_issuer === issuerKeypair.publicKey()
+      );
+
+      const operations = [];
+
+      // If authorized flag is not set and issuer requires it, authorize now
+      if (needsAuth && (!currentTrust || !currentTrust.is_authorized)) {
+        console.log(`[StellarService] Authorizing distributor trustline for asset ${code}`);
+        operations.push(
+          Operation.setTrustLineFlags({
+            trustor: distributorKeypair.publicKey(),
+            asset: asset,
+            setFlags: 1, // AUTHORIZED_FLAG
+            source: issuerKeypair.publicKey(),
+          })
+        );
+      }
+
+      // 4. Perform payment (issuance)
+      operations.push(
         Operation.payment({
           destination: distributorKeypair.publicKey(),
           asset: asset,
           amount: amount.toString(),
-        }),
-      ];
+          source: issuerKeypair.publicKey(),
+        })
+      );
 
       // Configurar home domain se fornecido
       if (options.homeDomain) {
@@ -333,11 +394,15 @@ export class StellarService {
         );
       }
 
-      const transaction = await buildTransaction(issuerKeypair, operations);
-      const result = await signAndSubmitTransaction(transaction, issuerKeypair);
+      // Reload issuer account to get fresh sequence number (using fresh server)
+      console.log(`[StellarService] Building issuance transaction for asset ${code}`);
+      const freshIssuerAccount = await freshServer.loadAccount(issuerKeypair.publicKey());
+
+      const transaction = buildTransactionWithAccount(freshIssuerAccount, operations);
+      const result = await signAndSubmitTransaction(transaction, issuerKeypair, freshServer);
 
       if (!result.success) {
-        throw new Error(`Failed to issue token: ${result.error}`);
+        throw new Error(`Failed to issue token: ${result.userFriendlyError || result.error}`);
       }
 
       const returnData = {
@@ -730,10 +795,10 @@ export class StellarService {
         balances: account.balances,
         sequenceNumber: account.sequenceNumber(),
         flags: {
-          authRequired: account.flags.authRequired(),
-          authRevocable: account.flags.authRevocable(),
-          authImmutable: account.flags.authImmutable(),
-          authClawbackEnabled: account.flags.authClawbackEnabled(),
+          authRequired: account.flags.auth_required,
+          authRevocable: account.flags.auth_revocable,
+          authImmutable: account.flags.auth_immutable,
+          authClawbackEnabled: account.flags.auth_clawback_enabled,
         },
       };
     } catch (error) {
