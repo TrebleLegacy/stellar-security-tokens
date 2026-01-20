@@ -175,8 +175,15 @@ router.post('/passkey-login/discover', [
         console.log('[Auth] Company lookup result:', company ? `Found (ID: ${company.id})` : 'Not found');
 
         if (company) {
+          // Find the ghost CompanyUser created during registration
+          const ghostUser = await prisma.companyUser.findFirst({
+            where: { companyId: company.id, role: 'admin' },
+            select: { id: true }
+          });
+
           user = {
-            id: company.id,
+            id: ghostUser?.id || company.id, // Use CompanyUser ID if exists
+            companyUserId: ghostUser?.id, // For offer creation
             name: company.name,
             email: company.email,
             status: company.status,
@@ -202,7 +209,10 @@ router.post('/passkey-login/discover', [
       email: user.email,
       userType: user.userType,
       role: user.userType === 'investor' ? 'investor' : user.role,
-      ...(user.userType === 'company' ? { companyId: user.companyId } : {})
+      ...(user.userType === 'company' ? {
+        companyId: user.companyId,
+        companyUserId: user.companyUserId || user.id // For offer creation FK
+      } : {})
     });
 
     const userData = {
