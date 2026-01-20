@@ -20,7 +20,7 @@ import {
 import api from '@/api/client';
 
 interface TokenHolder {
-    account: string;
+    publicKey: string;
     balance: string;
     authorized: boolean;
 }
@@ -86,8 +86,9 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
         setError('');
         setSuccess('');
         try {
-            await api.post(`/tokens/${assetCode}/freeze`, {
-                holderPublicKey: holderAddress
+            await api.post(`/tokens/freeze`, {
+                investorPublicKey: holderAddress,
+                assetCode: assetCode
             });
             setSuccess(`Account frozen successfully`);
             loadHolders();
@@ -105,8 +106,9 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
         setError('');
         setSuccess('');
         try {
-            await api.post(`/tokens/${assetCode}/unfreeze`, {
-                holderPublicKey: holderAddress
+            await api.post(`/tokens/unfreeze`, {
+                investorPublicKey: holderAddress,
+                assetCode: assetCode
             });
             setSuccess(`Account unfrozen successfully`);
             loadHolders();
@@ -130,8 +132,9 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
         setError('');
         setSuccess('');
         try {
-            await api.post(`/tokens/${assetCode}/clawback`, {
-                holderPublicKey: holderAddress,
+            await api.post(`/tokens/clawback`, {
+                investorPublicKey: holderAddress,
+                assetCode: assetCode,
                 amount
             });
             setSuccess(`Clawback of ${amount} ${assetCode} successful`);
@@ -146,7 +149,7 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
     };
 
     const filteredHolders = holders.filter(h =>
-        h.account.toLowerCase().includes(searchQuery.toLowerCase())
+        h.publicKey.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     const totalCirculating = holders.reduce((sum, h) => sum + parseFloat(h.balance), 0);
@@ -271,13 +274,13 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
                                                 <tr key={i} className="border-b border-white/5 last:border-0">
                                                     <td className="p-3">
                                                         <code className="text-sm text-white">
-                                                            {holder.account.substring(0, 8)}...{holder.account.substring(48)}
+                                                            {holder.publicKey.substring(0, 8)}...{holder.publicKey.substring(48)}
                                                         </code>
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
                                                             className="h-6 w-6 ml-1"
-                                                            onClick={() => navigator.clipboard.writeText(holder.account)}
+                                                            onClick={() => navigator.clipboard.writeText(holder.publicKey)}
                                                         >
                                                             <Copy className="w-3 h-3" />
                                                         </Button>
@@ -298,10 +301,10 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    onClick={() => handleFreeze(holder.account)}
-                                                                    disabled={actionLoading === holder.account}
+                                                                    onClick={() => handleFreeze(holder.publicKey)}
+                                                                    disabled={actionLoading === holder.publicKey}
                                                                 >
-                                                                    {actionLoading === holder.account ? (
+                                                                    {actionLoading === holder.publicKey ? (
                                                                         <Loader2 className="w-3 h-3 animate-spin" />
                                                                     ) : (
                                                                         <Snowflake className="w-3 h-3 mr-1" />
@@ -312,10 +315,10 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    onClick={() => handleUnfreeze(holder.account)}
-                                                                    disabled={actionLoading === holder.account}
+                                                                    onClick={() => handleUnfreeze(holder.publicKey)}
+                                                                    disabled={actionLoading === holder.publicKey}
                                                                 >
-                                                                    {actionLoading === holder.account ? (
+                                                                    {actionLoading === holder.publicKey ? (
                                                                         <Loader2 className="w-3 h-3 animate-spin" />
                                                                     ) : (
                                                                         <Sun className="w-3 h-3 mr-1" />
@@ -324,7 +327,7 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
                                                                 </Button>
                                                             )}
 
-                                                            {selectedHolder === holder.account ? (
+                                                            {selectedHolder === holder.publicKey ? (
                                                                 <div className="flex items-center gap-1">
                                                                     <Input
                                                                         type="number"
@@ -336,10 +339,10 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
                                                                     <Button
                                                                         variant="destructive"
                                                                         size="sm"
-                                                                        onClick={() => handleClawback(holder.account, clawbackAmount)}
-                                                                        disabled={actionLoading === holder.account}
+                                                                        onClick={() => handleClawback(holder.publicKey, clawbackAmount)}
+                                                                        disabled={actionLoading === holder.publicKey}
                                                                     >
-                                                                        {actionLoading === holder.account ? (
+                                                                        {actionLoading === holder.publicKey ? (
                                                                             <Loader2 className="w-3 h-3 animate-spin" />
                                                                         ) : (
                                                                             <Flame className="w-3 h-3" />
@@ -360,7 +363,7 @@ export function TokenManagementModal({ token, walletName, onClose }: TokenManage
                                                                 <Button
                                                                     variant="destructive"
                                                                     size="sm"
-                                                                    onClick={() => setSelectedHolder(holder.account)}
+                                                                    onClick={() => setSelectedHolder(holder.publicKey)}
                                                                 >
                                                                     <Flame className="w-3 h-3 mr-1" />
                                                                     Clawback
