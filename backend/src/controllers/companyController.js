@@ -5,6 +5,7 @@ import { ipfsService } from '../services/ipfs.service.js';
 import jwt from 'jsonwebtoken';
 import { generate6DigitCode, storeEmailCode, verifyEmailCode as redisVerifyEmailCode } from '../config/redis.js';
 import { EmailService } from '../services/email.service.js';
+import prisma from '../config/prisma.js';
 
 /**
  * Controller para gerenciar empresas
@@ -181,6 +182,22 @@ export class CompanyController {
         kyc_status: 'pending',
         ...passkeyData,
       });
+
+      // Auto-create ghost CompanyUser for offer creation
+      // This allows the company to create offers without manual CompanyUser setup
+      const ghostCompanyUser = await prisma.companyUser.create({
+        data: {
+          companyId: company.id,
+          email: company.email,
+          name: `${company.name} Admin`,
+          role: 'admin',
+          isActive: true,
+          stellarContractId: company.stellarContractId || null,
+          passkeyCredentialId: company.passkeyCredentialId || null,
+          passkeyPublicKey: company.passkeyPublicKey || null,
+        }
+      });
+      console.log(`[registerCompany] Created ghost CompanyUser ${ghostCompanyUser.id} for Company ${company.id}`);
 
       // TODO: Send "registration pending" email to company
       // TODO: Send notification to admins about new company

@@ -4,9 +4,106 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Wallet, ArrowRightLeft, PenTool, CheckCircle, Loader2, Copy, Clock, AlertCircle } from 'lucide-react';
+import { Wallet, ArrowRightLeft, PenTool, CheckCircle, Loader2, Copy, Clock, AlertCircle, ExternalLink, X, Info } from 'lucide-react';
 import { walletsApi } from '@/api/wallets';
 import type { WalletStatus, MultiSigTransaction } from '@/api/wallets';
+
+// Wallet Detail Modal Component
+function WalletDetailModal({ wallet, onClose }: { wallet: WalletStatus; onClose: () => void }) {
+    const explorerUrl = `https://stellar.expert/explorer/testnet/account/${wallet.publicKey}`;
+
+    return (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-slate-900 border border-white/10 rounded-xl max-w-2xl w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-4 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                        <Wallet className="w-6 h-6 text-emerald-400" />
+                        <h3 className="text-xl font-bold text-white">{wallet.name} Wallet</h3>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={onClose}>
+                        <X className="w-5 h-5" />
+                    </Button>
+                </div>
+
+                <div className="p-6 space-y-6">
+                    {/* Status */}
+                    <div className="flex items-center gap-2">
+                        <Badge variant={wallet.exists ? 'default' : 'destructive'} className={wallet.exists ? 'bg-emerald-600' : ''}>
+                            {wallet.exists ? 'Active on Network' : 'Not Created'}
+                        </Badge>
+                    </div>
+
+                    {/* Full Address */}
+                    <div className="space-y-2">
+                        <Label className="text-muted-foreground">Wallet Address</Label>
+                        <div className="flex items-center gap-2 bg-black/40 p-3 rounded-lg">
+                            <code className="text-sm text-white break-all flex-1">{wallet.publicKey}</code>
+                            <Button variant="ghost" size="icon" onClick={() => navigator.clipboard.writeText(wallet.publicKey)}>
+                                <Copy className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* Explorer Link */}
+                    <Button variant="outline" className="w-full" onClick={() => window.open(explorerUrl, '_blank')}>
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        View on Stellar Expert
+                    </Button>
+
+                    {/* Balances Table */}
+                    <div className="space-y-2">
+                        <Label className="text-muted-foreground">Balances (Platform Tokens Only)</Label>
+                        {wallet.exists && wallet.balances.length > 0 ? (
+                            <div className="bg-black/40 rounded-lg overflow-hidden">
+                                <table className="w-full">
+                                    <thead className="border-b border-white/10">
+                                        <tr>
+                                            <th className="text-left p-3 text-sm text-muted-foreground">Asset</th>
+                                            <th className="text-right p-3 text-sm text-muted-foreground">Balance</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {wallet.balances.map((b, i) => (
+                                            <tr key={i} className="border-b border-white/5 last:border-0">
+                                                <td className="p-3">
+                                                    <span className="text-emerald-400 font-medium">{b.asset_code || 'XLM'}</span>
+                                                    {b.asset_issuer && (
+                                                        <span className="text-xs text-muted-foreground ml-2">
+                                                            {b.asset_issuer.substring(0, 8)}...
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-3 text-right text-white font-mono">
+                                                    {parseFloat(b.balance).toLocaleString(undefined, { maximumFractionDigits: 7 })}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <div className="bg-black/40 p-4 rounded-lg text-center text-muted-foreground">
+                                {wallet.exists ? 'No platform tokens found' : 'Wallet not created on network'}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Wallet Role Description */}
+                    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                        <div className="flex gap-3">
+                            <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+                            <div className="text-sm text-blue-300">
+                                {wallet.name === 'Treasury' && 'Holds platform revenue and operational funds. Used for interest payments to investors.'}
+                                {wallet.name === 'Issuer' && 'The asset issuing account. Creates and manages all security tokens. Should be locked with multisig in production.'}
+                                {wallet.name === 'Distributor' && 'Distributes tokens to investors after purchase. Holds tokens before distribution.'}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
 
 export function Wallets() {
     const [loading, setLoading] = useState(true);
@@ -14,6 +111,7 @@ export function Wallets() {
     const [proposals, setProposals] = useState<MultiSigTransaction[]>([]);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [selectedWallet, setSelectedWallet] = useState<WalletStatus | null>(null);
 
     // Form State
     const [sourceWallet, setSourceWallet] = useState('treasury');
@@ -134,7 +232,11 @@ export function Wallets() {
             {/* Wallet Overview */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {wallets.map((wallet) => (
-                    <Card key={wallet.name} className="glass-panel border-white/5 bg-white/5">
+                    <Card
+                        key={wallet.name}
+                        className="glass-panel border-white/5 bg-white/5 cursor-pointer hover:border-emerald-500/30 transition-colors"
+                        onClick={() => setSelectedWallet(wallet)}
+                    >
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium text-white">{wallet.name}</CardTitle>
                             <Wallet className="h-4 w-4 text-emerald-400" />
@@ -144,11 +246,14 @@ export function Wallets() {
                                 {wallet.exists ? (
                                     wallet.balances.length > 0 ? (
                                         <div className="space-y-1">
-                                            {wallet.balances.map((b, i) => (
+                                            {wallet.balances.slice(0, 2).map((b, i) => (
                                                 <div key={i} className="text-sm">
                                                     {parseFloat(b.balance).toLocaleString()} <span className="text-emerald-400">{b.asset_code || 'XLM'}</span>
                                                 </div>
                                             ))}
+                                            {wallet.balances.length > 2 && (
+                                                <div className="text-xs text-muted-foreground">+{wallet.balances.length - 2} more...</div>
+                                            )}
                                         </div>
                                     ) : '0.00 XLM'
                                 ) : (
@@ -157,13 +262,15 @@ export function Wallets() {
                             </div>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground break-all">
                                 <span className="font-mono">{wallet.publicKey?.substring(0, 8)}...{wallet.publicKey?.substring(48)}</span>
-                                <Button variant="ghost" size="icon" className="h-4 w-4" onClick={() => {
+                                <Button variant="ghost" size="icon" className="h-4 w-4" onClick={(e) => {
+                                    e.stopPropagation();
                                     navigator.clipboard.writeText(wallet.publicKey);
                                     setSuccess('Copied to clipboard');
                                 }}>
                                     <Copy className="h-3 w-3" />
                                 </Button>
                             </div>
+                            <div className="text-xs text-emerald-400 mt-2">Click for details →</div>
                         </CardContent>
                     </Card>
                 ))}
@@ -288,6 +395,14 @@ export function Wallets() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Wallet Detail Modal */}
+            {selectedWallet && (
+                <WalletDetailModal
+                    wallet={selectedWallet}
+                    onClose={() => setSelectedWallet(null)}
+                />
+            )}
         </div>
     );
 }
