@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +11,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QRCode } from "@/components/ui/qrcode";
 import { useInvestment } from '@/hooks/useInvestment';
+import { Copy, Check } from 'lucide-react';
 
 interface InvestmentDialogProps {
     offer: {
@@ -21,6 +22,28 @@ interface InvestmentDialogProps {
         asset_code: string;
     };
     trigger?: React.ReactNode;
+}
+
+function CopyButton({ text, className = '' }: { text: string; className?: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <Button
+            size="sm"
+            variant="ghost"
+            className={`h-6 px-2 ${className}`}
+            onClick={handleCopy}
+        >
+            {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+            <span className="ml-1">{copied ? 'Copied!' : 'Copy'}</span>
+        </Button>
+    );
 }
 
 export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
@@ -85,12 +108,12 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                         {error && <p className="text-red-400 text-sm text-center">{error}</p>}
                         <DialogFooter>
                             <Button type="submit" disabled={loading || !amount} onClick={handleInvest} className="w-full bg-blue-600 hover:bg-blue-500 text-white">
-                                {loading ? 'Processing...' : 'Confirm Integration'}
+                                {loading ? 'Processing...' : 'Confirm Investment'}
                             </Button>
                         </DialogFooter>
                     </div>
                 ) : (
-                    // STEP 2: PAYMENT INSTRUCTIONS with MEMO
+                    // STEP 2: PAYMENT INSTRUCTIONS with MEMO and QR CODE
                     <div className="space-y-4 py-4">
                         {/* CHAIN WARNING */}
                         <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-sm">
@@ -102,13 +125,22 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                             </p>
                         </div>
 
+                        {/* QR CODE - Centered */}
+                        <div className="flex flex-col items-center space-y-2">
+                            <QRCode value={instructions.treasuryAddress} size={150} />
+                            <p className="text-xs text-slate-500">Scan to get deposit address</p>
+                        </div>
+
                         <div className="space-y-3">
+                            {/* Treasury Address - FULL, not truncated */}
                             <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
-                                <Label className="text-xs text-slate-500 uppercase">Deposit Address</Label>
-                                <div className="flex items-center justify-between mt-1">
-                                    <code className="text-sm text-blue-400 break-all">{instructions.treasuryAddress}</code>
-                                    <Button size="sm" variant="ghost" className="h-6 px-2" onClick={() => navigator.clipboard.writeText(instructions.treasuryAddress)}>Copy</Button>
+                                <div className="flex items-center justify-between mb-1">
+                                    <Label className="text-xs text-slate-500 uppercase">Deposit Address</Label>
+                                    <CopyButton text={instructions.treasuryAddress} />
                                 </div>
+                                <code className="text-xs text-blue-400 break-all block mt-1">
+                                    {instructions.treasuryAddress}
+                                </code>
                             </div>
 
                             <div className="grid grid-cols-2 gap-3">
@@ -121,11 +153,11 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
 
                                 {/* MEMO DISPLAY is CRITICAL */}
                                 <div className="p-3 bg-yellow-900/20 rounded-lg border border-yellow-700/50">
-                                    <Label className="text-xs text-yellow-500 uppercase font-bold">REQUIRED MEMO</Label>
-                                    <div className="flex items-center justify-between mt-1">
-                                        <code className="font-bold text-yellow-400 text-lg">{instructions.memo}</code>
-                                        <Button size="sm" variant="ghost" className="h-6 px-2 text-yellow-500 hover:text-yellow-400" onClick={() => navigator.clipboard.writeText(instructions.memo)}>Copy</Button>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <Label className="text-xs text-yellow-500 uppercase font-bold">REQUIRED MEMO</Label>
+                                        <CopyButton text={instructions.memo} className="text-yellow-500 hover:text-yellow-400" />
                                     </div>
+                                    <code className="font-bold text-yellow-400 text-lg">{instructions.memo}</code>
                                 </div>
                             </div>
 

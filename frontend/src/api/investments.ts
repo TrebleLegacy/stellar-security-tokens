@@ -2,6 +2,39 @@ import api from './client';
 import type { ApiResponse, Investment } from '@/types';
 
 export const investmentsApi = {
+  // Investor-facing: Get my investments with status filter
+  getMyInvestments: async (investorId: number, params?: {
+    status?: string;  // e.g., "pending_payment,payment_received" or single status
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{
+    investments: Array<{
+      id: number;
+      offerId: number | null;
+      offerName: string | null;
+      assetCode: string;
+      usdcAmount: number;
+      tokenAmount: number;
+      status: 'pending_payment' | 'payment_received' | 'distributed' | 'failed';
+      memo: string | null;
+      createdAt: string;
+      updatedAt: string;
+      paymentInstructions?: {
+        treasuryAddress: string;
+        memo: string;
+        amount: number;
+        asset: string;
+      };
+      distributionTxHash?: string;
+      errorMessage?: string;
+    }>;
+    pagination: { total: number; limit: number; offset: number; count: number };
+    summary: { pending: number; processing: number; distributed: number; failed: number };
+  }>> => {
+    const response = await api.get(`/investors/${investorId}/investments`, { params });
+    return response.data;
+  },
+
   purchase: async (data: {
     offer_id: number;
     usdc_amount: string;

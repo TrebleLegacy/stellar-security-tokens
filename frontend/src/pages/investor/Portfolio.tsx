@@ -1,9 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Loader2, Wallet, TrendingUp, PieChart, Briefcase } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Wallet, TrendingUp, PieChart, Briefcase, Clock, Copy, Check, RefreshCw, AlertCircle, Hourglass } from 'lucide-react';
 import { api } from '@/lib/api';
 import { authStorage } from '@/utils/authStorage';
+import { usePendingInvestments, type PendingInvestment } from '@/hooks/usePendingInvestments';
 
 interface Investment {
     assetCode: string;
@@ -14,10 +15,140 @@ interface Investment {
     maturityDate: string;
 }
 
+function CopyButton({ text, label }: { text: string; label: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = async () => {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopy}
+            className="h-8 gap-2 text-xs border-white/10 hover:bg-white/5"
+        >
+            {copied ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+            {label}
+        </Button>
+    );
+}
+
+function PendingInvestmentCard({ investment, isProcessing }: { investment: PendingInvestment; isProcessing?: boolean }) {
+    const statusConfig = isProcessing ? {
+        label: 'Processing',
+        sublabel: 'Payment detected, distributing tokens...',
+        bgClass: 'bg-blue-500/10 border-blue-500/30',
+        textClass: 'text-blue-400',
+        icon: RefreshCw,
+        iconClass: 'animate-spin',
+    } : {
+        label: 'Awaiting Payment',
+        sublabel: 'Send USDC to complete your investment',
+        bgClass: 'bg-amber-500/10 border-amber-500/30',
+        textClass: 'text-amber-400',
+        icon: Hourglass,
+        iconClass: '',
+    };
+
+    const StatusIcon = statusConfig.icon;
+
+    return (
+        <div className={`p-4 rounded-xl border ${statusConfig.bgClass} space-y-4`}>
+            {/* Header */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[hsl(43_45%_55%)] to-[hsl(43_45%_35%)] flex items-center justify-center text-white font-bold text-sm">
+                        {investment.assetCode.slice(0, 2)}
+                    </div>
+                    <div>
+                        <p className="font-medium">{investment.offerName || investment.assetCode}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{investment.assetCode}</p>
+                    </div>
+                </div>
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${statusConfig.bgClass} ${statusConfig.textClass}`}>
+                    <StatusIcon className={`h-3 w-3 ${statusConfig.iconClass}`} />
+                    {statusConfig.label}
+                </div>
+            </div>
+
+            {/* Investment Details */}
+            <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <p className="text-muted-foreground">Amount to Pay</p>
+                    <p className="font-semibold text-lg">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(investment.usdcAmount)}
+                    </p>
+                </div>
+                <div>
+                    <p className="text-muted-foreground">Tokens to Receive</p>
+                    <p className="font-semibold text-lg">
+                        {investment.tokenAmount.toLocaleString()} {investment.assetCode}
+                    </p>
+                </div>
+            </div>
+
+            {/* Payment Instructions (only for pending_payment) */}
+            {!isProcessing && investment.paymentInstructions && (
+                <div className="space-y-3 pt-2 border-t border-white/10">
+                    <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
+
+                    {/* Memo - Most Important */}
+                    <div className="bg-amber-500/5 p-3 rounded-lg border border-amber-500/20">
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-amber-400 flex items-center gap-1">
+                                <AlertCircle className="h-3 w-3" /> MEMO (Required)
+                            </span>
+                            <CopyButton text={investment.paymentInstructions.memo} label="Copy Memo" />
+                        </div>
+                        <p className="font-mono text-sm break-all">{investment.paymentInstructions.memo}</p>
+                    </div>
+
+                    {/* Treasury Address */}
+                    <div className="bg-white/5 p-3 rounded-lg">
+                        <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-muted-foreground">Treasury Address</span>
+                            <CopyButton text={investment.paymentInstructions.treasuryAddress} label="Copy" />
+                        </div>
+                        <p className="font-mono text-xs break-all text-muted-foreground">
+                            {investment.paymentInstructions.treasuryAddress}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Processing message */}
+            {isProcessing && (
+                <div className="pt-2 border-t border-white/10">
+                    <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
+                </div>
+            )}
+
+            {/* Timestamp */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Created {new Date(investment.createdAt).toLocaleString()}
+            </div>
+        </div>
+    );
+}
+
 export function Portfolio() {
     const [investments, setInvestments] = useState<Investment[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    const {
+        pendingInvestments,
+        processingInvestments,
+        hasPending,
+        loading: pendingLoading,
+        refresh: refreshPending,
+        lastUpdated,
+    } = usePendingInvestments();
 
     useEffect(() => {
         async function fetchPortfolio() {
@@ -77,6 +208,55 @@ export function Portfolio() {
                 <h2 className="text-3xl font-bold tracking-tight">My Portfolio</h2>
                 <p className="text-muted-foreground">Track your security token investments</p>
             </div>
+
+            {/* Pending Investments Section */}
+            {(hasPending || pendingLoading) && (
+                <Card className="glass-panel rounded-2xl border-amber-500/20 animate-fade-in-up">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div>
+                            <CardTitle className="text-xl flex items-center gap-2">
+                                <Hourglass className="h-5 w-5 text-amber-400" />
+                                Pending Investments
+                            </CardTitle>
+                            <CardDescription>
+                                {pendingInvestments.length} awaiting payment, {processingInvestments.length} processing
+                            </CardDescription>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {lastUpdated && (
+                                <span className="text-xs text-muted-foreground">
+                                    Updated {lastUpdated.toLocaleTimeString()}
+                                </span>
+                            )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={refreshPending}
+                                disabled={pendingLoading}
+                                className="h-8 gap-2 border-white/10"
+                            >
+                                <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
+                                Refresh
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {/* Processing investments first (more urgent) */}
+                        {processingInvestments.map(inv => (
+                            <PendingInvestmentCard key={inv.id} investment={inv} isProcessing />
+                        ))}
+                        {/* Pending payment investments */}
+                        {pendingInvestments.map(inv => (
+                            <PendingInvestmentCard key={inv.id} investment={inv} />
+                        ))}
+                        {pendingLoading && pendingInvestments.length === 0 && processingInvestments.length === 0 && (
+                            <div className="flex items-center justify-center py-4">
+                                <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Summary Cards */}
             <div className="grid gap-5 md:grid-cols-3">

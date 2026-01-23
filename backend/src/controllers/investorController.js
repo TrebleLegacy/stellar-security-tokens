@@ -340,6 +340,116 @@ export const getInvestorMetrics = async (req, res, next) => {
   }
 };
 
+/**
+ * Get investor investments with optional status filter
+ * GET /api/investors/:id/investments
+ */
+export const getInvestorInvestments = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { status, limit = 50, offset = 0 } = req.query;
+    const investorId = parseInt(id, 10);
+
+    const investor = await Investor.findById(investorId);
+    if (!investor) {
+      return res.status(404).json({
+        success: false,
+        error: 'Investor not found',
+      });
+    }
+
+    // Build query filter
+    const where = { investorId };
+    if (status) {
+      // Support comma-separated status list (e.g., "pending_payment,payment_received")
+      const statuses = status.split(',').map(s => s.trim().toLowerCase());
+      where.status = { in: statuses };
+    }
+
+    // Fetch investments with offer details
+    const [investments, total] = await Promise.all([
+      prisma.investment.findMany({
+        where,
+        include: {
+          offer: {
+            select: {
+              id: true,
+              offerName: true,
+              assetCode: true,
+              description: true,
+            },
+          },
+        },
+        take: parseInt(limit, 10),
+        skip: parseInt(offset, 10),
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.investment.count({ where }),
+    ]);
+
+    // For pending investments, include payment instructions
+    const { getTreasuryKeypair } = await import('../config/stellar.js');
+    let treasuryAddress = null;
+    try {
+      const treasuryKeypair = getTreasuryKeypair();
+      treasuryAddress = treasuryKeypair.publicKey();
+    } catch {
+      console.warn('[getInvestorInvestments] Treasury keypair not configured');
+    }
+
+    // Enhance investments with payment info for pending status
+    const enhancedInvestments = investments.map(inv => ({
+      id: inv.id,
+      offerId: inv.offerId,
+      offerName: inv.offer?.offerName || null,
+      assetCode: inv.assetCode,
+      usdcAmount: parseFloat(inv.usdcAmount),
+      tokenAmount: parseFloat(inv.tokenAmount),
+      status: inv.status,
+      memo: inv.memo,
+      createdAt: inv.createdAt,
+      updatedAt: inv.updatedAt,
+      // Payment info for pending investments
+      ...(inv.status === 'pending_payment' && treasuryAddress ? {
+        paymentInstructions: {
+          treasuryAddress,
+          memo: inv.memo,
+          amount: parseFloat(inv.usdcAmount),
+          asset: 'USDC',
+        },
+      } : {}),
+      // Status-specific info
+      ...(inv.status === 'distributed' ? {
+        distributionTxHash: inv.distributionTxHash,
+      } : {}),
+      ...(inv.status === 'failed' ? {
+        errorMessage: inv.errorMessage,
+      } : {}),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        investments: enhancedInvestments,
+        pagination: {
+          total,
+          limit: parseInt(limit, 10),
+          offset: parseInt(offset, 10),
+          count: investments.length,
+        },
+        summary: {
+          pending: investments.filter(i => i.status === 'pending_payment').length,
+          processing: investments.filter(i => i.status === 'payment_received').length,
+          distributed: investments.filter(i => i.status === 'distributed').length,
+          failed: investments.filter(i => i.status === 'failed').length,
+        },
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ============================================================================
 // EMAIL-FIRST REGISTRATION FLOW (NEW)
 // ============================================================================
