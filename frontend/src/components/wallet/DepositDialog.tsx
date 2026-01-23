@@ -8,31 +8,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, Check, Shield, ExternalLink, Wallet, CreditCard, ArrowLeftRight } from 'lucide-react';
+import { QRCode } from '@/components/ui/qrcode';
 
 interface DepositDialogProps {
     walletAddress: string;
     network?: 'testnet' | 'mainnet';
-}
-
-// Simple QR Code component using inline SVG (no external dependencies)
-function QRCode({ value, size = 180 }: { value: string; size?: number }) {
-    // For MVP, we'll show a placeholder with the address
-    // In production, integrate with a QR library like 'qrcode'
-    return (
-        <div
-            className="bg-white p-4 rounded-xl inline-block"
-            style={{ width: size, height: size }}
-        >
-            <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-lg border-2 border-dashed border-gray-300">
-                <div className="text-center px-2">
-                    <Wallet className="w-8 h-8 mx-auto text-gray-400 mb-2" />
-                    <p className="text-[10px] text-gray-500 font-mono break-all leading-tight">
-                        {value.slice(0, 8)}...{value.slice(-8)}
-                    </p>
-                </div>
-            </div>
-        </div>
-    );
 }
 
 export function DepositDialog({ walletAddress, network = 'testnet' }: DepositDialogProps) {

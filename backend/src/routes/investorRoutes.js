@@ -19,6 +19,7 @@ import {
   getPasskeyConfig,
   getInvestorPortfolio,
   getInvestorMetrics,
+  getInvestorInvestments,
   getWalletStatus,
   proposeWithdrawal,
   submitWithdrawal,
@@ -351,6 +352,41 @@ router.get('/:id', authenticateToken, getInvestorById);
  *         description: Portfólio do investidor
  */
 router.get('/:id/portfolio', requireInvestor, requireOwnData, getInvestorPortfolio);
+
+/**
+ * @swagger
+ * /api/investors/{id}/investments:
+ *   get:
+ *     summary: Get investor investments with optional status filter
+ *     tags: [Investors]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filter by status (comma-separated, e.g. pending_payment,payment_received)
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *       - in: query
+ *         name: offset
+ *         schema:
+ *           type: integer
+ *           default: 0
+ *     responses:
+ *       200:
+ *         description: List of investor investments
+ */
+router.get('/:id/investments', requireInvestor, requireOwnData, getInvestorInvestments);
 
 /**
  * @swagger
