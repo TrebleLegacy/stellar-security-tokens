@@ -45,16 +45,23 @@ describe('JIT Authorization Flow', () => {
 
         const uniqueDoc = `DOC_${Date.now()}`;
         try {
-            await prisma.$executeRaw`
-                INSERT INTO investors (
-                    name, email, document, kyc_status, stellar_contract_id, created_at, updated_at
-                ) VALUES (
-                    'JIT Tester', 'jittester@test.com', ${uniqueDoc}, 'approved'::"KYCStatus", 'C_SMART_WALLET_123', NOW(), NOW()
-                )
-                ON CONFLICT (email) DO UPDATE SET
-                    kyc_status = 'approved'::"KYCStatus",
-                    stellar_contract_id = 'C_SMART_WALLET_123';
-            `;
+            await prisma.investor.upsert({
+                where: { email: 'jittester@test.com' },
+                update: {
+                    kycStatus: 'approved',
+                    stellarContractId: 'C_SMART_WALLET_123',
+                    passkeyCredentialId: 'mock-cred-id'
+                },
+                create: {
+                    name: 'JIT Tester',
+                    email: 'jittester@test.com',
+                    document: uniqueDoc,
+                    kycStatus: 'approved',
+                    stellarContractId: 'C_SMART_WALLET_123',
+                    passkeyCredentialId: 'mock-cred-id',
+                    emailVerified: true
+                }
+            });
         } catch (e) {
             console.error("Setup Error (Investor):", e);
             throw e;
