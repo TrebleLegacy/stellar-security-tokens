@@ -23,10 +23,9 @@ services:
       # Keep IPFS mocked in dev (empty = mock mode, real JWT in production only)
       PINATA_JWT: ""
     # Enable hot-reload by mounting source code
-    # Uncomment these volumes for live code changes:
-    # volumes:
-    #   - ./backend/src:/app/backend/src
-    #   - ./backend/prisma:/app/backend/prisma
+    volumes:
+      - ./backend/src:/app/backend/src
+      - ./backend/prisma:/app/backend/prisma
 
   frontend:
     build:

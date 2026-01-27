@@ -45,6 +45,14 @@ describe('KYC Lifecycle Flow (Mocked)', () => {
         const publicKey = Buffer.from(`pub-mocked-${Date.now()}`).toString('base64url');
         const contractId = 'C' + 'MOCK_CONTRACT_ID_KYC_MOCKED_' + Date.now().toString().padEnd(25, '0').substring(0, 25);
 
+        // 0. Manual verification token generation (bypassing Redis in test)
+        const jwt = (await import('jsonwebtoken')).default;
+        const registrationToken = jwt.sign(
+            { email: uniqueEmail.toLowerCase(), purpose: 'registration', verified: true },
+            process.env.JWT_SECRET || 'stellar-tokens-secret',
+            { expiresIn: '30m' }
+        );
+
         // 1. Register
         const registerRes = await request
             .post('/api/investors/register')
@@ -52,6 +60,7 @@ describe('KYC Lifecycle Flow (Mocked)', () => {
                 name: 'KYC Tester Mocked',
                 email: uniqueEmail,
                 document: uniqueDocument,
+                registrationToken: registrationToken,
                 credentialId: credentialId,
                 publicKey: publicKey,
                 contractId: contractId
@@ -65,6 +74,6 @@ describe('KYC Lifecycle Flow (Mocked)', () => {
         const investorId = registerRes.body.data.investor.id;
         assert.ok(investorId);
         assert.strictEqual(registerRes.body.data.investor.kycStatus, 'pending');
-        assert.strictEqual(registerRes.body.data.investor.emailVerified, false);
+        assert.strictEqual(registerRes.body.data.investor.emailVerified, true);
     });
 });

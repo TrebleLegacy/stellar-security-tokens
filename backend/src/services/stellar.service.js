@@ -1602,4 +1602,129 @@ export class StellarService {
       throw error;
     }
   }
+
+  /**
+   * Extends the TTL (Time-To-Live) of a Soroban contract (instance and wasm code).
+   * @param {string} contractId - The ID of the contract to extend.
+   * @param {number} [ledgersToExtend=100000] - Number of ledgers to extend the TTL by.
+   * @returns {Promise<Object>} Result of the extension transaction.
+   */
+  static async extendContractTTL(contractId, ledgersToExtend = 500000) {
+    try {
+      const operationsKeypair = getOperationsKeypair();
+      const operationsAccount = await stellarServer.loadAccount(operationsKeypair.publicKey());
+      const contract = new Contract(contractId);
+
+      console.log(`[StellarService] Extending TTL for contract ${contractId} by ${ledgersToExtend} ledgers`);
+
+      // 1. Create operations for instance and code extension
+      // Note: We use extendFootprintTtl operation which requires specific footprint
+      const extendOp = Operation.extendFootprintTtl({
+        extendTo: ledgersToExtend,
+      });
+
+      // 2. Build transaction
+      let transaction = buildTransactionWithAccount(operationsAccount, [extendOp]);
+
+      // 3. Prepare transaction (important: this sets the footprint)
+      // We need to manually set the footprint for the extension
+      const footprint = new xdr.LedgerFootprint({
+        readOnly: [
+          xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+            contract: Address.fromString(contractId).toScAddress(),
+            key: xdr.ScVal.scvLedgerKeyContractInstance(),
+            durability: xdr.ContractDataDurability.persistent(),
+          }))
+        ],
+        readWrite: [],
+      });
+
+      // Fetch the contract instance to get the WASM hash for code extension
+      const rpcServer = new rpc.Server(getSorobanRpcUrl());
+      const instanceKey = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+        contract: Address.fromString(contractId).toScAddress(),
+        key: xdr.ScVal.scvLedgerKeyContractInstance(),
+        durability: xdr.ContractDataDurability.persistent(),
+      }));
+
+      const ledgerEntries = await rpcServer.getLedgerEntries(instanceKey);
+      if (!ledgerEntries.entries || ledgerEntries.entries.length === 0) {
+        throw new Error(`Contract instance not found for ${contractId}`);
+      }
+
+      const instanceEntry = xdr.LedgerEntryData.fromXDR(ledgerEntries.entries[0].xdr, 'base64').contractData();
+      const wasmHash = instanceEntry.val().instance().executable().wasmHash();
+
+      // Add WASM code to footprint
+      footprint.readOnly().push(
+        xdr.LedgerKey.contractCode(new xdr.LedgerKeyContractCode({
+          hash: wasmHash,
+        }))
+      );
+
+      const sorobanData = new xdr.SorobanTransactionData({
+        resources: new xdr.SorobanResources({
+          footprint,
+          instructions: 0,
+          readBytes: 0,
+          writeBytes: 0,
+        }),
+        resourceFee: new xdr.Int64(0),
+        ext: new xdr.ExtensionPoint(0),
+      });
+
+      transaction.setSorobanData(sorobanData);
+
+      // 4. Prepare (sets proper fees/resources)
+      transaction = await this.prepareSorobanTransaction(transaction);
+
+      // 5. Submit
+      const result = await TransactionManager.submit({
+        transaction,
+        signingKeypair: operationsKeypair,
+        operationType: 'extend_ttl',
+        description: `Extend TTL for contract ${contractId}`,
+        metadata: { contractId, ledgersToExtend }
+      });
+
+      return result;
+    } catch (error) {
+      console.error(`[StellarService] Failed to extend TTL for contract ${contractId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Checks the current TTL (Time-To-Live) of a contract.
+   * @param {string} contractId - The ID of the contract to check.
+   * @returns {Promise<Object>} TTL information.
+   */
+  static async getContractTTL(contractId) {
+    try {
+      const rpcServer = new rpc.Server(getSorobanRpcUrl());
+      const instanceKey = xdr.LedgerKey.contractData(new xdr.LedgerKeyContractData({
+        contract: Address.fromString(contractId).toScAddress(),
+        key: xdr.ScVal.scvLedgerKeyContractInstance(),
+        durability: xdr.ContractDataDurability.persistent(),
+      }));
+
+      const response = await rpcServer.getLedgerEntries(instanceKey);
+      if (!response.entries || response.entries.length === 0) {
+        return { exists: false };
+      }
+
+      const entry = response.entries[0];
+      const latestLedger = await rpcServer.getLatestLedger();
+
+      return {
+        exists: true,
+        liveUntilLedger: entry.liveUntilLedgerSeq,
+        currentLedger: latestLedger.sequence,
+        ttlRemaining: entry.liveUntilLedgerSeq - latestLedger.sequence,
+      };
+    } catch (error) {
+      console.error(`[StellarService] Error checking TTL for ${contractId}:`, error);
+      throw error;
+    }
+  }
 }

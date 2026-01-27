@@ -5,6 +5,7 @@ import { startPaymentScheduler } from './services/paymentScheduler.js';
 import { PaymentReminderService } from './services/paymentReminder.service.js';
 import { getPaymentMonitor } from './services/paymentMonitor.service.js';
 import { initDistributionQueue } from './services/distributionQueue.service.js';
+import { MaintenanceService } from './services/maintenance.service.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 
@@ -175,5 +176,13 @@ app.listen(PORT, async () => {
     }
   } else {
     console.log('Distribution queue is disabled (ENABLE_DISTRIBUTION_QUEUE=false)');
+  }
+
+  // --- SOROBAN TTL MAINTENANCE ---
+  try {
+    MaintenanceService.init();
+    console.log('Soroban TTL Maintenance enabled - contracts will be extended automatically');
+  } catch (error) {
+    console.error('Failed to start Soroban TTL Maintenance:', error.message);
   }
 });
