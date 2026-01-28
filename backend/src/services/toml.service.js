@@ -1,6 +1,6 @@
 import { getIssuerKeypair, getNetworkPassphrase } from '../config/stellar.js';
-import { Token } from '../models/Token.js';
 import prisma from '../config/prisma.js';
+import { ipfsService } from './ipfs.service.js';
 
 export class TomlService {
     /**
@@ -11,8 +11,14 @@ export class TomlService {
         const issuerKey = getIssuerKeypair().publicKey();
         const networkPassphrase = getNetworkPassphrase();
 
-        // Fetch all tokens from DB
-        const tokens = await Token.findAll(1000, 0);
+        // Fetch all tokens from DB with their related offers to get legal documents
+        const tokens = await prisma.token.findMany({
+            include: {
+                offer: true
+            },
+            take: 1000,
+            orderBy: { createdAt: 'desc' }
+        });
 
         // Fetch system settings for organizational info
         const configs = await prisma.systemConfig.findMany();
@@ -51,9 +57,27 @@ is_asset_withheld=false
 is_stackable=false
 `;
 
-            // If we have an offer related, we could add more info
-            if (token.offerId) {
+            // If we have an offer related, we can add more info and IPFS documents
+            if (token.offer) {
                 toml += `status="live"\n`;
+
+                const docs = token.offer.legalDocuments || {};
+
+                // Add IPFS document links if they exist
+                if (docs.contract && docs.contract.hash) {
+                    toml += `ipfs_contract_hash="${docs.contract.hash}"\n`;
+                    toml += `ipfs_contract_url="${ipfsService.getGatewayUrl(docs.contract.hash)}"\n`;
+                }
+
+                if (docs.prospectus && docs.prospectus.hash) {
+                    toml += `ipfs_prospectus_hash="${docs.prospectus.hash}"\n`;
+                    toml += `ipfs_prospectus_url="${ipfsService.getGatewayUrl(docs.prospectus.hash)}"\n`;
+                }
+
+                if (docs.terms && docs.terms.hash) {
+                    toml += `ipfs_terms_hash="${docs.terms.hash}"\n`;
+                    toml += `ipfs_terms_url="${ipfsService.getGatewayUrl(docs.terms.hash)}"\n`;
+                }
             }
 
             toml += '\n';
