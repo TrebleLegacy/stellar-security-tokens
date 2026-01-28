@@ -115,6 +115,9 @@ export class OfferController {
       legal_documents: OfferController.formatLegalDocuments(legalDocuments),
       offerRules: offerRules,
       offer_rules: offerRules,
+      // Relations
+      company: offer.company || null,
+      token: (offer.tokens && offer.tokens.length > 0) ? offer.tokens[0] : (offer.token || null),
     };
   }
 
@@ -824,7 +827,7 @@ export class OfferController {
       const pendingTx = await prisma.multiSigTransaction.findFirst({
         where: {
           operationType: 'token_issue',
-          status: 'pending_signatures',
+          status: 'pending',
           metadata: {
             path: ['assetCode'],
             equals: offer.assetCode

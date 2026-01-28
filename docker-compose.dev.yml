@@ -39,3 +39,9 @@ services:
     # For frontend hot-reload, you may want to run `npm run dev` locally instead
     # volumes:
     #   - ./frontend/src:/app/frontend/src
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --url http://frontend:80
+    networks:
+      - stellar_network

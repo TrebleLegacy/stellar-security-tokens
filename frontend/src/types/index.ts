@@ -79,6 +79,7 @@ export interface Offer {
   };
   due_diligence_notes?: string;
   token?: Token;
+  company?: Company;
   created_at: string;
   updated_at: string;
 }

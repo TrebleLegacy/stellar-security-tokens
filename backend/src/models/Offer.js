@@ -77,6 +77,11 @@ export class Offer {
   static async findById(id) {
     return await prisma.offer.findUnique({
       where: { id },
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      }
     });
   }
 
@@ -88,6 +93,11 @@ export class Offer {
   static async findByAssetCode(assetCode) {
     return await prisma.offer.findUnique({
       where: { assetCode },
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      }
     });
   }
 
@@ -101,6 +111,11 @@ export class Offer {
   static async findByCompany(companyId, limit = 100, offset = 0) {
     return await prisma.offer.findMany({
       where: { companyId },
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      },
       take: limit,
       skip: offset,
       orderBy: { createdAt: 'desc' },
@@ -121,6 +136,11 @@ export class Offer {
 
     return await prisma.offer.findMany({
       where,
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      },
       take: limit,
       skip: offset,
       orderBy: { createdAt: 'desc' },
@@ -142,6 +162,11 @@ export class Offer {
 
     return await prisma.offer.findMany({
       where,
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      },
       take: limit,
       skip: offset,
       orderBy: { createdAt: 'desc' },
@@ -158,6 +183,11 @@ export class Offer {
   static async getOffersByType(offerType, limit = 100, offset = 0) {
     return await prisma.offer.findMany({
       where: { offerType: offerType.toLowerCase() },
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      },
       take: limit,
       skip: offset,
       orderBy: { createdAt: 'desc' },
