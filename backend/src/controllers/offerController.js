@@ -843,11 +843,11 @@ export class OfferController {
       }
 
       // Emitir token usando o serviço
-      const issuerPublicKey = process.env.STELLAR_ISSUER_PUBLIC_KEY;
+      const issuerPublicKey = process.env.STELLAR_ISSUER_PUBLIC_KEY || process.env.ISSUER_PUBLIC_KEY;
       if (!issuerPublicKey) {
         return res.status(500).json({
           success: false,
-          error: 'Stellar issuer public key not configured',
+          error: 'Stellar issuer public key not configured (STELLAR_ISSUER_PUBLIC_KEY or ISSUER_PUBLIC_KEY)',
         });
       }
 
