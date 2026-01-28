@@ -253,12 +253,14 @@ export class StellarService {
         await this.setupSponsoredAccount(keypair.publicKey());
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 5000)); // Increased wait for propagation
 
       try {
         await stellarServer.loadAccount(keypair.publicKey());
       } catch (error) {
-        throw new Error('Account was not created successfully');
+        console.error(`[StellarService] Critical: Account ${keypair.publicKey()} was not found on the network after creation/funding attempt.`);
+        console.error(`[StellarService] This may be due to Horizon lag or Friendbot failure. Check: https://stellar.expert/explorer/testnet/account/${keypair.publicKey()}`);
+        throw new Error(`Account ${keypair.publicKey()} was not created successfully on ${process.env.STELLAR_NETWORK || 'testnet'}.`);
       }
 
       return {

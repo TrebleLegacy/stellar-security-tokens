@@ -60,6 +60,11 @@ describe('Real Estate Offer Flow', () => {
             // Check LTV calculation: (500,000 / 800,000) * 100 = 62.5
             assert.strictEqual(parseFloat(response.body.data.collateral_ltv), 62.5);
 
+            // Check company data
+            assert.ok(response.body.data.company);
+            assert.strictEqual(response.body.data.company.id, companyUser.companyId);
+            assert.strictEqual(response.body.data.company.name, 'Test Company');
+
             // Check documents
             assert.ok(response.body.data.legal_documents.matricula);
             assert.ok(response.body.data.legal_documents.matricula.hash);
@@ -84,5 +89,9 @@ describe('Real Estate Offer Flow', () => {
         assert.ok(offer);
         assert.strictEqual(offer.collateralDescription, 'Casa de alto padrão');
         assert.strictEqual(offer.legalDocuments.matricula.fileName, 'test-document.pdf');
+
+        // Verify company is included in list view too
+        assert.ok(offer.company);
+        assert.strictEqual(offer.company.name, 'Test Company');
     });
 });

@@ -221,6 +221,11 @@ export class OfferService {
           collateralValue: offerData.collateral_value,
           collateralLTV: offerData.collateral_ltv,
           status: 'pending_review',
+        },
+        include: {
+          company: true,
+          tokens: true,
+          requester: true
         }
       });
 
