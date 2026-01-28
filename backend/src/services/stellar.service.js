@@ -684,7 +684,7 @@ export class StellarService {
     const networkId = hash(Buffer.from(networkPassphrase));
 
     // Preimage from Asset
-    const xdrAsset = asset.toXDR();
+    const xdrAsset = asset.toXDRObject();
     const contractIdPreimage = xdr.ContractIdPreimage.contractIdPreimageFromAsset(xdrAsset);
 
     const contractIdHash = hash(
