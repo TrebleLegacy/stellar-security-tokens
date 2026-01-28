@@ -117,4 +117,12 @@ export class MockStellarService {
             ledger: 105,
         };
     }
+
+    static async simulateSorobanTransaction(transaction) {
+        return { success: true, results: [] };
+    }
+
+    static async prepareSorobanTransaction(transaction) {
+        return transaction;
+    }
 }

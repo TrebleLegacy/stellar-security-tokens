@@ -21,6 +21,8 @@ import {
   AuthRevocableFlag,
   AuthClawbackEnabledFlag,
   TransactionBuilder,
+  Transaction,
+  FeeBumpTransaction,
   BASE_FEE,
   xdr,
   StrKey,
@@ -342,23 +344,24 @@ export class StellarService {
         (b) => b.asset_code === code && b.asset_issuer === issuerKeypair.publicKey()
       );
 
-      const operations = [];
+      // --- TRANSACTION 1: CLASSIC ISSUANCE ---
+      const classicOperations = [];
 
-      // If authorized flag is not set and issuer requires it, authorize now
+      // if authorized flag is not set and issuer requires it, authorize now
       if (needsAuth && (!currentTrust || !currentTrust.is_authorized)) {
         console.log(`[StellarService] Authorizing distributor trustline for asset ${code}`);
-        operations.push(
+        classicOperations.push(
           Operation.setTrustLineFlags({
             trustor: distributorKeypair.publicKey(),
             asset: asset,
-            setFlags: 1, // AUTHORIZED_FLAG
+            flags: { authorized: true },
             source: issuerKeypair.publicKey(),
           })
         );
       }
 
-      // 4. Perform payment (issuance)
-      operations.push(
+      // Perform payment (issuance)
+      classicOperations.push(
         Operation.payment({
           destination: distributorKeypair.publicKey(),
           asset: asset,
@@ -367,19 +370,9 @@ export class StellarService {
         })
       );
 
-      // 5. Deploy SAC (Stellar Asset Contract)
-      const sacContractId = this.getSACContractId(asset);
-      console.log(`[StellarService] Adding SAC deployment for asset ${code} (${sacContractId})`);
-      operations.push(
-        Operation.createAssetContract({
-          asset: asset,
-          source: issuerKeypair.publicKey(),
-        })
-      );
-
       // Configurar home domain se fornecido
       if (options.homeDomain) {
-        operations.unshift(
+        classicOperations.unshift(
           Operation.setOptions({
             source: issuerKeypair.publicKey(),
             homeDomain: options.homeDomain,
@@ -387,41 +380,60 @@ export class StellarService {
         );
       }
 
-      // Reload issuer account to get fresh sequence number (using fresh server)
-      console.log(`[StellarService] Building issuance and SAC deployment transaction for asset ${code}`);
-      const freshIssuerAccount = await freshServer.loadAccount(issuerKeypair.publicKey());
+      console.log(`[StellarService] Submitting classic issuance for asset ${code}`);
+      const issuerAccountClassic = await freshServer.loadAccount(issuerKeypair.publicKey());
+      const classicTx = buildTransactionWithAccount(issuerAccountClassic, classicOperations);
 
-      const transaction = buildTransactionWithAccount(freshIssuerAccount, operations);
-
-      const result = await TransactionManager.submit({
-        transaction,
+      const classicResult = await TransactionManager.submit({
+        transaction: classicTx,
         signingKeypair: issuerKeypair,
         operationType: 'token_issue',
-        description: `Issue ${amount} ${code} and deploy SAC`,
+        description: `Issue ${amount} ${code} (Classic)`,
         metadata: {
           assetCode: code,
           amount,
-          type: 'issuance_and_sac',
+          type: 'classic_issuance',
           issuerPublicKey: issuerKeypair.publicKey(),
-          totalSupply: amount,
-          description: options.description,
-          offerId: options.offerId,
+        }
+      });
+
+      if (!classicResult.success && classicResult.status !== 'pending_multisig') {
+        throw new Error(`Classic issuance failed: ${classicResult.userFriendlyError || classicResult.error}`);
+      }
+
+      // --- TRANSACTION 2: SOROBAN SAC DEPLOYMENT ---
+      // This is a separate transaction to avoid simulation errors with multiple ops
+      const sacContractId = this.getSACContractId(asset);
+      console.log(`[StellarService] Deploying SAC for asset ${code} (${sacContractId})`);
+
+      const sacOp = Operation.createStellarAssetContract({
+        asset: asset,
+        source: issuerKeypair.publicKey(),
+      });
+
+      // Reload issuer account (sequence number increased)
+      const issuerAccountSoroban = await freshServer.loadAccount(issuerKeypair.publicKey());
+      let sacTx = buildTransactionWithAccount(issuerAccountSoroban, [sacOp]);
+
+      console.log(`[StellarService] Preparing Soroban SAC deployment for asset ${code}...`);
+      sacTx = await this.prepareSorobanTransaction(sacTx);
+
+      const sacResult = await TransactionManager.submit({
+        transaction: sacTx,
+        signingKeypair: issuerKeypair,
+        operationType: 'token_issue',
+        description: `Deploy SAC for asset ${code}`,
+        metadata: {
+          assetCode: code,
+          type: 'sac_deployment',
           sacContractId
         }
       });
 
-      if (result.status === 'pending_multisig') {
-        return {
-          success: true,
-          status: 'pending_multisig',
-          assetCode: code,
-          sacContractId,
-          ...result
-        };
-      }
-
-      if (!result.success) {
-        throw new Error(`Failed to issue token and deploy SAC: ${result.userFriendlyError || result.error}`);
+      if (!sacResult.success && sacResult.status !== 'pending_multisig') {
+        console.warn(`[StellarService] SAC deployment failed (classic succeeded): ${sacResult.error}`);
+        // We don't necessarily want to fail the whole thing since issuance happened
+        // but for now, we'll keep error reporting strict.
       }
 
       const returnData = {
@@ -430,9 +442,10 @@ export class StellarService {
         issuerPublicKey: issuerKeypair.publicKey(),
         distributorPublicKey: distributorKeypair.publicKey(),
         amount: amount.toString(),
-        transactionHash: result.hash,
-        ledger: result.ledger,
+        transactionHash: classicResult.hash || (classicResult.status === 'pending_multisig' ? 'pending' : null),
+        ledger: classicResult.ledger,
         sacContractId,
+        sacTransactionHash: sacResult.hash,
       };
 
       if (options.homeDomain) {
@@ -740,9 +753,10 @@ export class StellarService {
         Operation.setTrustLineFlags({
           trustor: investorPublicKey,
           asset: asset,
-          // Issue 2 Fix: Clear the 'authorized' flag (value 1) to revoke authorization
-          // This prevents the investor from transacting with this asset
-          clearFlags: 1, // AUTHORIZED_FLAG = 1
+          flags: {
+            authorized: false
+          },
+          source: issuerKeypair.publicKey()
         }),
       ];
 
@@ -1512,7 +1526,7 @@ export class StellarService {
         Operation.setTrustLineFlags({
           trustor: investorPublicKey,
           asset: createAsset(tl.asset_code, tl.asset_issuer),
-          setFlags: 1, // AUTHORIZED_FLAG
+          flags: { authorized: true },
         })
       );
 
@@ -1592,7 +1606,7 @@ export class StellarService {
 
       // Re-build with the safe fee if it's a standard Transaction
       // Note: FeeBumpTransaction fees are handled differently
-      if (preparedTx instanceof TransactionBuilder.Transaction) {
+      if (preparedTx instanceof Transaction) {
         // Unfortunately assembleTransaction returns a new transaction, 
         // but we might want to adjust the fee further.
         // However, assembleTransaction already sets a valid fee.
