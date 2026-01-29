@@ -13,7 +13,15 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const network = process.env.STELLAR_NETWORK || 'testnet';
-const horizonUrl = process.env.STELLAR_HORIZON_URL || process.env.HORIZON_URL || 'https://horizon-testnet.stellar.org';
+let rawHorizonUrl = (process.env.STELLAR_HORIZON_URL || process.env.HORIZON_URL || 'https://horizon-testnet.stellar.org').trim();
+console.log(`[StellarConfig] Raw Horizon URL from ENV: '${rawHorizonUrl}'`);
+
+// ULTRATHINK FIX: Sanitize URL to prevent double pathing (SDK appends /transactions)
+// Removes trailing /transactions (with or without slash) and all trailing slashes
+// Regex explanation:
+// \/transactions\/?$ matches /transactions or /transactions/ at the end
+// \/+$ matches one or more slashes at the end
+const horizonUrl = rawHorizonUrl.replace(/\/transactions\/?$/, '').replace(/\/+$/, '');
 const sorobanRpcUrl = process.env.SOROBAN_RPC_URL || (
   network === 'testnet'
     ? 'https://soroban-testnet.stellar.org'
@@ -315,7 +323,31 @@ export const signAndSubmitTransaction = async (transaction, keypair, server = nu
   feeBumpTx.sign(channelKeypair);
 
   // Use provided server or fall back to default
-  const targetServer = server || stellarServer;
+  let targetServer = server || stellarServer;
+
+  // ULTRATHINK FIX: Runtime check for malformed URL
+  // If the server URL contains /transactions, it will cause a 405 error because the SDK appends it again.
+  try {
+    // In some SDK versions serverURL is a URI object, in others a string. Safest is to cast to string then URL.
+    if (targetServer.serverURL) {
+      const urlStr = targetServer.serverURL.toString();
+      const parsedUrl = new URL(urlStr);
+
+      if (parsedUrl.pathname && parsedUrl.pathname.includes('transactions')) {
+        console.warn(`[signAndSubmitTransaction] DETECTED MALFORMED URL: ${urlStr}. Fixing...`);
+        // Remove /transactions and trailing slashes
+        const cleanUrl = urlStr.replace(/\/transactions\/?$/, '').replace(/\/+$/, '');
+        console.warn(`[signAndSubmitTransaction] Fixed URL to: ${cleanUrl}`);
+        targetServer = new Horizon.Server(cleanUrl);
+      }
+    }
+  } catch (err) {
+    console.error('[signAndSubmitTransaction] Error checking server URL:', err);
+  }
+
+  if (targetServer.serverURL) {
+    console.log(`[signAndSubmitTransaction] Submitting to: ${targetServer.serverURL}`);
+  }
 
   try {
     const result = await targetServer.submitTransaction(feeBumpTx);

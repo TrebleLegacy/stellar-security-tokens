@@ -301,7 +301,7 @@ export function CreateOffer() {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-white">Description *</label>
                                 <textarea
-                                    placeholder="Describe your offer in detail..."
+                                    placeholder="Descreva sua oferta em detalhes (Ex: Endereço do imóvel, descrição do ativo, garantias, etc...)"
                                     value={formData.description}
                                     onChange={(e) => updateFormData({ description: e.target.value })}
                                     className="w-full min-h-[120px] px-3 py-2 rounded-md bg-white/5 border border-white/10 focus:border-teal-500/50 focus:outline-none text-white resize-none"
@@ -672,6 +672,44 @@ export function CreateOffer() {
                                         </div>
                                     </div>
                                 )}
+
+                                {/* Important Dates */}
+                                <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
+                                    <h4 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                                        <Calendar className="w-4 h-4 text-primary" />
+                                        Important Dates
+                                    </h4>
+                                    <div className="grid gap-4">
+                                        <div className="flex justify-between items-start border-b border-white/5 pb-3">
+                                            <span className="text-sm text-muted-foreground">Created Date</span>
+                                            <span className="text-sm text-white font-medium">{new Date().toLocaleDateString()}</span>
+                                        </div>
+                                        {formData.offer_type === 'collateral' && (
+                                            <>
+                                                <div className="flex justify-between items-start border-b border-white/5 pb-3">
+                                                    <span className="text-sm text-muted-foreground">First Payment Prediction</span>
+                                                    <span className="text-sm text-white font-medium">
+                                                        {formData.payment_type === 'bullet'
+                                                            ? (formData.maturity_date ? new Date(formData.maturity_date).toLocaleDateString() : 'N/A')
+                                                            : `Next Day ${formData.payment_day}`}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-start">
+                                                    <span className="text-sm text-muted-foreground">Maturity Date</span>
+                                                    <span className="text-sm text-white font-medium">
+                                                        {formData.maturity_date ? new Date(formData.maturity_date).toLocaleDateString() : 'Perpetual / Dividend based'}
+                                                    </span>
+                                                </div>
+                                            </>
+                                        )}
+                                        {formData.offer_type === 'sale' && (
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-sm text-muted-foreground">Payment Cycle</span>
+                                                <span className="text-sm text-white font-medium">Variable Dividends</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
 
                                 {/* Documents */}
                                 <div className="p-5 rounded-xl border border-white/10 bg-white/[0.02]">
