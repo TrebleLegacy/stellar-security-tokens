@@ -12,7 +12,13 @@ export function IPFSInfo() {
             <div className="space-y-4 animate-fade-in">
                 <Button
                     variant="ghost"
-                    onClick={() => navigate(-1)}
+                    onClick={() => {
+                        if (window.history.length > 1) {
+                            navigate(-1);
+                        } else {
+                            navigate('/company/offers');
+                        }
+                    }}
                     className="text-muted-foreground hover:text-white transition-transform hover:scale-105"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" />

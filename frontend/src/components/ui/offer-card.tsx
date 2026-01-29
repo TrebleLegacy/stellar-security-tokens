@@ -26,6 +26,9 @@ export function OfferCard({ offer, onInvest }: OfferCardProps) {
                     )}
                 </div>
                 <CardTitle className="text-xl mt-2">{offer.offer_name}</CardTitle>
+                <div className="flex items-center gap-1.5 text-xs text-blue-400 font-medium mb-1">
+                    <span>{offer.company?.name || 'Issuer'}</span>
+                </div>
                 <CardDescription className="line-clamp-2">{offer.description}</CardDescription>
             </CardHeader>
 

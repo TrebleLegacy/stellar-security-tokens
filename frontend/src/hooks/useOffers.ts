@@ -21,6 +21,10 @@ export interface Offer {
     payment_type?: string;
     maturity_date?: string;
     payment_frequency?: number;
+    company?: {
+        name: string;
+        email?: string;
+    };
 }
 
 export function useOffers() {

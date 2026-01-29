@@ -1599,6 +1599,13 @@ export class StellarService {
       // 2. Assemble (applies resources to footprint/auth/etc)
       let preparedTx = rpc.assembleTransaction(transaction, simulation);
 
+      // ULTRATHINK FIX: assembleTransaction might return a TransactionBuilder instead of a Transaction
+      // We must build it to get the signable Transaction object
+      if (preparedTx instanceof TransactionBuilder) {
+        console.log('[StellarService] assembleTransaction returned a Builder. Building transaction...');
+        preparedTx = preparedTx.build();
+      }
+
       // 3. Set a safer fee based on simulation
       // We add a small margin to the suggested fee to ensure execution
       const suggestedFee = parseInt(preparedTx.fee);
