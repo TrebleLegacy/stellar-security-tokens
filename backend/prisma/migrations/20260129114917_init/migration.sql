@@ -23,6 +23,9 @@ CREATE TYPE "PaymentDueStatus" AS ENUM ('current', 'upcoming', 'due', 'overdue',
 CREATE TYPE "InvestmentStatus" AS ENUM ('pending_payment', 'payment_received', 'distributed', 'failed', 'cancelled');
 
 -- CreateEnum
+CREATE TYPE "DepositStatus" AS ENUM ('pending', 'received', 'forwarding', 'completed', 'expired', 'failed');
+
+-- CreateEnum
 CREATE TYPE "ApprovalStatus" AS ENUM ('pending', 'approved', 'rejected');
 
 -- CreateEnum
@@ -32,7 +35,10 @@ CREATE TYPE "CompanyUserRole" AS ENUM ('user', 'admin');
 CREATE TYPE "PlatformAdminRole" AS ENUM ('admin', 'manager', 'super_admin');
 
 -- CreateEnum
-CREATE TYPE "MultiSigTxStatus" AS ENUM ('pending', 'executed', 'rejected', 'failed');
+CREATE TYPE "MultiSigTxStatus" AS ENUM ('pending', 'partially_signed', 'ready', 'submitted', 'executed', 'rejected', 'failed', 'expired');
+
+-- CreateEnum
+CREATE TYPE "MultiSigOperationType" AS ENUM ('token_issue', 'token_distribute', 'freeze_account', 'clawback', 'treasury_payment', 'trustline_auth', 'account_setup', 'other');
 
 -- CreateTable
 CREATE TABLE "investors" (
@@ -67,6 +73,8 @@ CREATE TABLE "tokens" (
     "issued_by" INTEGER,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "sac_contract_id" VARCHAR(56),
+    "issuance_transaction_hash" VARCHAR(64),
 
     CONSTRAINT "tokens_pkey" PRIMARY KEY ("id")
 );
@@ -118,9 +126,10 @@ CREATE TABLE "interest_payments" (
 CREATE TABLE "companies" (
     "id" SERIAL NOT NULL,
     "name" VARCHAR(255) NOT NULL,
-    "cnpj" VARCHAR(18) NOT NULL,
+    "cnpj" VARCHAR(18),
     "email" VARCHAR(255) NOT NULL,
-    "legal_representative" VARCHAR(255) NOT NULL,
+    "email_verified" BOOLEAN NOT NULL DEFAULT false,
+    "legal_representative" VARCHAR(255),
     "address" TEXT,
     "phone" VARCHAR(20),
     "status" "CompanyStatus" NOT NULL DEFAULT 'pending',
@@ -185,6 +194,7 @@ CREATE TABLE "offers" (
     "collateral_value" DECIMAL(20,2),
     "collateral_ltv" DECIMAL(5,2),
     "total_supply" DECIMAL(20,7) NOT NULL,
+    "unit_price" DECIMAL(20,7) NOT NULL DEFAULT 1.0,
     "annual_interest_rate" DECIMAL(10,7),
     "offer_type" "OfferType" NOT NULL,
     "offer_rules" JSONB NOT NULL DEFAULT '{}',
@@ -296,14 +306,21 @@ CREATE TABLE "fee_logs" (
 -- CreateTable
 CREATE TABLE "multisig_transactions" (
     "id" SERIAL NOT NULL,
+    "operation_type" "MultiSigOperationType" NOT NULL DEFAULT 'other',
     "xdr" TEXT NOT NULL,
+    "network_passphrase" VARCHAR(100) NOT NULL,
     "description" VARCHAR(255),
     "status" "MultiSigTxStatus" NOT NULL DEFAULT 'pending',
+    "required_signers" TEXT[],
+    "threshold_required" INTEGER NOT NULL DEFAULT 1,
+    "collected_signatures" JSONB NOT NULL DEFAULT '{}',
     "initiator_id" INTEGER,
-    "signatures" JSONB NOT NULL DEFAULT '[]',
-    "network" TEXT NOT NULL DEFAULT 'testnet',
-    "threshold_met" BOOLEAN NOT NULL DEFAULT false,
-    "hash" VARCHAR(64),
+    "initiator_type" VARCHAR(50),
+    "metadata" JSONB NOT NULL DEFAULT '{}',
+    "expires_at" TIMESTAMP NOT NULL,
+    "submitted_at" TIMESTAMP,
+    "tx_hash" VARCHAR(64),
+    "ledger" INTEGER,
     "error_message" TEXT,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -358,6 +375,24 @@ CREATE TABLE "company_penalties" (
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "company_penalties_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "deposits" (
+    "id" SERIAL NOT NULL,
+    "investor_id" INTEGER NOT NULL,
+    "memo" VARCHAR(28) NOT NULL,
+    "expected_amount" DECIMAL(20,7),
+    "actual_amount" DECIMAL(20,7),
+    "status" "DepositStatus" NOT NULL DEFAULT 'pending',
+    "incoming_tx_hash" VARCHAR(64),
+    "outgoing_tx_hash" VARCHAR(64),
+    "error_message" TEXT,
+    "expires_at" TIMESTAMP NOT NULL,
+    "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "deposits_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -610,7 +645,16 @@ CREATE INDEX "fee_logs_created_at_idx" ON "fee_logs"("created_at");
 CREATE INDEX "multisig_transactions_status_idx" ON "multisig_transactions"("status");
 
 -- CreateIndex
+CREATE INDEX "multisig_transactions_operation_type_idx" ON "multisig_transactions"("operation_type");
+
+-- CreateIndex
 CREATE INDEX "multisig_transactions_initiator_id_idx" ON "multisig_transactions"("initiator_id");
+
+-- CreateIndex
+CREATE INDEX "multisig_transactions_expires_at_idx" ON "multisig_transactions"("expires_at");
+
+-- CreateIndex
+CREATE INDEX "multisig_transactions_tx_hash_idx" ON "multisig_transactions"("tx_hash");
 
 -- CreateIndex
 CREATE INDEX "notifications_user_id_user_type_idx" ON "notifications"("user_id", "user_type");
@@ -647,6 +691,18 @@ CREATE INDEX "company_penalties_status_idx" ON "company_penalties"("status");
 
 -- CreateIndex
 CREATE INDEX "company_penalties_penalty_type_idx" ON "company_penalties"("penalty_type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "deposits_memo_key" ON "deposits"("memo");
+
+-- CreateIndex
+CREATE INDEX "deposits_memo_idx" ON "deposits"("memo");
+
+-- CreateIndex
+CREATE INDEX "deposits_investor_id_idx" ON "deposits"("investor_id");
+
+-- CreateIndex
+CREATE INDEX "deposits_status_idx" ON "deposits"("status");
 
 -- AddForeignKey
 ALTER TABLE "tokens" ADD CONSTRAINT "tokens_offer_id_fkey" FOREIGN KEY ("offer_id") REFERENCES "offers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -716,3 +772,6 @@ ALTER TABLE "payment_reminders" ADD CONSTRAINT "payment_reminders_company_id_fke
 
 -- AddForeignKey
 ALTER TABLE "company_penalties" ADD CONSTRAINT "company_penalties_company_id_fkey" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "deposits" ADD CONSTRAINT "deposits_investor_id_fkey" FOREIGN KEY ("investor_id") REFERENCES "investors"("id") ON DELETE CASCADE ON UPDATE CASCADE;
