@@ -32,6 +32,15 @@ echo "--------------------------------"
 
 # 1. Reset Database Schema (Destructive)
 echo "1️⃣  Running: prisma migrate reset --force"
+
+# Ensure backend container is running, or start it
+if ! docker compose -f "$PROJECT_ROOT/docker-compose.yml" ps --services --filter "status=running" | grep -q "backend"; then
+    echo "⚠️  Backend container is not running. Starting it..."
+    docker compose -f "$PROJECT_ROOT/docker-compose.yml" -f "$PROJECT_ROOT/docker-compose.dev.yml" up -d backend
+    echo "⏳ Waiting for backend to handle initial boot loop..."
+    sleep 5 
+fi
+
 docker compose -f "$PROJECT_ROOT/docker-compose.yml" -f "$PROJECT_ROOT/docker-compose.dev.yml" exec -w /app/backend backend npx prisma migrate reset --force
 
 if [ $? -ne 0 ]; then
