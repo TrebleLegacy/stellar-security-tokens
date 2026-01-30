@@ -130,7 +130,8 @@ app.listen(PORT, async () => {
     const cron = await import('node-cron');
     const { MultiSigTransactionService } = await import('./services/multiSigTransaction.service.js');
 
-    cron.default.schedule('*/10 * * * *', async () => {
+    // Run hourly (at minute 0)
+    cron.default.schedule('0 * * * *', async () => {
       console.log('[MultiSigExpiry] Checking for expired governance proposals');
       try {
         await MultiSigTransactionService.expireOldTransactions();
@@ -139,7 +140,7 @@ app.listen(PORT, async () => {
       }
     });
 
-    console.log('MultiSig governance expiry checker enabled - checks every 10 minutes');
+    console.log('MultiSig governance expiry checker enabled - checks every hour');
   } catch (error) {
     console.error('Failed to start MultiSig expiry checker:', error.message);
   }
