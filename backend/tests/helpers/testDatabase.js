@@ -186,11 +186,14 @@ export const seedTestData = async () => {
     });
 
     // Create test offer for token unlock tests
+    // Use fully random asset code to prevent collisions when tests run simultaneously
+    // Format: TEST + 8 random alphanumeric chars (uppercase)
+    const randomCode = Math.random().toString(36).substring(2, 10).toUpperCase();
     const offer = await prisma.offer.create({
       data: {
         companyId: company.id,
         requestedBy: companyUser.id,
-        assetCode: `TOFF${timestamp}`.slice(0, 12), // Unique asset code
+        assetCode: `TEST${randomCode}`.slice(0, 12), // Fully random unique asset code
         offerName: 'Test Offer for Token Unlock',
         description: 'Test offer description',
         totalSupply: 10000,
