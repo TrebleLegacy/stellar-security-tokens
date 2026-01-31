@@ -57,6 +57,19 @@ export class StellarService {
   }
 
   /**
+   * Helper to build an unsigned transaction using RPC for sequence number fetching.
+   * This is used by services that need to return XDR for later signing.
+   * @param {string} sourcePublicKey
+   * @param {Array<Operation>} operations
+   * @param {string} [memo]
+   * @returns {Promise<Transaction>} Unsigned transaction object
+   */
+  static async buildUnsignedTransaction(sourcePublicKey, operations, memo) {
+    const sourceAccount = await this.getAccountRPC(sourcePublicKey);
+    return buildTransactionWithAccount(sourceAccount, operations, { memo });
+  }
+
+  /**
    * Cria conta emissora com flags de compliance
    * Configura AuthRequiredFlag, AuthRevocableFlag e AuthClawbackEnabledFlag
    * @returns {Promise<Object>} Resultado da criação da conta

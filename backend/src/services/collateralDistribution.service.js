@@ -8,6 +8,7 @@ import { PaymentService } from './payment.service.js';
 import { NotificationService } from './notification.service.js';
 import { EmailService } from './email.service.js';
 import { Asset, Operation, Keypair } from '@stellar/stellar-sdk';
+import { getIssuerKeypair, getDistributorKeypair } from '../config/stellar.js';
 
 /**
  * Collateral Distribution Service
@@ -192,8 +193,8 @@ export class CollateralDistributionService {
         }
 
         const token = offer.tokens[0];
-        const issuerPublicKey = process.env.STELLAR_ISSUER_PUBLIC_KEY;
-        const distributorPublicKey = process.env.DISTRIBUTOR_PUBLIC_KEY || process.env.TREASURY_PUBLIC_KEY;
+        const issuerPublicKey = getIssuerKeypair().publicKey();
+        const distributorPublicKey = getDistributorKeypair().publicKey();
 
         if (!distributorPublicKey) {
             throw new Error('Distributor/Treasury public key not configured');
