@@ -598,10 +598,18 @@ export class PaymentService {
     logger.info('Starting monthly interest payment process', { assetCode, paymentDate });
 
     try {
-      const result = await retryOperation(
-        () => this.getInvestorsWithBalances(assetCode),
-        3
-      );
+      // Fetch token and offer FIRST to determine balance source
+      const token = await Token.findByAssetCode(assetCode);
+      const offerId = token?.offerId || null;
+
+      if (!offerId) {
+        logger.warn('Token has no associated offer, falling back to DB-only balance query');
+      }
+
+      // Use offer-aware balance query (handles locked vs unlocked tokens)
+      const result = offerId
+        ? await retryOperation(() => this.getInvestorsWithBalancesByOffer(offerId), 3)
+        : await retryOperation(() => this.getInvestorsWithBalances(assetCode), 3);
 
       const { investors, annualInterestRate } = result;
 
@@ -614,11 +622,8 @@ export class PaymentService {
         };
       }
 
-      logger.info(`Processing payments for ${investors.length} investors with ${annualInterestRate}% annual rate`);
-
-      // Buscar offerId do token se existir
-      const token = await Token.findByAssetCode(assetCode);
-      const offerId = token?.offerId || null;
+      logger.info(`Processing payments for ${investors.length} investors with ${annualInterestRate}% annual rate`,
+        { offerId, isTokenLocked: offerId ? 'checked via getInvestorsWithBalancesByOffer' : 'N/A' });
 
       const feePercent = await ConfigService.getFloat('DIVIDEND_FEE_PERCENT', 0);
       logger.info(`Applying Dividend Fee: ${feePercent}%`);
@@ -1610,7 +1615,8 @@ export class PaymentService {
         if (assetCode && offer.asset_code !== assetCode) continue;
 
         try {
-          const result = await this.getInvestorsWithBalances(assetCode, offer.id);
+          // Use offer-aware balance query (handles locked vs unlocked tokens)
+          const result = await this.getInvestorsWithBalancesByOffer(offer.id);
           const { investors, annualInterestRate } = result;
 
           if (investors.length === 0) continue;
