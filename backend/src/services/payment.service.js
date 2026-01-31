@@ -9,6 +9,7 @@ import {
   stellarServer,
   getDistributorKeypair,
   buildTransaction,
+  buildTransactionWithAccount,
   getSorobanRpcUrl,
   getIssuerKeypair,
 } from '../config/stellar.js';
@@ -377,7 +378,9 @@ export class PaymentService {
           })
         );
 
-        const transaction = await buildTransaction(distributorKeypair, operations);
+        // Use RPC for sequence number safety
+        const distributorAccountForTx = await StellarService.getAccountRPC(distributorKeypair.publicKey());
+        const transaction = await buildTransactionWithAccount(distributorAccountForTx, operations);
 
         const result = await TransactionManager.submit({
           transaction,

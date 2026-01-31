@@ -74,12 +74,19 @@ export const WalletController = {
                 default: return res.status(400).json({ error: 'Invalid source wallet' });
             }
 
-            // Check if source account exists
+            // Check if source account exists and get fresh sequence from RPC
             let sourceAccount;
             try {
-                sourceAccount = await stellarServer.loadAccount(sourceKeypair.publicKey());
+                // Use RPC for sequence number safety (Hybrid Pattern)
+                const { StellarService } = await import('../services/stellar.service.js');
+                sourceAccount = await StellarService.getAccountRPC(sourceKeypair.publicKey());
             } catch (e) {
-                return res.status(400).json({ error: 'Source wallet not found on network' });
+                console.warn('[WalletController] RPC fetch failed, falling back to Horizon check:', e.message);
+                try {
+                    sourceAccount = await stellarServer.loadAccount(sourceKeypair.publicKey());
+                } catch (innerError) {
+                    return res.status(400).json({ error: 'Source wallet not found on network' });
+                }
             }
 
             // Build Transaction
