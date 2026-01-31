@@ -296,28 +296,30 @@ export class StellarService {
         }),
       ];
 
-      // Check if this should go through MultiSig (production mode)
-      const transactionManager = new TransactionManager();
-      if (transactionManager.requiresMultisig('unlock_token')) {
-        // Queue for approval
-        return transactionManager.queueForMultisig(
-          operations,
-          issuerKeypair.publicKey(),
-          'unlock_token',
-          { assetCode, description: `Unlock ${assetCode} for DEX trading` }
-        );
-      }
-
-      // Immediate execution (dev/testnet mode)
-      // IMPLICIT: Use RPC for transaction building
+      // Build and submit transaction (handles multisig routing automatically)
       const accountForTx = await this.getAccountRPC(issuerKeypair.publicKey());
       const transaction = await buildTransactionWithAccount(accountForTx, operations);
-      const result = await signAndSubmitTransaction(transaction, issuerKeypair);
 
-      if (!result.success) {
-        throw new Error(`Failed to unlock token: ${result.error}`);
+      const result = await TransactionManager.submit({
+        transaction,
+        signingKeypair: issuerKeypair,
+        operationType: 'unlock_token',
+        description: `Unlock ${assetCode} for DEX trading`,
+        metadata: { assetCode },
+      });
+
+      // Handle multisig pending case
+      if (result.status === 'pending_multisig') {
+        console.log(`[StellarService] Token unlock queued for MultiSig approval. ID: ${result.multiSigTransactionId}`);
+        return {
+          success: true,
+          pendingMultisig: true,
+          multiSigTransactionId: result.multiSigTransactionId,
+          message: `Token unlock request for ${assetCode} queued for MultiSig approval`,
+        };
       }
 
+      // Direct execution success
       console.log(`[StellarService] Token ${assetCode} unlocked successfully. TxHash: ${result.hash}`);
 
       return {
