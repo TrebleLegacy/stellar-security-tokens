@@ -32,9 +32,30 @@ import {
   rpc,
   scValToNative,
   nativeToScVal,
+  Account, // Imported Account class
 } from '@stellar/stellar-sdk';
 
 export class StellarService {
+
+  /**
+   * Helper to fetch account via Soroban RPC (removes dependency on Horizon loadAccount)
+   * This is critical for high-performance and future-proof sequence number fetching.
+   * @param {string} publicKey
+   * @returns {Promise<Account>} Stellar Account object with correct sequence number
+   */
+  static async getAccountRPC(publicKey) {
+    try {
+      const server = new rpc.Server(getSorobanRpcUrl());
+      const account = await server.getAccount(publicKey);
+      return account;
+    } catch (error) {
+      // Fallback to Horizon if RPC fails (during migration/testing)
+      // or if account not found (404 handling differ between RPC/Horizon)
+      console.warn(`[StellarService] RPC getAccount failed for ${publicKey}, falling back to Horizon: ${error.message}`);
+      return stellarServer.loadAccount(publicKey);
+    }
+  }
+
   /**
    * Cria conta emissora com flags de compliance
    * Configura AuthRequiredFlag, AuthRevocableFlag e AuthClawbackEnabledFlag
@@ -73,8 +94,11 @@ export class StellarService {
               setFlags: expectedFlags,
             }),
           ];
-          const transaction = await buildTransaction(issuerKeypair, operations);
-          await signAndSubmitTransaction(transaction, issuerKeypair);
+
+          // Hybrid Pattern: Use RPC for accurate sequence number when building transaction
+          const accountForTx = await this.getAccountRPC(issuerKeypair.publicKey());
+          const transaction = await buildTransactionWithAccount(accountForTx, operations);
+          const result = await signAndSubmitTransaction(transaction, issuerKeypair);
           console.log('Issuer flags updated successfully.');
         }
 
@@ -90,7 +114,7 @@ export class StellarService {
           }
         };
       } catch (error) {
-        if (error.status !== 404) {
+        if (error.status !== 404 && !error.message.includes('404')) {
           throw error;
         }
       }
@@ -127,7 +151,9 @@ export class StellarService {
         }),
       ];
 
-      const transaction = await buildTransaction(issuerKeypair, operations);
+      // Hybrid Pattern: Use RPC for accurate sequence number when building transaction
+      const accountForTx = await this.getAccountRPC(issuerKeypair.publicKey());
+      const transaction = await buildTransactionWithAccount(accountForTx, operations);
       const result = await signAndSubmitTransaction(transaction, issuerKeypair);
 
       if (!result.success) {
@@ -270,7 +296,9 @@ export class StellarService {
       }
 
       // Immediate execution (dev/testnet mode)
-      const transaction = await buildTransaction(issuerKeypair, operations);
+      // IMPLICIT: Use RPC for transaction building
+      const accountForTx = await this.getAccountRPC(issuerKeypair.publicKey());
+      const transaction = await buildTransactionWithAccount(accountForTx, operations);
       const result = await signAndSubmitTransaction(transaction, issuerKeypair);
 
       if (!result.success) {
@@ -458,7 +486,7 @@ export class StellarService {
       }
 
       console.log(`[StellarService] Submitting classic issuance for asset ${code}`);
-      const issuerAccountClassic = await freshServer.loadAccount(issuerKeypair.publicKey());
+      const issuerAccountClassic = await this.getAccountRPC(issuerKeypair.publicKey());
       const classicTx = buildTransactionWithAccount(issuerAccountClassic, classicOperations);
 
       const classicResult = await TransactionManager.submit({
@@ -489,7 +517,7 @@ export class StellarService {
       });
 
       // Reload issuer account (sequence number increased)
-      const issuerAccountSoroban = await freshServer.loadAccount(issuerKeypair.publicKey());
+      const issuerAccountSoroban = await this.getAccountRPC(issuerKeypair.publicKey());
       let sacTx = buildTransactionWithAccount(issuerAccountSoroban, [sacOp]);
 
       console.log(`[StellarService] Preparing Soroban SAC deployment for asset ${code}...`);
@@ -554,7 +582,7 @@ export class StellarService {
         source: issuerKeypair.publicKey(),
       });
 
-      const issuerAccount = await stellarServer.loadAccount(issuerKeypair.publicKey());
+      const issuerAccount = await this.getAccountRPC(issuerKeypair.publicKey());
       const transaction = buildTransactionWithAccount(issuerAccount, [op]);
       const result = await signAndSubmitTransaction(transaction, issuerKeypair);
 
@@ -613,7 +641,7 @@ export class StellarService {
           nativeToScVal(BigInt(Math.floor(parseFloat(amountStr) * 10000000)), { type: 'i128' })
         );
 
-        const distributorAccount = await stellarServer.loadAccount(distributorKeypair.publicKey());
+        const distributorAccount = await this.getAccountRPC(distributorKeypair.publicKey());
         let transaction = buildTransactionWithAccount(distributorAccount, [transferOp]);
 
         // Soroban Simulation & Preparation
@@ -662,7 +690,9 @@ export class StellarService {
           }),
         ];
 
-        const transaction = await buildTransaction(distributorKeypair, operations, {
+        // Use RPC for sequence
+        const distributorAccount = await this.getAccountRPC(distributorKeypair.publicKey());
+        const transaction = await buildTransactionWithAccount(distributorAccount, operations, {
           memo: options.memo || null,
         });
 
@@ -734,7 +764,9 @@ export class StellarService {
         }),
       ];
 
-      const transaction = await buildTransaction(treasuryKeypair, operations, {
+      // Use RPC for sequence
+      const treasuryAccount = await this.getAccountRPC(treasuryKeypair.publicKey());
+      const transaction = await buildTransactionWithAccount(treasuryAccount, operations, {
         memo: description.substring(0, 28) // Text memo limit
       });
 
@@ -837,7 +869,9 @@ export class StellarService {
         }),
       ];
 
-      const transaction = await buildTransaction(issuerKeypair, operations);
+      // Use RPC for sequence
+      const issuerAccountForFreeze = await this.getAccountRPC(issuerKeypair.publicKey());
+      const transaction = await buildTransactionWithAccount(issuerAccountForFreeze, operations);
       const result = await TransactionManager.submit({
         transaction,
         signingKeypair: issuerKeypair,
@@ -925,7 +959,8 @@ export class StellarService {
 
       // Use custom build/submit to reuse loaded issuer account if possible, or force load new
       // For simplicity reusing standard internal flow
-      const issuerAccount = await server.loadAccount(issuerKeypair.publicKey());
+      // Use RPC for sequence
+      const issuerAccount = await this.getAccountRPC(issuerKeypair.publicKey());
       const tx = buildTransactionWithAccount(issuerAccount, [op]);
 
       const result = await TransactionManager.submit({
@@ -982,8 +1017,8 @@ export class StellarService {
         }
       }
 
-      // 2. Carregar conta de operações (Sponsor)
-      const sponsorAccount = await stellarServer.loadAccount(operationsKeypair.publicKey());
+      // 2. Carregar conta de operações via RPC (Sponsor)
+      const sponsorAccount = await this.getAccountRPC(operationsKeypair.publicKey());
 
       // 3. Iniciar construção da transação
       const transactionBuilder = new TransactionBuilder(sponsorAccount, {
@@ -1066,7 +1101,7 @@ export class StellarService {
   static async setupSponsoredAccount(destination) {
     try {
       const operationsKeypair = getOperationsKeypair();
-      const operationsAccount = await stellarServer.loadAccount(operationsKeypair.publicKey());
+      const operationsAccount = await this.getAccountRPC(operationsKeypair.publicKey());
 
       const transaction = new TransactionBuilder(operationsAccount, {
         fee: BASE_FEE,
