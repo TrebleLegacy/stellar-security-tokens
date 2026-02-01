@@ -43,6 +43,7 @@ export function Offers() {
         { value: 'funding', label: '🟣 Funding' },
         { value: 'rejected', label: '🔴 Declined' },
         { value: 'closed', label: '⚫ Completed' },
+        { value: 'matured', label: '🔴 Payment Due' },
     ];
 
     return (
@@ -236,6 +237,14 @@ function StatusBadge({ status }: { status: string }) {
                     text: 'text-slate-400',
                     border: 'border-slate-500/30',
                     dot: 'bg-slate-400',
+                };
+            case 'matured':
+                return {
+                    label: 'Payment Due',
+                    bg: 'bg-rose-500/15',
+                    text: 'text-rose-400',
+                    border: 'border-rose-500/30',
+                    dot: 'bg-rose-400 animate-pulse',
                 };
             case 'paused':
                 return {

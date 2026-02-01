@@ -160,13 +160,18 @@ export function OfferDetails() {
                             Launch to Market
                         </Button>
                     )}
-                    {offer.status === 'active' && offer.offer_type === 'collateral' && (
+                    {(offer.status === 'active' || offer.status === 'matured') && offer.offer_type === 'collateral' && (
                         <Button
                             onClick={() => navigate(`/company/payments/${offer.id}`)}
-                            className="bg-success hover:bg-success/90 text-success-foreground shadow-lg shadow-success/10 btn-glow rounded-full"
+                            className={cn(
+                                "shadow-lg btn-glow rounded-full",
+                                offer.status === 'matured'
+                                    ? "bg-rose-500 hover:bg-rose-600 text-white shadow-rose-500/20 animate-pulse"
+                                    : "bg-success hover:bg-success/90 text-success-foreground shadow-success/10"
+                            )}
                         >
                             <DollarSign className="w-4 h-4 mr-2" />
-                            Pay Investors
+                            {offer.status === 'matured' ? 'Pay Now - Matured!' : 'Pay Investors'}
                         </Button>
                     )}
                     {canEdit && (
@@ -488,6 +493,8 @@ function StatusBadge({ status }: { status: string }) {
                 return 'bg-destructive/15 text-destructive border-destructive/30';
             case 'closed':
                 return 'bg-muted/50 text-muted-foreground border-white/10';
+            case 'matured':
+                return 'bg-rose-500/15 text-rose-400 border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse';
             default:
                 return 'bg-muted/50 text-muted-foreground border-white/10';
         }

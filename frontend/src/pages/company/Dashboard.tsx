@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, Clock, Loader2, Plus, Users, DollarSign, PieChart as PieChartIcon, BarChart3, ArrowUpRight } from "lucide-react";
+import { TrendingUp, Clock, Loader2, Plus, Users, DollarSign, PieChart as PieChartIcon, BarChart3, ArrowUpRight, AlertTriangle } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -101,6 +101,32 @@ export function CompanyDashboard() {
                         <p className="text-sm text-warning/80">
                             Your KYC is under review. You can create offers, but they won't be approved until your KYC is verified.
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Payment Alerts - Matured/Due Offers */}
+            {offers.filter(o => o.status === 'matured').length > 0 && (
+                <div className="p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl animate-fade-in animate-pulse-subtle">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="p-2 rounded-lg bg-rose-500/20">
+                                <AlertTriangle className="w-5 h-5 text-rose-400" />
+                            </div>
+                            <div>
+                                <h4 className="font-semibold text-rose-400">Payment Due</h4>
+                                <p className="text-sm text-rose-400/80">
+                                    {offers.filter(o => o.status === 'matured').length} offer(s) have matured and require payment to investors.
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            onClick={() => navigate('/company/offers?status=matured')}
+                            className="bg-rose-500 hover:bg-rose-600 text-white"
+                        >
+                            <DollarSign className="w-4 h-4 mr-2" />
+                            Pay Now
+                        </Button>
                     </div>
                 </div>
             )}
@@ -363,6 +389,8 @@ function StatusBadge({ status }: { status: string }) {
                 return 'bg-red-500/15 text-red-400 border border-red-500/30';
             case 'closed':
                 return 'bg-muted text-muted-foreground border border-white/10';
+            case 'matured':
+                return 'bg-rose-500/15 text-rose-400 border border-rose-500/30 animate-pulse';
             default:
                 return 'bg-muted text-muted-foreground border border-white/10';
         }

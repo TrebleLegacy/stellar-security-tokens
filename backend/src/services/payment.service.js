@@ -1256,28 +1256,29 @@ export class PaymentService {
 
   /**
    * Processa todos os pagamentos agendados (Bullet e Periódicos)
+   * MVP: Apenas envia notificações - todos os pagamentos são manuais
    * Executa diariamente:
    * 1. Verifica vencimentos de ofertas Bullet (diário)
-   * 2. Se for dia 1 do mês, processa pagamentos mensais, trimestrais, etc.
+   * 2. Se for dia 1 do mês, notifica sobre pagamentos periódicos devidos
    */
   static async processAllScheduledPayments() {
     const today = new Date();
     const isFirstOfMonth = today.getDate() === 1;
     const currentMonth = today.getMonth() + 1; // 1-12
 
-    logger.info('Starting unified scheduled payment process', {
+    logger.info('[MVP] Starting payment notification process (all payments are manual)', {
       date: today.toISOString().split('T')[0],
       isFirstOfMonth
     });
 
-    // 1. Processar pagamentos Bullet (sempre verifica vencimentos diários)
+    // 1. Processar maturidade de ofertas Bullet (sempre verifica diariamente)
     try {
       await this.processBulletPayments();
     } catch (error) {
-      logger.error('Error during automatic bullet payment processing', error);
+      logger.error('[MVP] Error checking bullet maturity', error);
     }
 
-    // 2. Processar pagamentos periódicos no primeiro dia do mês
+    // 2. Notificar sobre pagamentos periódicos no primeiro dia do mês
     if (isFirstOfMonth) {
       try {
         // Buscar todas as ofertas ativas que não são bullet
@@ -1285,43 +1286,73 @@ export class PaymentService {
           where: {
             status: 'active',
             paymentType: { not: 'bullet' }
+          },
+          include: {
+            company: true
           }
         });
 
-        logger.info(`Found ${periodicOffers.length} periodic offers to evaluate`);
+        logger.info(`[MVP] Found ${periodicOffers.length} periodic offers to check for due payments`);
+
+        let notificationsSent = 0;
 
         for (const offer of periodicOffers) {
           try {
             const frequency = offer.paymentFrequency || 1;
 
-            // Lógica simplificada: processar se (mês atual - 1) % frequência == 0
+            // Lógica simplificada: notificar se (mês atual - 1) % frequência == 0
             // Ex: Mensal (freq 1): todos os meses
             // Ex: Trimestral (freq 3): meses 1, 4, 7, 10
             // Ex: Semestral (freq 6): meses 1, 7
             if ((currentMonth - 1) % frequency === 0) {
-              logger.info(`Processing ${offer.paymentType} payment for ${offer.assetCode}`, {
+              logger.info(`[MVP] Payment due for ${offer.paymentType} offer ${offer.assetCode}`, {
                 frequency,
                 currentMonth
               });
 
-              if (offer.paymentType === 'monthly') {
-                await this.processMonthlyInterestPayments(offer.assetCode);
-              } else if (offer.paymentType === 'quarterly') {
-                await this.processQuarterlyPayments(offer.assetCode);
-              } else if (offer.paymentType === 'semi_annual') {
-                await this.processSemiAnnualPayments(offer.assetCode);
-              } else if (offer.paymentType === 'annual') {
-                // Para annual, usamos processPeriodicPayments diretamente ou criamos um wrapper
-                const paymentDate = today.toISOString().split('T')[0];
-                await this.processPeriodicPayments(offer.assetCode, [offer], paymentDate, 'annual');
+              // Get company users to notify
+              const companyUsers = await prisma.companyUser.findMany({
+                where: {
+                  companyId: offer.companyId,
+                  isActive: true
+                },
+                select: { id: true, email: true, name: true }
+              });
+
+              // Create notification for each company user
+              for (const user of companyUsers) {
+                await prisma.notification.create({
+                  data: {
+                    userId: user.id,
+                    userType: 'company_user',
+                    type: 'warning',
+                    title: `${offer.paymentType.charAt(0).toUpperCase() + offer.paymentType.slice(1)} Payment Due`,
+                    message: `Your ${offer.paymentType} interest payment for "${offer.offerName}" (${offer.assetCode}) is due. Please initiate payment to investors.`,
+                    actionLink: `/company/payments/${offer.id}`,
+                  }
+                });
+                notificationsSent++;
               }
+
+              // Update nextPaymentDue for tracking
+              await prisma.offer.update({
+                where: { id: offer.id },
+                data: {
+                  paymentDueStatus: 'due',
+                  nextPaymentDue: today
+                }
+              });
+
+              logger.info(`[MVP] Notified ${companyUsers.length} users about payment due for ${offer.assetCode}`);
             }
           } catch (error) {
-            logger.error(`Error processing periodic payment for offer ${offer.assetCode}`, error);
+            logger.error(`[MVP] Error notifying about payment for offer ${offer.assetCode}`, error);
           }
         }
+
+        logger.info(`[MVP] Periodic payment notification complete: ${notificationsSent} notifications sent`);
       } catch (error) {
-        logger.error('Error during automatic periodic payment processing', error);
+        logger.error('[MVP] Error during periodic payment notification', error);
       }
     }
 
