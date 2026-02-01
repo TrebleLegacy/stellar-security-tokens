@@ -5,7 +5,7 @@ CREATE TYPE "KYCStatus" AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE "CompanyStatus" AS ENUM ('pending', 'approved', 'suspended', 'rejected');
 
 -- CreateEnum
-CREATE TYPE "OfferStatus" AS ENUM ('pending_review', 'under_review', 'approved', 'rejected', 'active', 'closed');
+CREATE TYPE "OfferStatus" AS ENUM ('pending_review', 'under_review', 'approved', 'rejected', 'active', 'closed', 'matured');
 
 -- CreateEnum
 CREATE TYPE "PaymentType" AS ENUM ('monthly', 'bullet', 'quarterly', 'semi_annual', 'annual');
@@ -212,6 +212,8 @@ CREATE TABLE "offers" (
     "next_payment_due" TIMESTAMP(3),
     "last_payment_date" TIMESTAMP(3),
     "payment_due_status" "PaymentDueStatus" NOT NULL DEFAULT 'current',
+    "is_token_locked" BOOLEAN NOT NULL DEFAULT true,
+    "token_unlocked_at" TIMESTAMP,
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
