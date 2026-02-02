@@ -101,6 +101,30 @@ export class ApiClient {
 
     return response.json();
   }
+
+  async delete(endpoint: string) {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeader(),
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      this.handleUnauthorized();
+      throw new Error('Unauthorized');
+    }
+
+    if (response.status === 204) return null;
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `API Error: ${response.statusText}`);
+    }
+
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

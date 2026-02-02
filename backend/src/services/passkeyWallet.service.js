@@ -972,4 +972,264 @@ export class PasskeyWalletService {
       walletId: company.stellarContractId
     };
   }
+
+  // ============================================
+  // MULTI-DEVICE PASSKEY MANAGEMENT
+  // ============================================
+
+  /**
+   * Get the WebAuthn credential table for a user type
+   * @private
+   */
+  static #getCredentialModel(userType) {
+    const models = {
+      [UserType.INVESTOR]: 'investorWebauthnCredential',
+      [UserType.COMPANY_USER]: 'companyUserWebauthnCredential',
+    };
+    return models[userType];
+  }
+
+  /**
+   * Get the FK field name for the credential table
+   * @private
+   */
+  static #getCredentialFkField(userType) {
+    const fields = {
+      [UserType.INVESTOR]: 'investorId',
+      [UserType.COMPANY_USER]: 'companyUserId',
+    };
+    return fields[userType];
+  }
+
+  /**
+   * List all passkeys registered for a user
+   * 
+   * @param {string} userType - Type of user: 'investor' or 'company_user'
+   * @param {number} userId - User database ID
+   * @returns {Promise<Array>} List of passkey credentials
+   */
+  static async listUserPasskeys(userType, userId) {
+    const credentialModel = this.#getCredentialModel(userType);
+    const fkField = this.#getCredentialFkField(userType);
+
+    if (!credentialModel) {
+      throw new Error(`Invalid user type: ${userType}`);
+    }
+
+    const credentials = await prisma[credentialModel].findMany({
+      where: { [fkField]: userId },
+      select: {
+        id: true,
+        credentialId: true,
+        deviceName: true,
+        createdAt: true,
+        lastUsedAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return credentials.map(cred => ({
+      id: cred.id,
+      credentialId: cred.credentialId,
+      deviceName: cred.deviceName || 'Unknown Device',
+      createdAt: cred.createdAt,
+      lastUsedAt: cred.lastUsedAt,
+      isPrimary: credentials[0]?.id === cred.id,
+    }));
+  }
+
+  /**
+   * Add a new passkey signer to user's smart wallet
+   * 
+   * @param {string} userType - Type of user: 'investor' or 'company_user'
+   * @param {number} userId - User database ID
+   * @param {string} credentialId - The new WebAuthn credential ID (base64)
+   * @param {Buffer} publicKey - The new passkey public key
+   * @param {string} deviceName - Optional device name
+   * @returns {Promise<Object>} Result with new passkey info
+   */
+  static async addPasskeySigner(userType, userId, credentialId, publicKey, deviceName = null) {
+    try {
+      const model = this.#getPrismaModel(userType);
+      const credentialModel = this.#getCredentialModel(userType);
+      const fkField = this.#getCredentialFkField(userType);
+
+      if (!model || !credentialModel) {
+        throw new Error(`Invalid user type: ${userType}`);
+      }
+
+      // 1. Verify user exists and has a wallet
+      const user = await prisma[model].findUnique({
+        where: { id: userId },
+        select: { id: true, stellarContractId: true, email: true },
+      });
+
+      if (!user) throw new Error('User not found');
+      if (!user.stellarContractId) throw new Error('User does not have a smart wallet yet');
+
+      // 2. Check if credential already registered
+      const existingCred = await prisma[credentialModel].findFirst({
+        where: { credentialId },
+      });
+      if (existingCred) throw new Error('This passkey is already registered');
+
+      // 3. Prepare key buffers
+      const credentialIdBuffer = Buffer.from(credentialId, 'base64');
+      const publicKeyBuffer = Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64');
+
+      // 4. Call smart wallet contract to add signer
+      const walletContract = new Contract(user.stellarContractId);
+      const server = this.getServer();
+      const networkPassphrase = getNetworkPassphrase();
+      const issuerKeypair = getIssuerKeypair();
+
+      const addSignerOp = walletContract.call(
+        'add_sig',
+        xdr.ScVal.scvBytes(credentialIdBuffer),
+        xdr.ScVal.scvBytes(publicKeyBuffer)
+      );
+
+      let tx = new TransactionBuilder(
+        await server.rpc.getAccount(issuerKeypair.publicKey()),
+        { fee: BASE_FEE, networkPassphrase }
+      )
+        .addOperation(addSignerOp)
+        .setTimeout(30)
+        .build();
+
+      tx = await StellarService.prepareSorobanTransaction(tx);
+      tx.sign(issuerKeypair);
+
+      // 5. Send transaction
+      let result;
+      try {
+        result = await server.send(tx);
+        if (!result?.hash) throw new Error('No hash returned');
+      } catch (err) {
+        result = await this.submitWithSponsorship(tx.toXDR());
+      }
+
+      // 6. Store in database
+      const newCredential = await prisma[credentialModel].create({
+        data: {
+          [fkField]: userId,
+          credentialId,
+          publicKey: publicKeyBuffer,
+          deviceName: deviceName || 'New Device',
+          counter: 0,
+        },
+      });
+
+      return {
+        success: true,
+        credentialId: newCredential.id,
+        deviceName: newCredential.deviceName,
+        transactionHash: result.hash,
+      };
+    } catch (error) {
+      console.error('Error adding passkey signer:', error);
+      throw new Error(`Failed to add passkey: ${error.message}`);
+    }
+  }
+
+  /**
+   * Remove a passkey signer from user's smart wallet
+   * Enforces minimum of 1 passkey
+   * 
+   * @param {string} userType - Type of user: 'investor' or 'company_user'
+   * @param {number} userId - User database ID
+   * @param {number} passkeyId - The database ID of the passkey to remove
+   * @returns {Promise<Object>} Result with removal confirmation
+   */
+  static async removePasskeySigner(userType, userId, passkeyId) {
+    try {
+      const model = this.#getPrismaModel(userType);
+      const credentialModel = this.#getCredentialModel(userType);
+      const fkField = this.#getCredentialFkField(userType);
+
+      if (!model || !credentialModel) throw new Error(`Invalid user type: ${userType}`);
+
+      const user = await prisma[model].findUnique({
+        where: { id: userId },
+        select: { id: true, stellarContractId: true },
+      });
+
+      if (!user) throw new Error('User not found');
+      if (!user.stellarContractId) throw new Error('User does not have a smart wallet');
+
+      // Get all passkeys
+      const allPasskeys = await prisma[credentialModel].findMany({
+        where: { [fkField]: userId },
+      });
+
+      if (allPasskeys.length <= 1) {
+        throw new Error('Cannot remove the last passkey. You must have at least one.');
+      }
+
+      const passkeyToRemove = allPasskeys.find(p => p.id === passkeyId);
+      if (!passkeyToRemove) throw new Error('Passkey not found');
+
+      // Remove from contract
+      const credentialIdBuffer = Buffer.from(passkeyToRemove.credentialId, 'base64');
+      const walletContract = new Contract(user.stellarContractId);
+      const server = this.getServer();
+      const networkPassphrase = getNetworkPassphrase();
+      const issuerKeypair = getIssuerKeypair();
+
+      const removeSignerOp = walletContract.call(
+        'rm_sig',
+        xdr.ScVal.scvBytes(credentialIdBuffer)
+      );
+
+      let tx = new TransactionBuilder(
+        await server.rpc.getAccount(issuerKeypair.publicKey()),
+        { fee: BASE_FEE, networkPassphrase }
+      )
+        .addOperation(removeSignerOp)
+        .setTimeout(30)
+        .build();
+
+      tx = await StellarService.prepareSorobanTransaction(tx);
+      tx.sign(issuerKeypair);
+
+      let result;
+      try {
+        result = await server.send(tx);
+        if (!result?.hash) throw new Error('No hash returned');
+      } catch (err) {
+        result = await this.submitWithSponsorship(tx.toXDR());
+      }
+
+      // Remove from database
+      await prisma[credentialModel].delete({ where: { id: passkeyId } });
+
+      return {
+        success: true,
+        removedId: passkeyId,
+        transactionHash: result.hash,
+        remainingPasskeys: allPasskeys.length - 1,
+      };
+    } catch (error) {
+      console.error('Error removing passkey:', error);
+      throw new Error(`Failed to remove passkey: ${error.message}`);
+    }
+  }
+
+  /**
+   * Update the last used timestamp for a passkey
+   */
+  static async updatePasskeyLastUsed(userType, credentialId) {
+    const credentialModel = this.#getCredentialModel(userType);
+    if (!credentialModel) return;
+
+    try {
+      await prisma[credentialModel].updateMany({
+        where: { credentialId },
+        data: { lastUsedAt: new Date() },
+      });
+    } catch (error) {
+      console.error('Error updating passkey last used:', error);
+    }
+  }
 }
+

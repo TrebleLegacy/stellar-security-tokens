@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Save, CheckCircle, Clock, AlertCircle, Building2 } from "lucide-react";
+import { Loader2, Save, CheckCircle, Clock, AlertCircle, Building2, Shield, Smartphone, Plus, Trash2 } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
 import { companiesApi } from "@/api/companies";
+import { usePasskeys } from "@/hooks/usePasskeys";
 
 export function Settings() {
     const { company, loading, error, refetch } = useCompany();
@@ -12,6 +13,11 @@ export function Settings() {
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Passkey management
+    const { passkeys, loading: passkeyLoading, error: passkeyError, addPasskey, removePasskey } = usePasskeys();
+    const [addingPasskey, setAddingPasskey] = useState(false);
+    const [removingPasskeyId, setRemovingPasskeyId] = useState<number | null>(null);
 
     const [formData, setFormData] = useState({
         address: '',
@@ -272,6 +278,119 @@ export function Settings() {
                             </p>
                         </div>
                     </div>
+                </CardContent>
+            </Card>
+
+            {/* Security - Multi-Device Passkeys */}
+            <Card className="glass-panel border-white/5 bg-white/5 animate-fade-in-up animate-delay-4">
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="font-heading flex items-center gap-2">
+                                <Shield className="w-5 h-5 text-primary" />
+                                Security
+                            </CardTitle>
+                            <CardDescription>Manage your passkeys for secure login</CardDescription>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={async () => {
+                                setAddingPasskey(true);
+                                try {
+                                    await addPasskey();
+                                } catch (e) {
+                                    console.error(e);
+                                } finally {
+                                    setAddingPasskey(false);
+                                }
+                            }}
+                            disabled={addingPasskey}
+                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                        >
+                            {addingPasskey ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                            ) : (
+                                <Plus className="w-4 h-4 mr-2" />
+                            )}
+                            Add Device
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {passkeyError && (
+                        <div className="p-3 rounded-lg text-sm bg-red-500/10 text-red-400 border border-red-500/20">
+                            {passkeyError}
+                        </div>
+                    )}
+
+                    {passkeyLoading ? (
+                        <div className="flex justify-center py-4">
+                            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : passkeys.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                            No passkeys registered. Add a device to enable secure login.
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            {passkeys.map((passkey) => (
+                                <div
+                                    key={passkey.id}
+                                    className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-white/10"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Smartphone className="w-5 h-5 text-muted-foreground" />
+                                        <div>
+                                            <p className="font-medium text-white flex items-center gap-2">
+                                                {passkey.deviceName}
+                                                {passkey.isPrimary && (
+                                                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30">
+                                                        Primary
+                                                    </span>
+                                                )}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                Added {new Date(passkey.createdAt).toLocaleDateString()}
+                                                {passkey.lastUsedAt && (
+                                                    <> · Last used {new Date(passkey.lastUsedAt).toLocaleDateString()}</>
+                                                )}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={async () => {
+                                            if (passkeys.length <= 1) {
+                                                alert('Cannot remove the last passkey');
+                                                return;
+                                            }
+                                            setRemovingPasskeyId(passkey.id);
+                                            try {
+                                                await removePasskey(passkey.id);
+                                            } catch (e) {
+                                                console.error(e);
+                                            } finally {
+                                                setRemovingPasskeyId(null);
+                                            }
+                                        }}
+                                        disabled={removingPasskeyId === passkey.id || passkeys.length <= 1}
+                                        className="text-red-400 hover:text-red-500 hover:bg-red-500/10"
+                                    >
+                                        {removingPasskeyId === passkey.id ? (
+                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Trash2 className="w-4 h-4" />
+                                        )}
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    <p className="text-xs text-muted-foreground mt-4">
+                        💡 Add multiple devices for backup access. You need at least one passkey to sign in.
+                    </p>
                 </CardContent>
             </Card>
         </div>
