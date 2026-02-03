@@ -13,6 +13,9 @@ export function AdminLogin() {
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [otp, setOtp] = useState('');
+    const [step, setStep] = useState<'login' | 'mfa'>('login');
+    const [mfaToken, setMfaToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [passkeyLoading, setPasskeyLoading] = useState(false);
     const [error, setError] = useState('');
@@ -24,16 +27,47 @@ export function AdminLogin() {
 
         try {
             const response = await platformAdminsApi.login(email, password);
-            if (response.success && response.data) {
-                // Use authStorage with explicit 'admin' type for multi-session support
-                authStorage.setToken(response.data.token, 'admin');
-                authStorage.setUser(response.data.admin, 'admin');
-                navigate('/admin/dashboard');
+            if (response.success) {
+                if (response.mfaRequired && response.data?.mfaToken) {
+                    setMfaToken(response.data.mfaToken);
+                    setStep('mfa');
+                } else if (response.data?.token) {
+                    // This case shouldn't happen with the new backend but keeping for compatibility
+                    authStorage.setToken(response.data.token, 'admin');
+                    authStorage.setUser(response.data.admin, 'admin');
+                    navigate('/admin/dashboard');
+                }
             } else {
                 setError('Login failed. Please check your credentials.');
             }
         } catch (err: any) {
             setError(err.response?.data?.error || 'Login failed. Please try again.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyMfa = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        try {
+            // Set the temporary mfaToken for the API call (needed if middleware requires it)
+            authStorage.setToken(mfaToken, 'admin');
+
+            const response = await platformAdminsApi.verifyMfa(otp, mfaToken);
+
+            if (response.success && response.data) {
+                authStorage.setToken(response.data.token, 'admin');
+                authStorage.setUser(response.data.admin, 'admin');
+                navigate('/admin/dashboard');
+            } else {
+                setError(response.error || 'Invalid or expired OTP.');
+            }
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'MFA verification failed.');
+            // If it failed, we usually stay on the MFA screen unless the error is critical
         } finally {
             setLoading(false);
         }
@@ -112,7 +146,9 @@ export function AdminLogin() {
                         <Shield className="w-6 h-6 text-white" />
                     </div>
                     <CardTitle className="text-2xl text-white">Admin Portal</CardTitle>
-                    <CardDescription>Platform Administrator Access</CardDescription>
+                    <CardDescription>
+                        {step === 'login' ? 'Platform Administrator Access' : 'Security Verification Needed'}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     {error && (
@@ -121,96 +157,151 @@ export function AdminLogin() {
                         </div>
                     )}
 
-                    {/* Test Login Environment (Dev Only) */}
-                    {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_LOGIN === 'true') && (
-                        <div className="space-y-3 pb-4 border-b border-white/5">
-                            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">
-                                Development Test Login
-                            </p>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleTestLogin}
-                                className="bg-red-600/10 border-red-500/20 text-red-500 hover:bg-red-600/20 w-full"
-                                disabled={loading}
-                            >
-                                Test Admin
-                            </Button>
-                        </div>
-                    )}
-
-                    {/* Passkey Login Button */}
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full border-white/10 hover:bg-white/5"
-                        onClick={handlePasskeyLogin}
-                        disabled={passkeyLoading || loading}
-                    >
-                        {passkeyLoading ? (
-                            <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Authenticating...
-                            </>
-                        ) : (
-                            <>
-                                <Fingerprint className="mr-2 h-4 w-4" />
-                                Login with Passkey
-                            </>
-                        )}
-                    </Button>
-
-                    <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-white/10" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                            <span className="bg-slate-950 px-2 text-muted-foreground">or</span>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input
-                                id="email"
-                                type="email"
-                                placeholder="admin@tokenizadora.com"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                className="bg-white/5 border-white/10"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
-                            <Input
-                                id="password"
-                                type="password"
-                                placeholder="••••••••"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                                className="bg-white/5 border-white/10"
-                            />
-                        </div>
-
-                        <Button
-                            type="submit"
-                            className="w-full bg-red-600 hover:bg-red-700"
-                            disabled={loading || passkeyLoading}
-                        >
-                            {loading ? (
-                                <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Signing in...
-                                </>
-                            ) : (
-                                'Sign In with Password'
+                    {step === 'login' ? (
+                        <>
+                            {/* Test Login Environment (Dev Only) */}
+                            {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_LOGIN === 'true') && (
+                                <div className="space-y-3 pb-4 border-b border-white/5">
+                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">
+                                        Development Test Login
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleTestLogin}
+                                        className="bg-red-600/10 border-red-500/20 text-red-500 hover:bg-red-600/20 w-full"
+                                        disabled={loading}
+                                    >
+                                        Test Admin
+                                    </Button>
+                                </div>
                             )}
-                        </Button>
-                    </form>
+
+                            {/* Passkey Login Button */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full border-white/10 hover:bg-white/5"
+                                onClick={handlePasskeyLogin}
+                                disabled={passkeyLoading || loading}
+                            >
+                                {passkeyLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Authenticating...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Fingerprint className="mr-2 h-4 w-4" />
+                                        Login with Passkey
+                                    </>
+                                )}
+                            </Button>
+
+                            <div className="relative">
+                                <div className="absolute inset-0 flex items-center">
+                                    <span className="w-full border-t border-white/10" />
+                                </div>
+                                <div className="relative flex justify-center text-xs uppercase">
+                                    <span className="bg-slate-950 px-2 text-muted-foreground">or</span>
+                                </div>
+                            </div>
+
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="email">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="admin@tokenizadora.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                        className="bg-white/5 border-white/10"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="password">Password</Label>
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        placeholder="••••••••"
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                        className="bg-white/5 border-white/10"
+                                    />
+                                </div>
+
+                                <Button
+                                    type="submit"
+                                    className="w-full bg-red-600 hover:bg-red-700"
+                                    disabled={loading || passkeyLoading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Signing in...
+                                        </>
+                                    ) : (
+                                        'Sign In with Password'
+                                    )}
+                                </Button>
+                            </form>
+                        </>
+                    ) : (
+                        <form onSubmit={handleVerifyMfa} className="space-y-6">
+                            <div className="space-y-2 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    We've sent a 6-digit verification code to
+                                    <br />
+                                    <span className="text-white font-medium">{email}</span>
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="otp">Verification Code</Label>
+                                <Input
+                                    id="otp"
+                                    type="text"
+                                    placeholder="123456"
+                                    value={otp}
+                                    onChange={(e) => setOtp(e.target.value)}
+                                    maxLength={6}
+                                    required
+                                    className="bg-white/5 border-white/10 text-center text-2xl tracking-[0.5em] font-mono"
+                                />
+                            </div>
+
+                            <div className="space-y-3">
+                                <Button
+                                    type="submit"
+                                    className="w-full bg-red-600 hover:bg-red-700 font-semibold"
+                                    disabled={loading}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                            Verifying...
+                                        </>
+                                    ) : (
+                                        'Verify & Login'
+                                    )}
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    className="w-full text-xs text-muted-foreground"
+                                    onClick={() => setStep('login')}
+                                    disabled={loading}
+                                >
+                                    Cancel and try again
+                                </Button>
+                            </div>
+                        </form>
+                    )}
                 </CardContent>
             </Card>
         </div>

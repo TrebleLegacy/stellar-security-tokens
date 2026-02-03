@@ -198,4 +198,53 @@ export class PlatformAdmin {
       throw error;
     }
   }
+
+  /**
+   * Define um novo OTP de MFA para o admin
+   * @param {number} id - ID do admin
+   * @param {string} otp - Código OTP de 6 dígitos
+   * @param {number} [expiryMinutes=10] - Tempo de expiração em minutos
+   * @returns {Promise<void>}
+   */
+  static async setMfaOtp(id, otp, expiryMinutes = 10) {
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + expiryMinutes);
+
+    await prisma.platformAdmin.update({
+      where: { id },
+      data: {
+        mfaOtp: otp,
+        mfaOtpExpires: expiresAt,
+      },
+    });
+  }
+
+  /**
+   * Verifica o OTP de MFA do admin
+   * @param {number} id - ID do admin
+   * @param {string} otp - Código OTP a verificar
+   * @returns {Promise<boolean>} True se válido e não expirado
+   */
+  static async verifyMfaOtp(id, otp) {
+    const admin = await prisma.platformAdmin.findUnique({
+      where: { id },
+      select: { mfaOtp: true, mfaOtpExpires: true },
+    });
+
+    if (!admin || !admin.mfaOtp) return false;
+    if (admin.mfaOtp !== otp) return false;
+    if (new Date() > admin.mfaOtpExpires) return false;
+
+    // Limpar OTP após sucesso
+    await prisma.platformAdmin.update({
+      where: { id },
+      data: {
+        mfaOtp: null,
+        mfaOtpExpires: null,
+      },
+    });
+
+    return true;
+  }
 }
+

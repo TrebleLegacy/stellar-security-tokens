@@ -65,10 +65,11 @@ export const authenticateToken = async (req, res, next) => {
 /**
  * Gera um token JWT com payload fornecido
  * @param {Object} payload - Dados a serem incluídos no token (ex: { userId, email })
- * @returns {string} Token JWT assinado (expira em 24 horas)
+ * @param {string} [expiresIn='24h'] - Tempo de expiração do token (ex: '15m', '1h', '7d')
+ * @returns {string} Token JWT assinado (padrão: expira em 24 horas)
  */
-export const generateToken = (payload) => {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+export const generateToken = (payload, expiresIn = '24h') => {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 };
 
 /**
