@@ -50,28 +50,40 @@ export function usePasskeys(): UsePasskeysReturn {
         try {
             setError(null);
 
-            // STEP 1: Get verification challenge for existing passkey
-            const verifyResponse = await api.post('/security/passkeys/verify/challenge', {});
-            const verifyOptions = verifyResponse.data?.data?.options;
+            let verificationAssertion = null;
 
-            if (!verifyOptions) {
-                throw new Error('Failed to get verification challenge');
-            }
+            // Only require verification if user already has passkeys
+            // First passkey doesn't need verification (nothing to verify against)
+            if (passkeys.length > 0) {
+                // STEP 1: Get verification challenge for existing passkey
+                const verifyResponse = await api.post('/security/passkeys/verify/challenge', {});
+                const verifyOptions = verifyResponse.data?.data?.options;
 
-            // STEP 2: Authenticate with existing passkey (proves identity)
-            const verifyCredential = await navigator.credentials.get({
-                publicKey: {
-                    ...verifyOptions,
-                    challenge: base64ToArrayBuffer(verifyOptions.challenge),
-                    allowCredentials: verifyOptions.allowCredentials?.map((cred: any) => ({
-                        ...cred,
-                        id: base64ToArrayBuffer(cred.id),
-                    })) || [],
-                },
-            }) as PublicKeyCredential;
+                if (!verifyOptions) {
+                    throw new Error('Failed to get verification challenge');
+                }
 
-            if (!verifyCredential) {
-                throw new Error('Identity verification cancelled');
+                // STEP 2: Authenticate with existing passkey (proves identity)
+                const verifyCredential = await navigator.credentials.get({
+                    publicKey: {
+                        ...verifyOptions,
+                        challenge: base64ToArrayBuffer(verifyOptions.challenge),
+                        allowCredentials: verifyOptions.allowCredentials?.map((cred: any) => ({
+                            ...cred,
+                            id: base64ToArrayBuffer(cred.id),
+                        })) || [],
+                    },
+                }) as PublicKeyCredential;
+
+                if (!verifyCredential) {
+                    throw new Error('Identity verification cancelled');
+                }
+
+                verificationAssertion = {
+                    credentialId: arrayBufferToBase64(verifyCredential.rawId),
+                    authenticatorData: arrayBufferToBase64((verifyCredential.response as AuthenticatorAssertionResponse).authenticatorData),
+                    signature: arrayBufferToBase64((verifyCredential.response as AuthenticatorAssertionResponse).signature),
+                };
             }
 
             // STEP 3: Get registration options for new passkey
@@ -112,11 +124,7 @@ export function usePasskeys(): UsePasskeysReturn {
                 credentialId: arrayBufferToBase64(credential.rawId),
                 publicKey: arrayBufferToBase64(response.getPublicKey()!),
                 deviceName: deviceName || getDeviceName(),
-                verificationAssertion: {
-                    credentialId: arrayBufferToBase64(verifyCredential.rawId),
-                    authenticatorData: arrayBufferToBase64((verifyCredential.response as AuthenticatorAssertionResponse).authenticatorData),
-                    signature: arrayBufferToBase64((verifyCredential.response as AuthenticatorAssertionResponse).signature),
-                },
+                verificationAssertion, // null for first passkey, object for additional
             });
 
             // STEP 6: Refresh list
@@ -129,7 +137,7 @@ export function usePasskeys(): UsePasskeysReturn {
             setError(message);
             throw new Error(message);
         }
-    }, [fetchPasskeys]);
+    }, [fetchPasskeys, passkeys.length]);
 
     const removePasskey = useCallback(async (passkeyId: number) => {
         try {
