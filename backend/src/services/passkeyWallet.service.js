@@ -1027,13 +1027,24 @@ export class PasskeyWalletService {
    */
   static async listUserPasskeys(userType, userId) {
     const credentialModel = this.#getCredentialModel(userType);
+    const userModel = this.#getPrismaModel(userType);
     const fkField = this.#getCredentialFkField(userType);
 
-    if (!credentialModel) {
+    if (!credentialModel || !userModel) {
       throw new Error(`Invalid user type: ${userType}`);
     }
 
-    const credentials = await prisma[credentialModel].findMany({
+    // Get the primary passkey from user record
+    const user = await prisma[userModel].findUnique({
+      where: { id: userId },
+      select: {
+        passkeyCredentialId: true,
+        createdAt: true,
+      },
+    });
+
+    // Get additional passkeys from credentials table
+    const additionalCredentials = await prisma[credentialModel].findMany({
       where: { [fkField]: userId },
       select: {
         id: true,
@@ -1045,14 +1056,33 @@ export class PasskeyWalletService {
       orderBy: { createdAt: 'asc' },
     });
 
-    return credentials.map(cred => ({
-      id: cred.id,
-      credentialId: cred.credentialId,
-      deviceName: cred.deviceName || 'Unknown Device',
-      createdAt: cred.createdAt,
-      lastUsedAt: cred.lastUsedAt,
-      isPrimary: credentials[0]?.id === cred.id,
-    }));
+    const allPasskeys = [];
+
+    // Add primary passkey first (if exists)
+    if (user?.passkeyCredentialId) {
+      allPasskeys.push({
+        id: 0, // Special ID for primary passkey (can't be deleted via normal flow)
+        credentialId: user.passkeyCredentialId,
+        deviceName: 'Primary Device',
+        createdAt: user.createdAt,
+        lastUsedAt: null,
+        isPrimary: true,
+      });
+    }
+
+    // Add additional passkeys
+    additionalCredentials.forEach(cred => {
+      allPasskeys.push({
+        id: cred.id,
+        credentialId: cred.credentialId,
+        deviceName: cred.deviceName || 'Unknown Device',
+        createdAt: cred.createdAt,
+        lastUsedAt: cred.lastUsedAt,
+        isPrimary: false,
+      });
+    });
+
+    return allPasskeys;
   }
 
   /**
