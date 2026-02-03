@@ -1,4 +1,4 @@
-import { stellarServer, getUsdcIssuer } from '../config/stellar.js';
+import { stellarServer, getUsdcIssuer, createFreshServer } from '../config/stellar.js';
 import { getTreasuryKeypair } from '../config/stellar.js';
 import { Investment } from '../models/Investment.js';
 import { Investor } from '../models/Investor.js';
@@ -294,7 +294,9 @@ export class PaymentMonitor {
     // We need to fetch the transaction to get the memo
     let memo = null;
     try {
-      const tx = await stellarServer.transactions().transaction(payment.transaction_hash).call();
+      // CRITICAL: Use fresh server to avoid URL corruption from previous operations
+      const freshServer = createFreshServer();
+      const tx = await freshServer.transactions().transaction(payment.transaction_hash).call();
       if (tx.memo_type === 'text' && tx.memo) {
         memo = tx.memo;
       }
