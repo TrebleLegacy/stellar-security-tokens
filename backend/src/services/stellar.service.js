@@ -100,7 +100,8 @@ export class StellarService {
           (flags.auth_clawback_enabled ? AuthClawbackEnabledFlag : 0);
 
         if ((currentFlagsValue & expectedFlags) !== expectedFlags) {
-          console.log('Issuer flags are missing. Setting them now...');
+          console.log('[StellarService] Issuer flags are missing. Setting them now...');
+          console.log('[StellarService] Current flags:', flags);
           const operations = [
             Operation.setOptions({
               source: issuerKeypair.publicKey(),
@@ -112,8 +113,16 @@ export class StellarService {
           const accountForTx = await this.getAccountRPC(issuerKeypair.publicKey());
           const transaction = await buildTransactionWithAccount(accountForTx, operations);
           const result = await signAndSubmitTransaction(transaction, issuerKeypair);
-          console.log('Issuer flags updated successfully.');
+
+          if (!result.success) {
+            console.error('[StellarService] Failed to set issuer flags:', result);
+            throw new Error(`Failed to set issuer account flags: ${result.userFriendlyError || result.error}`);
+          }
+          console.log('[StellarService] Issuer flags updated successfully. TxHash:', result.hash);
+        } else {
+          console.log('[StellarService] Issuer flags already correct:', flags);
         }
+
 
         return {
           success: true,

@@ -319,6 +319,8 @@ model PlatformAdmin {
   stellarPublicKey String?           @map("stellar_public_key") @db.VarChar(56)
   createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamp
   updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamp
+  mfaOtp           String?           @map("mfa_otp") @db.VarChar(6)
+  mfaOtpExpires    DateTime?         @map("mfa_otp_expires") @db.Timestamp
 
   // Relations
   webauthnCredentials   PlatformAdminWebauthnCredential[]

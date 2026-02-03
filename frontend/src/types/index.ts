@@ -157,6 +157,7 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   details?: string;
+  mfaRequired?: boolean;
   pagination?: {
     limit: number;
     offset: number;

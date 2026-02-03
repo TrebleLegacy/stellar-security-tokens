@@ -88,7 +88,79 @@ export class PlatformAdminController {
         });
       }
 
-      // Gerar token JWT
+      // Generate 6-digit OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      await PlatformAdmin.setMfaOtp(admin.id, otp);
+
+      // Send OTP via email
+      try {
+        await EmailService.send6DigitVerificationCode(admin.email, otp);
+        console.log(`[Admin Login] MFA OTP sent to ${admin.email}`);
+      } catch (emailError) {
+        console.error('[Admin Login] Failed to send MFA email:', emailError);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to send verification email. Please try again.',
+        });
+      }
+
+      // Return partial response indicating MFA is required
+      // Generate a temporary short-lived token just for MFA verification
+      const mfaToken = generateToken({
+        userId: admin.id,
+        email: admin.email,
+        pendingMfa: true
+      }, '15m'); // 15 minutes to verify MFA
+
+      res.json({
+        success: true,
+        mfaRequired: true,
+        data: {
+          mfaToken,
+          email: admin.email
+        }
+      });
+    } catch (error) {
+
+      console.error('Error logging in platform admin:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to login',
+        details: error.message,
+      });
+    }
+  }
+
+  /**
+   * Verifica o OTP de MFA para login de administrador
+   * POST /api/platform-admins/verify-mfa
+   */
+  static async verifyAdminMfa(req, res) {
+    try {
+      const { otp, mfaToken } = req.body;
+
+      if (!otp || !mfaToken) {
+        return res.status(400).json({
+          success: false,
+          error: 'OTP and mfaToken are required',
+        });
+      }
+
+      // req.user is populated by the authenticateToken middleware
+      const userId = req.user.userId;
+
+      const isValid = await PlatformAdmin.verifyMfaOtp(userId, otp);
+      if (!isValid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid or expired OTP',
+        });
+      }
+
+      // Final authentication - get the full admin object
+      const admin = await PlatformAdmin.findById(userId);
+
+      // Generate the final JWT
       const token = generateToken({
         userId: admin.id,
         email: admin.email,
@@ -106,17 +178,14 @@ export class PlatformAdminController {
             name: admin.name,
             role: admin.role,
             is_active: admin.is_active,
-            created_at: admin.created_at,
-            updated_at: admin.updated_at,
           },
         },
       });
     } catch (error) {
-      console.error('Error logging in platform admin:', error);
+      console.error('Error verifying MFA:', error);
       res.status(500).json({
         success: false,
-        error: 'Failed to login',
-        details: error.message,
+        error: 'MFA verification failed',
       });
     }
   }

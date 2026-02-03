@@ -56,6 +56,7 @@ const loginValidation = [
  */
 // Rotas públicas
 router.post('/login', loginValidation, PlatformAdminController.loginPlatformAdmin);
+router.post('/verify-mfa', authenticateToken, PlatformAdminController.verifyAdminMfa);
 
 // Rota de debug para criar admin sem autenticação (apenas em desenvolvimento)
 if (process.env.NODE_ENV !== 'production') {
