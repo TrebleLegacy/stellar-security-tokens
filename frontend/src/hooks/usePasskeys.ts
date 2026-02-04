@@ -91,7 +91,8 @@ export function usePasskeys(): UsePasskeysReturn {
                 deviceName: deviceName || getDeviceName(),
             });
 
-            const { options } = optionsResponse.data?.data || {};
+            // API client returns JSON directly (not axios-style {data: ...})
+            const { options } = optionsResponse?.data || {};
 
             if (!options) {
                 throw new Error('Failed to get registration options');
