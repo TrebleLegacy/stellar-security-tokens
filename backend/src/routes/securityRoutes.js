@@ -121,13 +121,23 @@ router.post('/passkeys/add/options', authenticateToken, async (req, res) => {
         const { deviceName } = req.body;
 
         // Generate WebAuthn registration options
-        const options = await WebAuthnService.generateRegistrationOptions({
-            userId: userId.toString(),
-            userName: email,
-            userDisplayName: email,
-            rpId: process.env.WEBAUTHN_RP_ID || 'localhost',
-            rpName: process.env.WEBAUTHN_RP_NAME || 'Stellar Security Tokens',
-        });
+        // Map userType to service format (investor stays as investor, company becomes company_user)
+        const serviceUserType = userType === 'investor' ? 'investor' : 'company_user';
+        const options = await WebAuthnService.generateRegistrationOptions(
+            serviceUserType,
+            userId,
+            email,  // userName
+            email   // userEmail
+        );
+
+        // Debug: log the options structure
+        console.log('[Security] Registration options generated:', JSON.stringify({
+            hasChallenge: !!options.challenge,
+            hasUser: !!options.user,
+            userId: options.user?.id,
+            userName: options.user?.name,
+            rpId: options.rp?.id,
+        }));
 
         res.json({
             success: true,
@@ -193,39 +203,47 @@ router.post('/passkeys/add', authenticateToken, async (req, res) => {
             });
         }
 
-        // SECURITY: Require verification with existing passkey
-        if (!verificationAssertion) {
+        const serviceUserType = userType === 'investor' ? UserType.INVESTOR : UserType.COMPANY_USER;
+
+        // Check if user already has passkeys - verification only required for additional devices
+        const existingPasskeys = await PasskeyWalletService.listUserPasskeys(serviceUserType, userId);
+        const isFirstPasskey = existingPasskeys.length === 0;
+
+        // SECURITY: Require verification with existing passkey for ADDITIONAL passkeys only
+        // First passkey doesn't need verification (nothing to verify against)
+        if (!isFirstPasskey && !verificationAssertion) {
             return res.status(401).json({
                 success: false,
                 error: 'Passkey verification required. Please verify your identity first.',
             });
         }
 
-        const serviceUserType = userType === 'investor' ? UserType.INVESTOR : UserType.COMPANY_USER;
+        // Verify the assertion matches a registered passkey for this user (only for additional passkeys)
+        if (!isFirstPasskey) {
+            try {
+                const matchingPasskey = existingPasskeys.find(p =>
+                    p.credentialId === verificationAssertion.credentialId
+                );
 
-        // Verify the assertion matches a registered passkey for this user
-        try {
-            const passkeys = await PasskeyWalletService.listUserPasskeys(serviceUserType, userId);
-            const matchingPasskey = passkeys.find(p =>
-                p.credentialId === verificationAssertion.credentialId
-            );
+                if (!matchingPasskey) {
+                    return res.status(401).json({
+                        success: false,
+                        error: 'Verification failed. The passkey used does not belong to this account.',
+                    });
+                }
 
-            if (!matchingPasskey) {
+                // Note: Full WebAuthn assertion verification would check signature here
+                // For now, we verify the credential ID matches and trust the browser's verification
+                console.log(`[Security] Passkey verification passed for user ${userId} with credential ${matchingPasskey.id}`);
+            } catch (verifyError) {
+                console.error('Passkey verification failed:', verifyError);
                 return res.status(401).json({
                     success: false,
-                    error: 'Verification failed. The passkey used does not belong to this account.',
+                    error: 'Passkey verification failed.',
                 });
             }
-
-            // Note: Full WebAuthn assertion verification would check signature here
-            // For now, we verify the credential ID matches and trust the browser's verification
-            console.log(`[Security] Passkey verification passed for user ${userId} with credential ${matchingPasskey.id}`);
-        } catch (verifyError) {
-            console.error('Passkey verification failed:', verifyError);
-            return res.status(401).json({
-                success: false,
-                error: 'Passkey verification failed.',
-            });
+        } else {
+            console.log(`[Security] First passkey registration for user ${userId} - no verification needed`);
         }
 
         const result = await PasskeyWalletService.addPasskeySigner(
