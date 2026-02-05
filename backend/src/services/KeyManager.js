@@ -1,7 +1,11 @@
 import { Keypair } from '@stellar/stellar-sdk';
 import dotenv from 'dotenv';
+import logger from '../utils/logger.js';
 
 dotenv.config();
+
+// Scoped logger for this service
+const log = logger.scope('KeyManager');
 
 /**
  * KeyManager Service
@@ -27,9 +31,9 @@ class KeyManager {
         this.env = process.env.NODE_ENV || 'development';
 
         if (this.mode === 'multisig') {
-            console.log('[KeyManager] Running in MULTISIG mode - private keys on hardware wallets');
+            log.info('Running in MULTISIG mode - private keys on hardware wallets');
         } else {
-            console.log('[KeyManager] Running in ENV mode - using .env secret keys');
+            log.info('Running in ENV mode - using .env secret keys');
         }
 
         // Initialize Channel Pool for Sequencing (CAP-15)
@@ -52,7 +56,7 @@ class KeyManager {
                 try {
                     this.channels.push(Keypair.fromSecret(secret));
                 } catch (e) {
-                    console.error(`[KeyManager] Invalid secret for CHANNEL_${i}`);
+                    log.error(`Invalid secret for CHANNEL_${i}`);
                 }
             }
         }
@@ -61,12 +65,12 @@ class KeyManager {
         if (this.channels.length === 0) {
             try {
                 this.channels.push(this.getOperationsKeypair());
-                console.log('[KeyManager] No channels defined. Using Operations wallet as primary channel.');
+                log.info('No channels defined. Using Operations wallet as primary channel.');
             } catch (e) {
                 // Operations might not be defined yet during initial setup
             }
         } else {
-            console.log(`[KeyManager] Initialized channel pool with ${this.channels.length} accounts.`);
+            log.info(`Initialized channel pool with ${this.channels.length} accounts.`);
         }
     }
 

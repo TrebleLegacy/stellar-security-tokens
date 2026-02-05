@@ -6,11 +6,15 @@ import { StellarService } from './stellar.service.js';
 import { Token } from '../models/Token.js';
 import { EmailService } from './email.service.js';
 import { DepositRelayService } from './depositRelay.service.js';
+import logger from '../utils/logger.js';
 import crypto from 'crypto';
+
+// Scoped logger for this service
+const log = logger.scope('PaymentMonitor');
 
 // Use centralized getUsdcIssuer() for automatic testnet/mainnet detection
 const USDC_ISSUER = getUsdcIssuer();
-console.log(`[PaymentMonitor] Using USDC issuer: ${USDC_ISSUER}`);
+log.info(`Using USDC issuer: ${USDC_ISSUER}`);
 const USDC_ASSET_CODE = 'USDC';
 const RECONNECT_DELAY = parseInt(process.env.PAYMENT_MONITOR_RECONNECT_DELAY || '5000', 10);
 
@@ -51,21 +55,21 @@ export class PaymentMonitor {
   async start(treasuryPublicKey = null) {
     try {
       if (this.isRunning) {
-        console.log('[PaymentMonitor] Already running');
+        log.debug('Already running');
         return;
       }
 
       const treasuryKeypair = getTreasuryKeypair();
       this.treasuryPublicKey = treasuryPublicKey || treasuryKeypair.publicKey();
 
-      console.log(`[PaymentMonitor] Starting monitoring for treasury: ${this.treasuryPublicKey}`);
+      log.info(`Starting monitoring for treasury: ${this.treasuryPublicKey}`);
 
       this.isRunning = true;
       this.reconnectAttempts = 0;
 
       await this.startStream();
     } catch (error) {
-      console.error('[PaymentMonitor] Failed to start:', error);
+      log.error('Failed to start:', error);
       this.isRunning = false;
       throw error;
     }
@@ -87,7 +91,7 @@ export class PaymentMonitor {
         this.stream = null;
       }
 
-      console.log(`[PaymentMonitor] Starting stream with cursor: ${this.lastCursor}`);
+      log.debug(`Starting stream with cursor: ${this.lastCursor}`);
 
       this.isReconnecting = false; // Clear guard now that we're starting fresh
 
@@ -106,29 +110,29 @@ export class PaymentMonitor {
               this.reconnectAttempts = 0;
               await this.handlePayment(payment);
             } catch (error) {
-              console.error('[PaymentMonitor] Error handling payment:', error);
+              log.error('Error handling payment:', error);
             }
           },
           onerror: (error) => {
-            console.error('[PaymentMonitor] Stream error:', error);
+            log.error('Stream error:', error);
             this.handleStreamError(error);
           },
         });
 
-      console.log('[PaymentMonitor] Stream started successfully');
+      log.info('Stream started successfully');
 
       // Do NOT reset reconnectAttempts immediately.
       // Reset it only if the connection stays alive for a while (e.g., 60s)
       if (this.connectionStabilityTimer) clearTimeout(this.connectionStabilityTimer);
       this.connectionStabilityTimer = setTimeout(() => {
         if (this.isRunning) {
-          console.log('[PaymentMonitor] Connection stable for 60s. Resetting reconnection attempts.');
+          log.debug('Connection stable for 60s. Resetting reconnection attempts.');
           this.reconnectAttempts = 0;
         }
       }, 60000);
 
     } catch (error) {
-      console.error('[PaymentMonitor] Failed to start stream:', error);
+      log.error('Failed to start stream:', error);
       this.handleStreamError(error);
     }
   }
@@ -149,7 +153,7 @@ export class PaymentMonitor {
       try {
         this.stream();
       } catch (e) {
-        console.error('[PaymentMonitor] Error closing stream during error handling:', e);
+        log.error('Error closing stream during error handling:', e);
       }
       this.stream = null;
     }
@@ -160,7 +164,7 @@ export class PaymentMonitor {
 
     // Guard against multiple simultaneous reconnect attempts from EventSource firing onerror multiple times
     if (this.isReconnecting) {
-      console.log('[PaymentMonitor] Reconnection already in progress, ignoring duplicate error.');
+      log.debug('Reconnection already in progress, ignoring duplicate error.');
       return;
     }
     this.isReconnecting = true;
@@ -174,12 +178,12 @@ export class PaymentMonitor {
     const isAccountNotFound = this.isAccountNotFoundError(error);
 
     if (isAccountNotFound) {
-      console.warn(`[PaymentMonitor] Treasury account not found on Stellar network (404). The account may not be funded yet.`);
-      console.warn(`[PaymentMonitor] Payment monitoring disabled until treasury account exists. Will retry in 5 minutes.`);
+      log.warn(`Treasury account not found on Stellar network (404). The account may not be funded yet.`);
+      log.warn(`Payment monitoring disabled until treasury account exists. Will retry in 5 minutes.`);
       this.isRunning = false;
       // Schedule a retry in 5 minutes to check if account was created
       setTimeout(() => {
-        console.log('[PaymentMonitor] Retrying to start after account not found...');
+        log.info('Retrying to start after account not found...');
         this.isRunning = true;
         this.reconnectAttempts = 0;
         this.startStream();
@@ -188,7 +192,7 @@ export class PaymentMonitor {
     }
 
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(`[PaymentMonitor] Max reconnection attempts (${this.maxReconnectAttempts}) reached. Stopping.`);
+      log.error(`Max reconnection attempts (${this.maxReconnectAttempts}) reached. Stopping.`);
       this.isRunning = false;
       const { AlertService } = await import('./alert.service.js');
       await AlertService.paymentMonitorFailed(`Max reconnection attempts reached: ${error.message}`);
@@ -200,9 +204,9 @@ export class PaymentMonitor {
     const delay = baseDelay * Math.pow(2, Math.min(this.reconnectAttempts - 1, 4)); // Max 4 doublings
 
     if (isRateLimitError) {
-      console.warn(`[PaymentMonitor] Rate limited by Horizon (429). Backing off for ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      log.warn(`Rate limited by Horizon (429). Backing off for ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
     } else {
-      console.log(`[PaymentMonitor] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+      log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
     }
 
     setTimeout(() => {
@@ -301,13 +305,13 @@ export class PaymentMonitor {
         memo = tx.memo;
       }
     } catch (err) {
-      console.warn(`[PaymentMonitor] Could not fetch transaction ${payment.transaction_hash} for memo:`, err.message);
+      log.warn(`Could not fetch transaction ${payment.transaction_hash} for memo: ${err.message}`);
     }
 
     // Check if it's a deposit relay payment (memo starts with DEP-)
     // Deposit relay accepts ANY asset (XLM or USDC)
     if (memo && memo.startsWith(DepositRelayService.MEMO_PREFIX)) {
-      console.log(`[PaymentMonitor] Deposit relay payment detected: ${payment.amount} ${assetCode} from ${payment.from}, memo: ${memo}`);
+      log.info(`Deposit relay payment detected: ${payment.amount} ${assetCode} from ${payment.from}, memo: ${memo}`);
       await DepositRelayService.handleIncomingPayment(
         memo,
         payment.amount,
@@ -322,7 +326,7 @@ export class PaymentMonitor {
       return;
     }
 
-    console.log(`[PaymentMonitor] USDC investment payment detected: ${payment.amount} from ${payment.from}, memo: ${memo}`);
+    log.info(`USDC investment payment detected: ${payment.amount} from ${payment.from}, memo: ${memo}`);
 
     // Buscar investimento pendente correspondente
     const pendingInvestments = await Investment.findPendingByInvestor(
@@ -332,7 +336,7 @@ export class PaymentMonitor {
     );
 
     if (pendingInvestments.length === 0) {
-      console.warn(`[PaymentMonitor] No pending investment found for payment ${payment.transaction_hash} from ${payment.from}`);
+      log.warn(`No pending investment found for payment ${payment.transaction_hash} from ${payment.from}`);
       return;
     }
 
@@ -341,7 +345,7 @@ export class PaymentMonitor {
 
     // Verificar se já foi processado (idempotência)
     if (investment.usdcPaymentHash === payment.transaction_hash) {
-      console.log(`[PaymentMonitor] Investment ${investment.id} already processed for payment ${payment.transaction_hash}`);
+      log.debug(`Investment ${investment.id} already processed for payment ${payment.transaction_hash}`);
       return;
     }
 
@@ -356,13 +360,13 @@ export class PaymentMonitor {
    */
   async processInvestmentPayment(investment, payment) {
     try {
-      console.log(`[PaymentMonitor] Processing investment ${investment.id} for payment ${payment.transaction_hash}`);
+      log.info(`Processing investment ${investment.id} for payment ${payment.transaction_hash}`);
 
       // Verificar idempotência: se já existe distribuição para este pagamento
       const existingDistribution = await Token.findDistributionByUSDC(payment.transaction_hash);
 
       if (existingDistribution) {
-        console.log(`[PaymentMonitor] Distribution already exists for payment ${payment.transaction_hash}`);
+        log.debug(`Distribution already exists for payment ${payment.transaction_hash}`);
         await Investment.updateStatus(investment.id, {
           status: 'distributed',
           usdc_payment_hash: payment.transaction_hash,
@@ -377,7 +381,7 @@ export class PaymentMonitor {
         throw new Error(`Investor ${investment.investorId} not found or missing smart wallet address`);
       }
 
-      console.log(`[PaymentMonitor] Distributing ${investment.tokenAmount} tokens to ${investor.stellarContractId}`);
+      log.info(`Distributing ${investment.tokenAmount} tokens to ${investor.stellarContractId}`);
       // Verificar KYC
       if (investor.kycStatus !== 'approved') {
         throw new Error(`Investor ${investment.investorId} KYC not approved`);
@@ -417,14 +421,14 @@ export class PaymentMonitor {
         distribution_tx_hash: stellarResult.transactionHash,
       });
 
-      console.log(`[PaymentMonitor] Successfully processed investment ${investment.id}: distributed ${investment.tokenAmount} tokens`);
+      log.info(`Successfully processed investment ${investment.id}: distributed ${investment.tokenAmount} tokens`);
 
 
       // Enviar email de confirmação para investidor
       await EmailService.sendInvestmentConfirmation(investor.email, investment, distribution);
 
     } catch (error) {
-      console.error(`[PaymentMonitor] Error processing investment ${investment.id}:`, error);
+      log.error(`Error processing investment ${investment.id}:`, error);
 
       // Marcar investment como failed
       await Investment.updateStatus(investment.id, {
@@ -442,7 +446,7 @@ export class PaymentMonitor {
    * Para o monitoramento de pagamentos
    */
   stop() {
-    console.log('[PaymentMonitor] Stopping...');
+    log.info('Stopping...');
     this.isRunning = false;
 
     if (this.connectionStabilityTimer) {
@@ -454,12 +458,12 @@ export class PaymentMonitor {
       try {
         this.stream();
       } catch (error) {
-        console.error('[PaymentMonitor] Error stopping stream:', error);
+        log.error('Error stopping stream:', error);
       }
       this.stream = null;
     }
 
-    console.log('[PaymentMonitor] Stopped');
+    log.info('Stopped');
   }
 
   /**
