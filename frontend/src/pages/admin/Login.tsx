@@ -117,26 +117,7 @@ export function AdminLogin() {
         }
     };
 
-    const handleTestLogin = async () => {
-        setError('');
-        setLoading(true);
 
-        try {
-            const response = await api.post('/auth/test-login', { userType: 'admin' });
-            if (response.data.success && response.data.data) {
-                // Use authStorage with explicit 'admin' type for multi-session support
-                authStorage.setToken(response.data.data.token, 'admin');
-                authStorage.setUser(response.data.data.user, 'admin');
-                navigate('/admin/dashboard');
-            } else {
-                setError('Test login failed.');
-            }
-        } catch (err: any) {
-            setError(err.response?.data?.error || 'Test login failed.');
-        } finally {
-            setLoading(false);
-        }
-    };
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
@@ -159,23 +140,6 @@ export function AdminLogin() {
 
                     {step === 'login' ? (
                         <>
-                            {/* Test Login Environment (Dev Only) */}
-                            {(import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_LOGIN === 'true') && (
-                                <div className="space-y-3 pb-4 border-b border-white/5">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">
-                                        Development Test Login
-                                    </p>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={handleTestLogin}
-                                        className="bg-red-600/10 border-red-500/20 text-red-500 hover:bg-red-600/20 w-full"
-                                        disabled={loading}
-                                    >
-                                        Test Admin
-                                    </Button>
-                                </div>
-                            )}
 
                             {/* Passkey Login Button */}
                             <Button
