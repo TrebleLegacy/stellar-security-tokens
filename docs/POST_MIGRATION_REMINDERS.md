@@ -37,6 +37,8 @@ This document tracks items that need to be addressed **after** the initial Mainn
     - Beneficial ownership disclosure
 - [ ] **Company Multisig Wallets** (Optional): Allow companies to add multiple signers to their smart wallet for enhanced security (e.g., 2-of-3 passkeys required for transactions). The Stellar Smart Wallet architecture already supports this natively.
 - [ ] **Company User Management**: Currently using auto-provisioning for direct company logins to satisfy DB constraints. Post-MVP: Implement proper User Management for companies (Add/Remove users) and consider refining DB schema to support direct entity actions.
+- [ ] **Company Registration Emails**: Send "registration pending" confirmation to company + notify admins about new registrations. Templates needed in `EmailService`. See [companyController.js L202-203](file:///Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens/backend/src/controllers/companyController.js#L202).
+- [ ] **AlertService External Integrations**: Add Slack/Discord webhooks, Email, SMS for CRITICAL/ERROR alerts. Currently just logs. See [alert.service.js L44](file:///Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens/backend/src/services/alert.service.js#L44).
 
 ## 4. Housekeeping
 - [x] ~~**Clean `.env`**: Created separate `.env.development` (testnet) and `.env.production` (mainnet template). Use `--env-file` flag with docker compose.~~

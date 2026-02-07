@@ -14,7 +14,7 @@ last_verified: 2026-02-06
 
 | Category | Status | Notes |
 |----------|--------|-------|
-| Actionable TODOs | 4 remaining | 🟡 Medium priority |
+| Actionable TODOs | 0 active | ✅ All resolved/deferred |
 | Console.log in production | ✅ **COMPLETE** | All services migrated |
 | Duplicate/Redundant Files | ✅ None | Verified |
 | Env Templates | ✅ **FIXED** | Consolidated |
@@ -25,7 +25,9 @@ last_verified: 2026-02-06
 
 ---
 
-## ✅ Completed Fixes (2026-02-05)
+## ✅ Completed Fixes
+
+### 2026-02-06: Logger Migration Complete
 
 ### 1. Logger Utility Created
 **File**: `backend/src/utils/logger.js`
@@ -48,22 +50,28 @@ last_verified: 2026-02-06
 | `passkeyWallet.service.js` | ~35 |
 | **Total** | **~107** |
 
-### 3. Env Templates Consolidated
+### 2026-02-05: Environment & Infrastructure
+
 - Merged `.env.production.example` + `.env.production.template`
 - Single consolidated template: `.env.production.template`
 - Added `LOG_LEVEL` and `KEY_MANAGEMENT_MODE` settings
+- Deleted old `.env.production.example`
 
 ---
 
-## 🟡 Remaining TODOs
+## ✅ Remaining TODOs
 
-### Backend TODOs
+### Completed (2026-02-06)
 
-| File | Line | Description | Priority |
-|------|------|-------------|----------|
-| `alert.service.js` | 44 | `// TODO: Implementar integrações externas` | Low |
-| `companyController.js` | 202-203 | Send registration email/notification to admins | Medium |
-| `offerController.js` | 916 | Save stellar.toml to web server | Low |
+| File | Description | Resolution |
+|------|-------------|------------|
+| `stellar.service.js` | stellar.toml auto-publish | Dynamic serving + `home_domain` auto-set |
+
+### Deferred (Post-MVP)
+
+Moved to [POST_MIGRATION_REMINDERS.md](file:///Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens/docs/POST_MIGRATION_REMINDERS.md#L39):
+- `alert.service.js` L44 — External integrations (Slack/Email/SMS)
+- `companyController.js` L202-203 — Registration emails
 
 ---
 
@@ -71,10 +79,6 @@ last_verified: 2026-02-06
 
 | Action | Priority | Effort | Status |
 |--------|----------|--------|--------|
-| ~~Create logger utility~~ | ~~Low~~ | ~~1h~~ | ✅ Done |
-| ~~Consolidate env templates~~ | ~~Low~~ | ~~15min~~ | ✅ Done |
-| ~~Migrate all services to logger~~ | ~~Low~~ | ~~2h~~ | ✅ Done |
-| ~~Delete old `.env.production.example`~~ | ~~Low~~ | ~~Manual~~ | ✅ Done |
 | Implement company registration emails | Medium | 2h | Pending |
 
 All production services now use the centralized logger utility.
