@@ -6,7 +6,19 @@ This document tracks items that need to be addressed **after** the initial Mainn
 
 ### 📧 Email Infrastructure
 - [ ] **Migrate SMTP**: Currently using personal email (`psaragossy@gmail.com`).
-- [ ] **Action**: Switch to enterprise provider (Amazon SES, SendGrid, or Postmark) for reliability and domain reputation (`info@tokenizadora.com`).
+- [ ] **Action**: Switch to enterprise provider (Amazon SES, SendGrid, or Postmark) for reliability and domain reputation (`info@radox.net`).
+
+### 🔑 Production Environment (`.env.production`)
+- [ ] **Stellar Accounts**: Generate new mainnet accounts (Issuer, Distributor, Operations, Treasury). Fund with real XLM.
+- [ ] **JWT_SECRET**: Generate new with `openssl rand -hex 32`. **Must be different from dev.**
+- [ ] **Database**: Set up managed PostgreSQL (AWS RDS, Supabase). Update `DATABASE_URL`.
+- [ ] **Redis**: Set up managed Redis. Set `REDIS_PASSWORD`.
+- [ ] **API_KEY**: Generate new production API key.
+- [ ] **Pinata JWT**: ✅ Same key works for both dev and prod.
+- [ ] **Launchtube JWT**: ✅ Same key works for both networks.
+- [ ] **Factory Contract**: Deploy smart wallet factory to mainnet. Update `FACTORY_CONTRACT_ID`.
+- [ ] **SAC Contract IDs**: Look up mainnet XLM and USDC SAC IDs on Stellar Expert.
+- [ ] **Pusher**: Set up Pusher account for real-time notifications.
 
 ### 🌐 Frontend & Marketing
 - [ ] **Landing Page**: Develop a professional landing page for the main domain.

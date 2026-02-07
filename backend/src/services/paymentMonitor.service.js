@@ -1,5 +1,5 @@
 import { stellarServer, getUsdcIssuer, createFreshServer } from '../config/stellar.js';
-import { getTreasuryKeypair } from '../config/stellar.js';
+import { keyManager } from './KeyManager.js';
 import { Investment } from '../models/Investment.js';
 import { Investor } from '../models/Investor.js';
 import { StellarService } from './stellar.service.js';
@@ -59,8 +59,8 @@ export class PaymentMonitor {
         return;
       }
 
-      const treasuryKeypair = getTreasuryKeypair();
-      this.treasuryPublicKey = treasuryPublicKey || treasuryKeypair.publicKey();
+      // Use getPublicKey — works in both env and multisig modes
+      this.treasuryPublicKey = treasuryPublicKey || keyManager.getPublicKey('TREASURY');
 
       log.info(`Starting monitoring for treasury: ${this.treasuryPublicKey}`);
 
