@@ -47,19 +47,23 @@ services:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/stellar_tokens
+      # Key Management Mode ('multisig' = Freighter/Ledger, 'env' = server-side keys)
+      KEY_MANAGEMENT_MODE: ${KEY_MANAGEMENT_MODE:-env}
       # Stellar Network
       STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
       STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:-https://horizon-testnet.stellar.org}
       HORIZON_URL: ${HORIZON_URL:-https://horizon-testnet.stellar.org}
-      # Stellar Accounts (configure no .env ou passe via variáveis)
-      ISSUER_SECRET_KEY: ${ISSUER_SECRET_KEY}
+      STELLAR_HOME_DOMAIN: ${STELLAR_HOME_DOMAIN:-}
+      # Stellar Accounts - Public keys (always required)
       ISSUER_PUBLIC_KEY: ${ISSUER_PUBLIC_KEY}
-      DISTRIBUTOR_SECRET_KEY: ${DISTRIBUTOR_SECRET_KEY}
       DISTRIBUTOR_PUBLIC_KEY: ${DISTRIBUTOR_PUBLIC_KEY}
-      OPERATIONS_SECRET_KEY: ${OPERATIONS_SECRET_KEY}
       OPERATIONS_PUBLIC_KEY: ${OPERATIONS_PUBLIC_KEY}
-      TREASURY_SECRET_KEY: ${TREASURY_SECRET_KEY}
       TREASURY_PUBLIC_KEY: ${TREASURY_PUBLIC_KEY}
+      # Stellar Accounts - Secret keys (only needed when KEY_MANAGEMENT_MODE=env)
+      ISSUER_SECRET_KEY: ${ISSUER_SECRET_KEY:-}
+      DISTRIBUTOR_SECRET_KEY: ${DISTRIBUTOR_SECRET_KEY:-}
+      OPERATIONS_SECRET_KEY: ${OPERATIONS_SECRET_KEY:-}
+      TREASURY_SECRET_KEY: ${TREASURY_SECRET_KEY:-}
       # Token Details
       # ASSET_CODE and ASSET_SUPPLY removed - using offer-specific assets
       # USDC_ISSUER is auto-detected based on STELLAR_NETWORK (testnet/mainnet)

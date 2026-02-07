@@ -8,6 +8,7 @@ import { initDistributionQueue } from './services/distributionQueue.service.js';
 import { MaintenanceService } from './services/maintenance.service.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '../.env.tests') });
 
 const PORT = process.env.PORT || 3000;
 
@@ -96,16 +97,21 @@ app.listen(PORT, async () => {
   // --- AUTO-VERIFY ISSUER ACCOUNT FLAGS ---
   // This ensures the issuer account has correct flags (auth_required, auth_revocable, auth_clawback_enabled)
   // after Docker restarts or Testnet resets
-  try {
-    const { StellarService } = await import('./services/stellar.service.js');
-    console.log('[Startup] Verifying issuer account flags...');
-    const result = await StellarService.createIssuerAccount();
-    if (result.success) {
-      console.log('[Startup] Issuer account verified - flags are correct');
+  // NOTE: Skipped in multisig mode — issuer setup requires Freighter signing via Admin > Wallets
+  if (process.env.KEY_MANAGEMENT_MODE === 'multisig') {
+    console.log('[Startup] Multisig mode - skipping auto issuer verification (use Admin > Wallets)');
+  } else {
+    try {
+      const { StellarService } = await import('./services/stellar.service.js');
+      console.log('[Startup] Verifying issuer account flags...');
+      const result = await StellarService.createIssuerAccount();
+      if (result.success) {
+        console.log('[Startup] Issuer account verified - flags are correct');
+      }
+    } catch (error) {
+      console.error('[Startup] Failed to verify issuer account:', error.message);
+      console.warn('[Startup] You may need to manually set up the issuer account via Admin > Wallets');
     }
-  } catch (error) {
-    console.error('[Startup] Failed to verify issuer account:', error.message);
-    console.warn('[Startup] You may need to manually set up the issuer account via Admin > Wallets');
   }
 
   // Start payment reminder scheduler (daily reminders for upcoming payments)

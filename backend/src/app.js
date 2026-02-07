@@ -25,10 +25,10 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { globalLimiter, authLimiter, apiLimiter, strictLimiter } from './middleware/rateLimit.js';
 import path from 'path';
 
-// Load env vars if not already loaded
+// Load env vars if not already loaded (.env or .env.tests)
 if (!process.env.JWT_SECRET) {
     dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
-    // Fallback to local .env if parent not found or for other vars
+    dotenv.config({ path: path.resolve(process.cwd(), '../.env.tests') });
     dotenv.config();
 }
 
