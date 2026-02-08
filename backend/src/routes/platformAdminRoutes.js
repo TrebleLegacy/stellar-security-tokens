@@ -63,6 +63,198 @@ if (process.env.NODE_ENV !== 'production') {
   router.post('/debug/create', createValidation, PlatformAdminController.createPlatformAdmin);
 }
 
+// ============ Freighter Challenge-Response Login (Public) ============
+// Uses signTransaction for authentication (SEP-10 style challenge).
+
+// In-memory challenge store: { publicKey -> { nonce, txHash, adminId, networkPassphrase, expiresAt } }
+const freighterChallenges = new Map();
+
+// Cleanup expired challenges every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of freighterChallenges) {
+    if (now > val.expiresAt) freighterChallenges.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+/**
+ * POST /api/platform-admins/freighter/challenge
+ * Generate a challenge transaction XDR for the admin to sign with Freighter.
+ * Uses a ManageData operation with a random nonce — never submitted to the network.
+ */
+router.post('/freighter/challenge', async (req, res) => {
+  try {
+    const { publicKey } = req.body;
+    if (!publicKey || typeof publicKey !== 'string' || publicKey.length !== 56) {
+      return res.status(400).json({ success: false, error: 'Valid Stellar public key required' });
+    }
+
+    // Check if this public key belongs to a registered admin
+    const admin = await prisma.platformAdmin.findFirst({
+      where: { stellarPublicKey: publicKey, isActive: true },
+      select: { id: true, email: true, name: true }
+    });
+
+    if (!admin) {
+      return res.status(404).json({ success: false, error: 'No admin account found for this key. Contact a super_admin to register your key.' });
+    }
+
+    // Build a challenge transaction (SEP-10 style)
+    const { randomBytes } = await import('crypto');
+    const StellarSdk = await import('@stellar/stellar-sdk');
+    const { TransactionBuilder, Networks, Operation, Account } = StellarSdk;
+
+    const nonce = randomBytes(32).toString('hex');
+
+    // Use the admin's public key as source with sequence 0 (not submitted to network)
+    const sourceAccount = new Account(publicKey, '0');
+
+    const networkPassphrase = process.env.STELLAR_NETWORK === 'public'
+      ? Networks.PUBLIC
+      : Networks.TESTNET;
+
+    const tx = new TransactionBuilder(sourceAccount, {
+      fee: '100',
+      networkPassphrase,
+    })
+      .addOperation(Operation.manageData({
+        name: 'radox_auth_challenge',
+        value: nonce,
+      }))
+      .setTimeout(300)
+      .build();
+
+    const challengeXdr = tx.toXDR();
+    const txHash = tx.hash();
+
+    // Store challenge data
+    freighterChallenges.set(publicKey, {
+      nonce,
+      txHash,
+      adminId: admin.id,
+      networkPassphrase,
+      expiresAt: Date.now() + 5 * 60 * 1000,
+    });
+
+    console.log(`[Freighter Auth] Challenge TX issued for admin ${admin.email} (${publicKey.slice(0, 8)}...)`);
+
+    res.json({
+      success: true,
+      data: {
+        challengeXdr,
+        networkPassphrase,
+      }
+    });
+  } catch (error) {
+    console.error('[Freighter Auth] Challenge error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate challenge' });
+  }
+});
+
+/**
+ * POST /api/platform-admins/freighter/verify
+ * Verify the signed transaction XDR and issue a JWT.
+ */
+router.post('/freighter/verify', async (req, res) => {
+  try {
+    const { publicKey, signedXdr } = req.body;
+
+    if (!publicKey || !signedXdr) {
+      return res.status(400).json({ success: false, error: 'Public key and signed transaction are required' });
+    }
+
+    // Retrieve and validate the stored challenge
+    const stored = freighterChallenges.get(publicKey);
+    if (!stored) {
+      return res.status(401).json({ success: false, error: 'No pending challenge. Please request a new one.' });
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      freighterChallenges.delete(publicKey);
+      return res.status(401).json({ success: false, error: 'Challenge expired. Please request a new one.' });
+    }
+
+    // Parse the signed transaction and verify signature
+    const StellarSdk = await import('@stellar/stellar-sdk');
+    const { TransactionBuilder, Keypair } = StellarSdk;
+
+    let signedTx;
+    try {
+      signedTx = TransactionBuilder.fromXDR(signedXdr, stored.networkPassphrase);
+    } catch (e) {
+      freighterChallenges.delete(publicKey);
+      return res.status(400).json({ success: false, error: 'Invalid signed transaction XDR.' });
+    }
+
+    // Verify that this is our challenge tx by checking the hash matches
+    const signedTxHash = signedTx.hash();
+    if (!stored.txHash.equals(signedTxHash)) {
+      freighterChallenges.delete(publicKey);
+      return res.status(401).json({ success: false, error: 'Transaction hash mismatch. Please request a new challenge.' });
+    }
+
+    // Check that the transaction has a valid signature from the expected public key
+    const keypair = Keypair.fromPublicKey(publicKey);
+    const signatures = signedTx.signatures;
+
+    let verified = false;
+    for (const sig of signatures) {
+      try {
+        if (keypair.verify(signedTxHash, sig.signature())) {
+          verified = true;
+          break;
+        }
+      } catch {
+        // try next signature
+      }
+    }
+
+    // Consume the challenge regardless of result
+    freighterChallenges.delete(publicKey);
+
+    if (!verified) {
+      console.log(`[Freighter Auth] Signature verification failed for ${publicKey.slice(0, 8)}... (${signatures.length} signatures on TX)`);
+      return res.status(401).json({ success: false, error: 'Invalid signature. Authentication failed.' });
+    }
+
+    // Load the full admin record
+    const admin = await prisma.platformAdmin.findUnique({
+      where: { id: stored.adminId },
+      select: { id: true, email: true, name: true, role: true, isActive: true }
+    });
+
+    if (!admin || !admin.isActive) {
+      return res.status(401).json({ success: false, error: 'Admin account not found or inactive.' });
+    }
+
+    // Generate JWT
+    const token = generateToken({
+      userId: admin.id,
+      email: admin.email,
+      userType: 'platform_admin',
+      role: admin.role
+    });
+
+    console.log(`[Freighter Auth] Login successful for ${admin.email}`);
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        admin: {
+          id: admin.id,
+          email: admin.email,
+          name: admin.name,
+          role: admin.role
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[Freighter Auth] Verify error:', error);
+    res.status(500).json({ success: false, error: 'Authentication failed' });
+  }
+});
+
 // ============ Admin Passkey Login Routes (Public) ============
 
 router.post('/passkey/login/options', async (req, res) => {

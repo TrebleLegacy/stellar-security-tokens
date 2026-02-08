@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Shield, Loader2, Fingerprint } from 'lucide-react';
+import { Shield, Loader2, Fingerprint, Wallet } from 'lucide-react';
 import { platformAdminsApi } from '@/api/platformAdmins';
 import api from '@/api/client';
 import { authStorage } from '@/utils/authStorage';
+import { connectFreighter, signTransactionWithFreighter } from '@/lib/freighter';
 
 export function AdminLogin() {
     const navigate = useNavigate();
@@ -18,6 +19,7 @@ export function AdminLogin() {
     const [mfaToken, setMfaToken] = useState('');
     const [loading, setLoading] = useState(false);
     const [passkeyLoading, setPasskeyLoading] = useState(false);
+    const [freighterLoading, setFreighterLoading] = useState(false);
     const [error, setError] = useState('');
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -117,6 +119,45 @@ export function AdminLogin() {
         }
     };
 
+    const handleFreighterLogin = async () => {
+        setError('');
+        setFreighterLoading(true);
+
+        try {
+            // 1. Connect to Freighter and get the active public key
+            const device = await connectFreighter();
+            const publicKey = device.publicKey;
+
+            // 2. Request a challenge transaction XDR from the backend
+            const challengeResponse = await platformAdminsApi.freighterChallenge(publicKey);
+            if (!challengeResponse.success || !challengeResponse.data) {
+                throw new Error(challengeResponse.error || 'Failed to get challenge');
+            }
+
+            // 3. Sign the challenge transaction with Freighter
+            const { challengeXdr, networkPassphrase } = challengeResponse.data;
+            const { signedXdr } = await signTransactionWithFreighter(
+                challengeXdr,
+                networkPassphrase
+            );
+
+            // 4. Verify the signed transaction on the backend and get JWT
+            const verifyResponse = await platformAdminsApi.freighterVerify(publicKey, signedXdr);
+            if (!verifyResponse.success || !verifyResponse.data) {
+                throw new Error(verifyResponse.error || 'Freighter verification failed');
+            }
+
+            // 5. Store session and navigate
+            authStorage.setToken(verifyResponse.data.token, 'admin');
+            authStorage.setUser(verifyResponse.data.admin, 'admin');
+            navigate('/admin/dashboard');
+        } catch (err: any) {
+            console.error('Freighter login error:', err);
+            setError(err.response?.data?.error || err.message || 'Freighter login failed.');
+        } finally {
+            setFreighterLoading(false);
+        }
+    };
 
 
     return (
@@ -147,7 +188,7 @@ export function AdminLogin() {
                                 variant="outline"
                                 className="w-full border-white/10 hover:bg-white/5"
                                 onClick={handlePasskeyLogin}
-                                disabled={passkeyLoading || loading}
+                                disabled={passkeyLoading || loading || freighterLoading}
                             >
                                 {passkeyLoading ? (
                                     <>
@@ -158,6 +199,27 @@ export function AdminLogin() {
                                     <>
                                         <Fingerprint className="mr-2 h-4 w-4" />
                                         Login with Passkey
+                                    </>
+                                )}
+                            </Button>
+
+                            {/* Freighter Login Button */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full border-white/10 hover:bg-white/5"
+                                onClick={handleFreighterLogin}
+                                disabled={freighterLoading || loading || passkeyLoading}
+                            >
+                                {freighterLoading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Connecting to Freighter...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Wallet className="mr-2 h-4 w-4" />
+                                        Sign in with Freighter
                                     </>
                                 )}
                             </Button>

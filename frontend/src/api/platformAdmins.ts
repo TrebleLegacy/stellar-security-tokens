@@ -41,6 +41,17 @@ export const platformAdminsApi = {
     return response.data;
   },
 
+  // Freighter Challenge-Response Login (signTransaction-based)
+  freighterChallenge: async (publicKey: string): Promise<ApiResponse<{ challengeXdr: string; networkPassphrase: string }>> => {
+    const response = await api.post('/platform-admins/freighter/challenge', { publicKey });
+    return response.data;
+  },
+
+  freighterVerify: async (publicKey: string, signedXdr: string): Promise<ApiResponse<{ token: string; admin: PlatformAdmin }>> => {
+    const response = await api.post('/platform-admins/freighter/verify', { publicKey, signedXdr });
+    return response.data;
+  },
+
   getAll: async (params?: {
     role?: string;
     is_active?: boolean;
