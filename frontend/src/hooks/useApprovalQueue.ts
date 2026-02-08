@@ -7,7 +7,7 @@ import type { Offer } from '@/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
-export type ApprovalType = 'investor' | 'company' | 'offer' | 'token' | 'multisig';
+export type ApprovalType = 'investor' | 'company' | 'offer' | 'issuance' | 'token' | 'multisig';
 
 export interface ApprovalItem {
     id: string;            // composite: `${type}-${originalId}`
@@ -26,6 +26,7 @@ export interface ApprovalCounts {
     investor: number;
     company: number;
     offer: number;
+    issuance: number;
     token: number;
     multisig: number;
 }
@@ -37,6 +38,7 @@ function normalizeStatus(type: ApprovalType, status: string): ApprovalItem['norm
         investor: ['pending'],
         company: ['pending'],
         offer: ['pending_review', 'under_review'],
+        issuance: ['needs_issue', 'needs_verify'],
         token: ['locked'],
         multisig: ['pending'],
     };
@@ -45,6 +47,7 @@ function normalizeStatus(type: ApprovalType, status: string): ApprovalItem['norm
         investor: [],
         company: [],
         offer: [],
+        issuance: ['issuing'],
         token: [],
         multisig: ['partially_signed', 'ready'],
     };
@@ -104,6 +107,61 @@ function normalizeOffers(offers: Offer[]): ApprovalItem[] {
         }));
 }
 
+function normalizeIssuances(offers: Offer[], pendingIssuanceIds: number[]): ApprovalItem[] {
+    const items: ApprovalItem[] = [];
+
+    for (const offer of offers) {
+        if (offer.status !== 'approved') continue;
+
+        const hasToken = !!(offer as any).token;
+        const isVerified = !!(offer as any).offer_rules?.admin_verified;
+        const isIssuing = pendingIssuanceIds.includes(offer.id);
+
+        if (!hasToken && !isIssuing) {
+            // Step 2: Approved, needs token issuance
+            items.push({
+                id: `issuance-${offer.id}`,
+                originalId: offer.id,
+                type: 'issuance',
+                label: offer.offer_name,
+                subtitle: `${offer.asset_code} · Ready to Issue`,
+                status: 'needs_issue',
+                normalizedStatus: normalizeStatus('issuance', 'needs_issue'),
+                createdAt: offer.created_at,
+                raw: { ...offer, issuanceStep: 'issue' },
+            });
+        } else if (isIssuing) {
+            // Step 2b: Issuance in-flight (multisig pending)
+            items.push({
+                id: `issuance-${offer.id}`,
+                originalId: offer.id,
+                type: 'issuance',
+                label: offer.offer_name,
+                subtitle: `${offer.asset_code} · Issuing (MultiSig)`,
+                status: 'issuing',
+                normalizedStatus: normalizeStatus('issuance', 'issuing'),
+                createdAt: offer.created_at,
+                raw: { ...offer, issuanceStep: 'issuing' },
+            });
+        } else if (hasToken && !isVerified) {
+            // Step 3: Token exists, needs admin verification
+            items.push({
+                id: `issuance-${offer.id}`,
+                originalId: offer.id,
+                type: 'issuance',
+                label: offer.offer_name,
+                subtitle: `${offer.asset_code} · Needs Verification`,
+                status: 'needs_verify',
+                normalizedStatus: normalizeStatus('issuance', 'needs_verify'),
+                createdAt: offer.created_at,
+                raw: { ...offer, issuanceStep: 'verify' },
+            });
+        }
+    }
+
+    return items;
+}
+
 function normalizeTokens(offers: Offer[]): ApprovalItem[] {
     return offers
         .filter((o) => o.isTokenLocked === true && o.status === 'active')
@@ -146,11 +204,10 @@ export function useApprovalQueue() {
         setError(null);
 
         try {
-            const [investorsRes, companiesRes, offersRes, allOffersRes, txRes] = await Promise.allSettled([
+            const [investorsRes, companiesRes, offersRes, txRes] = await Promise.allSettled([
                 platformAdminsApi.getInvestors(),
                 api.get('/platform-admins/companies?status=pending'),
                 offersApi.getAllAdmin(),
-                offersApi.getAllAdmin(),   // second call for token-locked items (same endpoint, client-side filter)
                 api.get('/admin/transactions/pending'),
             ]);
 
@@ -167,20 +224,23 @@ export function useApprovalQueue() {
                 merged.push(...normalizeCompanies(data || []));
             }
 
-            // Offers (pending review)
-            if (offersRes.status === 'fulfilled' && offersRes.value?.data) {
-                merged.push(...normalizeOffers(offersRes.value.data));
-            }
-
-            // Tokens (locked offers)
-            if (allOffersRes.status === 'fulfilled' && allOffersRes.value?.data) {
-                merged.push(...normalizeTokens(allOffersRes.value.data));
-            }
-
-            // MultiSig
+            // Pending multisig issuance IDs (for cross-ref)
+            let pendingIssuanceIds: number[] = [];
             if (txRes.status === 'fulfilled') {
                 const txData = txRes.value?.data?.transactions || txRes.value?.transactions || [];
+                pendingIssuanceIds = txData
+                    .filter((tx: any) => tx.operationType === 'token_issue' && tx.status !== 'executed')
+                    .map((tx: any) => tx.metadata?.offerId)
+                    .filter(Boolean);
                 merged.push(...normalizeMultisig(txData));
+            }
+
+            // Offers (pending review)
+            if (offersRes.status === 'fulfilled' && offersRes.value?.data) {
+                const allOffers = offersRes.value.data;
+                merged.push(...normalizeOffers(allOffers));
+                merged.push(...normalizeIssuances(allOffers, pendingIssuanceIds));
+                merged.push(...normalizeTokens(allOffers));
             }
 
             // Sort: pending first, then by creation date (oldest first within group)
@@ -204,7 +264,7 @@ export function useApprovalQueue() {
     }, [fetchAll]);
 
     const counts = useMemo<ApprovalCounts>(() => {
-        const c: ApprovalCounts = { all: 0, investor: 0, company: 0, offer: 0, token: 0, multisig: 0 };
+        const c: ApprovalCounts = { all: 0, investor: 0, company: 0, offer: 0, issuance: 0, token: 0, multisig: 0 };
         for (const item of items) {
             if (item.normalizedStatus !== 'resolved') {
                 c.all++;
