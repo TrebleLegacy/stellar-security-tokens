@@ -11,9 +11,11 @@ import {
     XCircle,
     Wallet,
     Send,
-
+    Rocket,
     AlertTriangle,
     Inbox,
+    DollarSign,
+    Clock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -59,6 +61,12 @@ const TYPE_CONFIG: Record<ApprovalType, { icon: typeof Users; label: string; col
         label: 'Offers',
         color: 'text-amber-400',
         badgeCls: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    },
+    issuance: {
+        icon: Rocket,
+        label: 'Issuance',
+        color: 'text-blue-400',
+        badgeCls: 'bg-blue-500/15 text-blue-400 border-blue-500/30',
     },
     token: {
         icon: Lock,
@@ -282,6 +290,44 @@ export function Approvals() {
         }
     };
 
+    const handleIssueToken = async (item: ApprovalItem) => {
+        setActionLoading(true);
+        try {
+            const response = await offersApi.issueToken(item.originalId);
+            if (response.success) {
+                if (response.data?.status === 'pending_multisig' || (response as any).status === 'pending_multisig') {
+                    toast.success('Token issuance queued for MultiSig approval');
+                } else {
+                    toast.success(`Token issued for ${item.label}`);
+                }
+                await refresh();
+            } else {
+                toast.error(response.error || 'Failed to issue token');
+            }
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Failed to issue token');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleVerifyIssuance = async (item: ApprovalItem) => {
+        setActionLoading(true);
+        try {
+            const response = await offersApi.verifyIssuance(item.originalId);
+            if (response.success) {
+                toast.success(`${item.label} verified — ready for launch`);
+                await refresh();
+            } else {
+                toast.error(response.error || 'Failed to verify issuance');
+            }
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Failed to verify issuance');
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const handleSignMultisig = async (item: ApprovalItem) => {
         if (!freighterDevice) {
             toast.error('Connect Freighter wallet first');
@@ -492,6 +538,8 @@ export function Approvals() {
                             onSponsorCompany={() => setSponsorDialog({ open: true, item: selected })}
                             onApproveOffer={() => handleReviewOffer(selected, 'approved')}
                             onRejectOffer={() => handleReviewOffer(selected, 'rejected')}
+                            onIssueToken={() => handleIssueToken(selected)}
+                            onVerifyIssuance={() => handleVerifyIssuance(selected)}
                             onUnlockToken={() => handleUnlockToken(selected)}
                             onSignMultisig={() => handleSignMultisig(selected)}
                             onSubmitMultisig={() => handleSubmitMultisig(selected)}
@@ -643,6 +691,8 @@ function DetailPanel({
     onSponsorCompany,
     onApproveOffer,
     onRejectOffer,
+    onIssueToken,
+    onVerifyIssuance,
     onUnlockToken,
     onSignMultisig,
     onSubmitMultisig,
@@ -661,6 +711,8 @@ function DetailPanel({
     onSponsorCompany: () => void;
     onApproveOffer: () => void;
     onRejectOffer: () => void;
+    onIssueToken: () => void;
+    onVerifyIssuance: () => void;
     onUnlockToken: () => void;
     onSignMultisig: () => void;
     onSubmitMultisig: () => void;
@@ -693,6 +745,7 @@ function DetailPanel({
                 {item.type === 'investor' && <InvestorDetail raw={item.raw} />}
                 {item.type === 'company' && <CompanyDetail raw={item.raw} />}
                 {item.type === 'offer' && <OfferDetail raw={item.raw} />}
+                {item.type === 'issuance' && <IssuanceDetail raw={item.raw} />}
                 {item.type === 'token' && <TokenDetail raw={item.raw} />}
                 {item.type === 'multisig' && <MultisigDetail raw={item.raw} />}
             </div>
@@ -772,6 +825,40 @@ function DetailPanel({
                             <XCircle className="w-4 h-4 mr-2" />
                             Reject
                         </Button>
+                    </div>
+                )}
+
+                {item.type === 'issuance' && (
+                    <div className="space-y-2">
+                        {item.raw.issuanceStep === 'issue' && (
+                            <Button
+                                className="w-full bg-blue-600 hover:bg-blue-500"
+                                disabled={actionLoading}
+                                onClick={onIssueToken}
+                            >
+                                <DollarSign className="w-4 h-4 mr-2" />
+                                Issue Token on Stellar
+                            </Button>
+                        )}
+                        {item.raw.issuanceStep === 'issuing' && (
+                            <Button
+                                className="w-full bg-blue-600/50 cursor-not-allowed"
+                                disabled
+                            >
+                                <Clock className="w-4 h-4 mr-2 animate-pulse" />
+                                Issuing... (pending MultiSig)
+                            </Button>
+                        )}
+                        {item.raw.issuanceStep === 'verify' && (
+                            <Button
+                                className="w-full bg-emerald-600 hover:bg-emerald-500"
+                                disabled={actionLoading}
+                                onClick={onVerifyIssuance}
+                            >
+                                <CheckCircle className="w-4 h-4 mr-2" />
+                                Verify & Enable Launch
+                            </Button>
+                        )}
                     </div>
                 )}
 
@@ -961,6 +1048,97 @@ function OfferDetail({ raw }: { raw: any }) {
             {raw.due_diligence_notes && (
                 <DetailSection title="Due Diligence Notes">
                     <p className="text-sm text-zinc-300 whitespace-pre-wrap">{raw.due_diligence_notes}</p>
+                </DetailSection>
+            )}
+        </>
+    );
+}
+
+function IssuanceDetail({ raw }: { raw: any }) {
+    const stepLabels: Record<string, { label: string; color: string; description: string }> = {
+        issue: {
+            label: '🔵 Ready to Issue',
+            color: 'text-blue-400',
+            description: 'This offer has been approved. Click below to create the token on the Stellar network.',
+        },
+        issuing: {
+            label: '⏳ Issuing (MultiSig)',
+            color: 'text-blue-300',
+            description: 'Token issuance is in progress. A multi-signature transaction is pending approval in the Transaction Queue.',
+        },
+        verify: {
+            label: '🟢 Needs Verification',
+            color: 'text-emerald-400',
+            description: 'Token has been issued on the network. Verify the issuance to allow the company to launch the offer.',
+        },
+    };
+    const step = stepLabels[raw.issuanceStep] || stepLabels.issue;
+
+    return (
+        <>
+            <DetailSection title="Issuance Pipeline">
+                <div className="flex items-center gap-3">
+                    <span className={`text-sm font-semibold ${step.color}`}>{step.label}</span>
+                </div>
+                <p className="text-xs text-zinc-400 mt-2">{step.description}</p>
+                {/* Progress steps */}
+                <div className="flex items-center gap-2 mt-4">
+                    {['Approved', 'Issue Token', 'Verify', 'Active'].map((s, i) => {
+                        const currentStep = raw.issuanceStep === 'issue' ? 1 : raw.issuanceStep === 'issuing' ? 1 : raw.issuanceStep === 'verify' ? 2 : 0;
+                        const isCompleted = i < currentStep;
+                        const isCurrent = i === currentStep;
+                        return (
+                            <div key={s} className="flex items-center gap-2">
+                                <div
+                                    className={`w-2 h-2 rounded-full ${isCompleted ? 'bg-emerald-400' : isCurrent ? 'bg-blue-400 ring-2 ring-blue-400/30' : 'bg-zinc-700'
+                                        }`}
+                                />
+                                <span className={`text-[11px] ${isCompleted ? 'text-emerald-400' : isCurrent ? 'text-blue-400 font-medium' : 'text-zinc-600'
+                                    }`}>
+                                    {s}
+                                </span>
+                                {i < 3 && <div className={`w-6 h-px ${isCompleted ? 'bg-emerald-400/50' : 'bg-zinc-700'}`} />}
+                            </div>
+                        );
+                    })}
+                </div>
+            </DetailSection>
+            <DetailSection title="Offer Info">
+                <div className="grid grid-cols-2 gap-4">
+                    <DetailRow label="Name" value={raw.offer_name} />
+                    <DetailRow label="Asset Code" value={raw.asset_code} />
+                    <DetailRow label="Type" value={raw.offer_type} />
+                    <DetailRow label="Total Supply" value={raw.total_supply} />
+                    <DetailRow
+                        label="Interest Rate"
+                        value={raw.annual_interest_rate != null ? `${raw.annual_interest_rate}%` : '—'}
+                    />
+                    {raw.payment_type && <DetailRow label="Payment Type" value={raw.payment_type} />}
+                </div>
+            </DetailSection>
+            {raw.company && (
+                <DetailSection title="Issuing Company">
+                    <div className="grid grid-cols-2 gap-4">
+                        <DetailRow label="Company" value={raw.company.name} />
+                        <DetailRow label="CNPJ" value={raw.company.cnpj} />
+                    </div>
+                </DetailSection>
+            )}
+            {raw.token && (
+                <DetailSection title="Token Details">
+                    <div className="grid grid-cols-2 gap-4">
+                        <DetailRow label="Asset Code" value={raw.token.assetCode || raw.asset_code} />
+                        {raw.token.sacContractId && (
+                            <DetailRow
+                                label="SAC Contract"
+                                value={
+                                    <code className="text-xs text-emerald-400 bg-black/30 px-2 py-1 rounded break-all">
+                                        {raw.token.sacContractId}
+                                    </code>
+                                }
+                            />
+                        )}
+                    </div>
                 </DetailSection>
             )}
         </>
