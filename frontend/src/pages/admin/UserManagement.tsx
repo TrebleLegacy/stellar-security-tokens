@@ -1,8 +1,22 @@
-import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import {
+    Users,
+    Search,
+    RefreshCw,
+    Loader2,
+    CheckCircle,
+    XCircle,
+    Wallet,
+    Copy,
+    ExternalLink,
+    History,
+    Inbox,
+    AlertTriangle,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Dialog,
     DialogContent,
@@ -11,55 +25,95 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle, XCircle, Search, RefreshCw, Wallet, ExternalLink, MoreVertical, User, Copy, History } from 'lucide-react';
-import { platformAdminsApi, type Investor } from '@/api/platformAdmins';
+import { toast } from 'sonner';
 import api from '@/api/client';
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { HELP_CONTENT } from '@/constants/help-content';
+import { platformAdminsApi } from '@/api/platformAdmins';
 
-// Extended investor with wallet details
+// ─── Types ────────────────────────────────────────────────────────────────
+
+interface Investor {
+    id: number;
+    name: string;
+    email: string;
+    document: string;
+    status: string;
+    walletAddress?: string | null;
+    createdAt: string;
+}
+
 interface InvestorDetails extends Investor {
     stellarContractId?: string;
     balances?: { xlm: string; usdc: string };
     transactions?: Array<{ hash: string; type: string; amount: string; date: string }>;
 }
 
+type FilterStatus = 'all' | 'pending' | 'approved' | 'rejected';
+
+// ─── Design tokens ────────────────────────────────────────────────────────
+
+const STATUS_DOT: Record<string, string> = {
+    pending: 'bg-yellow-400',
+    approved: 'bg-emerald-400',
+    rejected: 'bg-red-400',
+};
+
+const STATUS_BADGE: Record<string, string> = {
+    pending: 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30',
+    approved: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
+    rejected: 'bg-red-500/15 text-red-400 border-red-500/30',
+};
+
+const FILTER_CONFIG: { key: FilterStatus; label: string }[] = [
+    { key: 'all', label: 'All' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'rejected', label: 'Rejected' },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function getInitials(name: string): string {
+    return name
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+}
+
+function formatDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+
+
+// ─── Component ────────────────────────────────────────────────────────────
+
 export function UserManagement() {
     const [loading, setLoading] = useState(true);
     const [investors, setInvestors] = useState<Investor[]>([]);
-    const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+    const [filter, setFilter] = useState<FilterStatus>('all');
     const [search, setSearch] = useState('');
     const [error, setError] = useState('');
+    const [selected, setSelected] = useState<InvestorDetails | null>(null);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [actionLoading, setActionLoading] = useState(false);
 
-    // Reject Modal State
-    const [rejectModal, setRejectModal] = useState<{ open: boolean; investor: Investor | null }>({
+    // Reject dialog (kept as dialog for destructive action confirmation)
+    const [rejectDialog, setRejectDialog] = useState<{ open: boolean; investor: InvestorDetails | null }>({
         open: false,
         investor: null,
     });
     const [rejectReason, setRejectReason] = useState('');
-    const [actionLoading, setActionLoading] = useState(false);
 
-    // Sponsor Modal State
-    const [sponsorModal, setSponsorModal] = useState<{ open: boolean; investor: Investor | null; result?: { success: boolean; message?: string; explorer?: string } }>({
+    // Sponsor dialog
+    const [sponsorDialog, setSponsorDialog] = useState<{ open: boolean; investor: InvestorDetails | null }>({
         open: false,
         investor: null,
     });
     const [sponsorAmount, setSponsorAmount] = useState('10');
 
-    // Detail Modal State
-    const [detailModal, setDetailModal] = useState<{ open: boolean; investor: InvestorDetails | null; loading: boolean }>({
-        open: false,
-        investor: null,
-        loading: false,
-    });
+    // ─── Data loading ─────────────────────────────────────────────────────
 
     useEffect(() => {
         loadInvestors();
@@ -79,291 +133,483 @@ export function UserManagement() {
         }
     };
 
-    const handleApprove = async (investor: Investor) => {
+    const loadDetails = async (investor: Investor) => {
+        setSelected({ ...investor } as InvestorDetails);
+        setDetailLoading(true);
+        try {
+            const response = await api.get(`/platform-admins/investors/${investor.id}/details`);
+            if (response.data.success) {
+                setSelected(response.data.data);
+            }
+        } catch {
+            setSelected({
+                ...investor,
+                balances: { xlm: '0', usdc: '0' },
+                transactions: [],
+            } as InvestorDetails);
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    // Keep selected in sync after refresh
+    useEffect(() => {
+        if (selected) {
+            const updated = investors.find((i) => i.id === selected.id);
+            if (!updated) setSelected(null);
+        }
+    }, [investors]);
+
+    // ─── Actions ──────────────────────────────────────────────────────────
+
+    const handleApprove = async () => {
+        if (!selected) return;
         setActionLoading(true);
         try {
-            await platformAdminsApi.approveInvestor(investor.id);
-            loadInvestors();
+            await platformAdminsApi.approveInvestor(selected.id);
+            toast.success(`${selected.name} approved`);
+            await loadInvestors();
+            // Reload details to get updated status
+            loadDetails({ ...selected, status: 'approved' });
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to approve investor');
+            toast.error(err.response?.data?.error || 'Failed to approve');
         } finally {
             setActionLoading(false);
         }
     };
 
     const handleReject = async () => {
-        if (!rejectModal.investor || !rejectReason.trim()) return;
+        if (!rejectDialog.investor || !rejectReason.trim()) return;
         setActionLoading(true);
         try {
-            await platformAdminsApi.rejectInvestor(rejectModal.investor.id, rejectReason);
-            setRejectModal({ open: false, investor: null });
+            await platformAdminsApi.rejectInvestor(rejectDialog.investor.id, rejectReason);
+            toast.success(`${rejectDialog.investor.name} rejected`);
+            setRejectDialog({ open: false, investor: null });
             setRejectReason('');
-            loadInvestors();
+            await loadInvestors();
         } catch (err: any) {
-            setError(err.response?.data?.error || 'Failed to reject investor');
+            toast.error(err.response?.data?.error || 'Failed to reject');
         } finally {
             setActionLoading(false);
         }
     };
 
     const handleSponsor = async () => {
-        if (!sponsorModal.investor) return;
+        if (!sponsorDialog.investor) return;
         setActionLoading(true);
         try {
-            const response = await platformAdminsApi.sponsorInvestorWallet(sponsorModal.investor.id, sponsorAmount);
-            setSponsorModal({
-                ...sponsorModal,
-                result: {
-                    success: true,
-                    message: response.message || `Sent ${sponsorAmount} XLM successfully`,
-                    explorer: response.data?.explorer
-                }
-            });
-            loadInvestors();
+            const response = await platformAdminsApi.sponsorInvestorWallet(sponsorDialog.investor.id, sponsorAmount);
+            toast.success(response.message || `Sent ${sponsorAmount} XLM successfully`);
+            if (response.data?.explorer) {
+                toast.info(
+                    <a href={response.data.explorer} target="_blank" rel="noopener noreferrer" className="underline">
+                        View on Explorer →
+                    </a>
+                );
+            }
+            setSponsorDialog({ open: false, investor: null });
+            await loadInvestors();
         } catch (err: any) {
-            setSponsorModal({
-                ...sponsorModal,
-                result: { success: false, message: err.response?.data?.error || 'Failed to sponsor wallet' }
-            });
+            toast.error(err.response?.data?.error || 'Failed to sponsor wallet');
         } finally {
             setActionLoading(false);
         }
     };
 
-    const handleViewDetails = async (investor: Investor) => {
-        setDetailModal({ open: true, investor: { ...investor }, loading: true });
-        try {
-            const response = await api.get(`/platform-admins/investors/${investor.id}/details`);
-            if (response.data.success) {
-                setDetailModal({
-                    open: true,
-                    investor: response.data.data,
-                    loading: false,
-                });
-            }
-        } catch (err: any) {
-            setDetailModal({
-                open: true,
-                investor: { ...investor, balances: { xlm: '0', usdc: '0' }, transactions: [] },
-                loading: false,
-            });
-        }
-    };
-
     const copyToClipboard = (text: string) => {
         navigator.clipboard.writeText(text);
+        toast.success('Copied to clipboard');
     };
 
-    const getStatusBadge = (status: string) => {
-        switch (status) {
-            case 'pending':
-                return <Badge variant="outline" className="border-yellow-500 text-yellow-500">Pending</Badge>;
-            case 'approved':
-                return <Badge variant="outline" className="border-emerald-500 text-emerald-500">Approved</Badge>;
-            case 'rejected':
-                return <Badge variant="outline" className="border-red-500 text-red-500">Rejected</Badge>;
-            default:
-                return <Badge variant="outline">{status}</Badge>;
-        }
-    };
+    // ─── Filtered list ────────────────────────────────────────────────────
 
-    const filteredInvestors = investors.filter((inv) =>
-        inv.name.toLowerCase().includes(search.toLowerCase()) ||
-        inv.email.toLowerCase().includes(search.toLowerCase())
+    const filteredInvestors = investors.filter(
+        (inv) =>
+            inv.name.toLowerCase().includes(search.toLowerCase()) ||
+            inv.email.toLowerCase().includes(search.toLowerCase())
     );
 
+    const counts: Record<FilterStatus, number> = {
+        all: investors.length,
+        pending: investors.filter((i) => i.status === 'pending').length,
+        approved: investors.filter((i) => i.status === 'approved').length,
+        rejected: investors.filter((i) => i.status === 'rejected').length,
+    };
+
+    // ─── Render ───────────────────────────────────────────────────────────
+
     return (
-        <div className="space-y-6">
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <div className="flex gap-2">
-                    {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
-                        <Button
-                            key={f}
-                            variant={filter === f ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setFilter(f)}
-                            className={filter === f ? 'bg-red-600 hover:bg-red-700' : ''}
-                        >
-                            {f.charAt(0).toUpperCase() + f.slice(1)}
-                        </Button>
-                    ))}
-                </div>
-                <div className="flex gap-2 w-full sm:w-auto">
-                    <div className="relative flex-1 sm:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <div className="space-y-4">
+            {/* Filter chips + search */}
+            <div className="flex flex-wrap items-center gap-2">
+                {FILTER_CONFIG.map(({ key, label }) => (
+                    <button
+                        key={key}
+                        onClick={() => setFilter(key)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${filter === key
+                            ? 'bg-white/10 text-white border border-white/20'
+                            : 'bg-white/[0.03] text-zinc-400 border border-white/[0.06] hover:bg-white/[0.06]'
+                            }`}
+                    >
+                        {label}
+                        {counts[key] > 0 && (
+                            <span
+                                className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${filter === key ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-zinc-500'
+                                    }`}
+                            >
+                                {counts[key]}
+                            </span>
+                        )}
+                    </button>
+                ))}
+
+                <div className="ml-auto flex items-center gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500" />
                         <Input
-                            placeholder="Search by name or email..."
+                            placeholder="Search name or email…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="pl-9 bg-white/5 border-white/10"
+                            className="pl-8 h-8 w-56 text-sm bg-white/[0.03] border-white/[0.06]"
                         />
                     </div>
-                    <Button variant="outline" size="icon" onClick={loadInvestors}>
-                        <RefreshCw className="w-4 h-4" />
+                    <Button variant="outline" size="sm" onClick={loadInvestors} disabled={loading} className="gap-1.5">
+                        <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                        Refresh
                     </Button>
                 </div>
             </div>
 
+            {/* Error */}
             {error && (
-                <div className="p-3 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 text-sm">
+                <div className="p-3 bg-red-500/10 text-red-400 rounded-lg border border-red-500/20 text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
                     {error}
                 </div>
             )}
 
-            {/* Table */}
-            <Card className="glass-panel border-white/5 bg-white/5">
-                <CardHeader>
-                    <CardTitle>Investors ({filteredInvestors.length})</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {loading ? (
-                        <div className="flex items-center justify-center py-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-red-500" />
-                        </div>
-                    ) : filteredInvestors.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-8">No investors found.</p>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-white/10">
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">Name</th>
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">Email</th>
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">Document</th>
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">
-                                            <div className="flex items-center gap-1.5">
-                                                Status
-                                                <InfoTooltip content={HELP_CONTENT.userManagement.kycStatus.content} side="top" />
-                                            </div>
-                                        </th>
-                                        <th className="text-left py-3 px-2 text-muted-foreground font-medium">Registered</th>
-                                        <th className="text-right py-3 px-2 text-muted-foreground font-medium">Actions</th>
-                                        <th className="py-3 px-2 text-muted-foreground font-medium w-10"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredInvestors.map((investor) => (
-                                        <tr key={investor.id} className="border-b border-white/5 hover:bg-white/5">
-                                            <td className="py-3 px-2 text-white">{investor.name}</td>
-                                            <td className="py-3 px-2 text-muted-foreground">{investor.email}</td>
-                                            <td className="py-3 px-2 text-muted-foreground">{investor.document}</td>
-                                            <td className="py-3 px-2">{getStatusBadge(investor.status)}</td>
-                                            <td className="py-3 px-2 text-muted-foreground">
-                                                {new Date(investor.createdAt).toLocaleDateString()}
-                                            </td>
-                                            <td className="py-3 px-2 text-right">
-                                                {investor.status === 'pending' && (
-                                                    <div className="flex gap-2 justify-end">
-                                                        <div className="flex items-center gap-1">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="border-emerald-500 text-emerald-500 hover:bg-emerald-500/10"
-                                                                onClick={() => handleApprove(investor)}
-                                                                disabled={actionLoading}
-                                                            >
-                                                                <CheckCircle className="w-4 h-4 mr-1" />
-                                                                Approve
-                                                            </Button>
-                                                            <InfoTooltip content={HELP_CONTENT.userManagement.approveButton.content} side="left" maxWidth="400px" />
-                                                        </div>
-                                                        <div className="flex items-center gap-1">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="border-red-500 text-red-500 hover:bg-red-500/10"
-                                                                onClick={() => setRejectModal({ open: true, investor })}
-                                                                disabled={actionLoading}
-                                                            >
-                                                                <XCircle className="w-4 h-4 mr-1" />
-                                                                Reject
-                                                            </Button>
-                                                            <InfoTooltip content={HELP_CONTENT.userManagement.rejectButton.content} side="left" maxWidth="400px" />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                {investor.status === 'approved' && (
-                                                    <div className="flex items-center gap-1">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            className="border-blue-500 text-blue-500 hover:bg-blue-500/10"
-                                                            onClick={() => setSponsorModal({ open: true, investor, result: undefined })}
-                                                            disabled={actionLoading}
-                                                        >
-                                                            <Wallet className="w-4 h-4 mr-1" />
-                                                            Sponsor
-                                                        </Button>
-                                                        <InfoTooltip content={HELP_CONTENT.userManagement.sponsorTrustline.content} side="left" maxWidth="400px" />
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="py-3 px-2">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => handleViewDetails(investor)}>
-                                                            <User className="w-4 h-4 mr-2" />
-                                                            View Details
-                                                        </DropdownMenuItem>
-                                                        {investor.walletAddress && (
-                                                            <DropdownMenuItem onClick={() => copyToClipboard(investor.walletAddress!)}>
-                                                                <Copy className="w-4 h-4 mr-2" />
-                                                                Copy Wallet
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem asChild>
-                                                            <a
-                                                                href={`https://stellar.expert/explorer/testnet/account/${investor.walletAddress}`}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="flex items-center"
-                                                            >
-                                                                <ExternalLink className="w-4 h-4 mr-2" />
-                                                                View on Explorer
-                                                            </a>
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+            {/* Split pane */}
+            <div className="grid grid-cols-[minmax(420px,2fr)_3fr] gap-4 min-h-[calc(100vh-220px)]">
+                {/* ── Left: Investor list ── */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden flex flex-col">
+                    {/* Table header */}
+                    <div className="grid grid-cols-[36px_1fr_28px_28px_80px] gap-2 items-center px-3 py-2 border-b border-white/[0.06] text-[11px] text-zinc-500 uppercase tracking-wider font-medium">
+                        <span></span>
+                        <span>Investor</span>
+                        <span className="text-center">KYC</span>
+                        <span className="text-center">
+                            <Wallet className="w-3 h-3 mx-auto" />
+                        </span>
+                        <span className="text-right">Registered</span>
+                    </div>
 
-            {/* Reject Modal */}
-            <Dialog open={rejectModal.open} onOpenChange={(open) => setRejectModal({ open, investor: rejectModal.investor })}>
+                    {/* Scrollable list */}
+                    <div className="flex-1 overflow-y-auto">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+                            </div>
+                        ) : filteredInvestors.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <Users className="w-8 h-8 text-zinc-700 mb-2" />
+                                <p className="text-sm text-zinc-500">No investors found</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-white/[0.04]">
+                                {filteredInvestors.map((inv) => {
+                                    const isSelected = selected?.id === inv.id;
+                                    return (
+                                        <button
+                                            key={inv.id}
+                                            onClick={() => loadDetails(inv)}
+                                            className={`w-full text-left grid grid-cols-[36px_1fr_28px_28px_80px] gap-2 items-center px-3 py-2.5 transition-colors hover:bg-white/[0.04] ${isSelected
+                                                ? 'bg-white/[0.06] border-l-2 border-l-blue-500'
+                                                : 'border-l-2 border-l-transparent'
+                                                }`}
+                                        >
+                                            {/* Avatar */}
+                                            <div className="w-7 h-7 rounded-full bg-white/[0.08] flex items-center justify-center text-[10px] font-semibold text-zinc-300">
+                                                {getInitials(inv.name)}
+                                            </div>
+
+                                            {/* Name + Email */}
+                                            <div className="min-w-0">
+                                                <p className="text-[13px] font-medium text-white truncate">
+                                                    {inv.name}
+                                                </p>
+                                                <p className="text-[11px] text-zinc-500 truncate">{inv.email}</p>
+                                            </div>
+
+                                            {/* KYC dot */}
+                                            <div className="flex justify-center">
+                                                <div
+                                                    className={`w-2 h-2 rounded-full ${STATUS_DOT[inv.status] || 'bg-zinc-500'}`}
+                                                    title={inv.status}
+                                                />
+                                            </div>
+
+                                            {/* Wallet indicator */}
+                                            <div className="flex justify-center">
+                                                <Wallet
+                                                    className={`w-3 h-3 ${inv.walletAddress ? 'text-emerald-400' : 'text-zinc-600'}`}
+                                                />
+                                            </div>
+
+                                            {/* Date */}
+                                            <span className="text-[11px] text-zinc-600 text-right">
+                                                {formatDate(inv.createdAt)}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Footer count */}
+                    <div className="px-3 py-2 border-t border-white/[0.06] text-[11px] text-zinc-500">
+                        {filteredInvestors.length} investor{filteredInvestors.length !== 1 ? 's' : ''}
+                    </div>
+                </div>
+
+                {/* ── Right: Detail panel ── */}
+                <div className="bg-white/[0.02] border border-white/[0.06] rounded-xl overflow-hidden flex flex-col">
+                    {!selected ? (
+                        <div className="flex flex-col items-center justify-center h-full text-center px-6">
+                            <Inbox className="w-10 h-10 text-zinc-700 mb-2" />
+                            <p className="text-sm text-zinc-500">Select an investor to view details</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Header */}
+                            <div className="px-5 py-4 border-b border-white/[0.06] flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-full bg-white/[0.08] flex items-center justify-center text-xs font-semibold text-zinc-300">
+                                    {getInitials(selected.name)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-base font-semibold text-white truncate">
+                                            {selected.name}
+                                        </h3>
+                                        <Badge
+                                            variant="outline"
+                                            className={`text-[10px] px-1.5 py-0 h-4 shrink-0 ${STATUS_BADGE[selected.status] || ''}`}
+                                        >
+                                            {selected.status}
+                                        </Badge>
+                                    </div>
+                                    <p className="text-xs text-zinc-500">{selected.email}</p>
+                                </div>
+                                {selected.stellarContractId && (
+                                    <a
+                                        href={`https://stellar.expert/explorer/testnet/contract/${selected.stellarContractId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                                        title="View on Explorer"
+                                    >
+                                        <ExternalLink className="w-4 h-4" />
+                                    </a>
+                                )}
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+                                {detailLoading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 className="w-5 h-5 animate-spin text-zinc-500" />
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Profile section */}
+                                        <section>
+                                            <h4 className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-3">
+                                                Profile
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                                                <div>
+                                                    <dt className="text-[11px] text-zinc-500">Email</dt>
+                                                    <dd className="text-sm text-white mt-0.5">{selected.email}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-[11px] text-zinc-500">Document</dt>
+                                                    <dd className="text-sm text-white mt-0.5">{selected.document}</dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-[11px] text-zinc-500">Status</dt>
+                                                    <dd className="text-sm mt-0.5">
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={`text-[10px] ${STATUS_BADGE[selected.status] || ''}`}
+                                                        >
+                                                            {selected.status}
+                                                        </Badge>
+                                                    </dd>
+                                                </div>
+                                                <div>
+                                                    <dt className="text-[11px] text-zinc-500">Registered</dt>
+                                                    <dd className="text-sm text-white mt-0.5">
+                                                        {formatDate(selected.createdAt)}
+                                                    </dd>
+                                                </div>
+                                            </div>
+                                        </section>
+
+                                        {/* Wallet section */}
+                                        <section>
+                                            <h4 className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-3">
+                                                Wallet
+                                            </h4>
+                                            {selected.stellarContractId ? (
+                                                <div className="space-y-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <code className="text-xs text-zinc-300 bg-white/[0.04] px-2 py-1 rounded font-mono flex-1 truncate">
+                                                            {selected.stellarContractId}
+                                                        </code>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="h-7 w-7 p-0 text-zinc-500 hover:text-white"
+                                                            onClick={() =>
+                                                                copyToClipboard(selected.stellarContractId!)
+                                                            }
+                                                        >
+                                                            <Copy className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                    </div>
+
+                                                    {selected.balances && (
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div className="p-3 bg-white/[0.03] rounded-lg border border-white/[0.06]">
+                                                                <p className="text-[11px] text-zinc-500 mb-0.5">XLM</p>
+                                                                <p className="text-sm font-medium text-white">
+                                                                    {parseFloat(selected.balances.xlm).toFixed(2)}
+                                                                </p>
+                                                            </div>
+                                                            <div className="p-3 bg-white/[0.03] rounded-lg border border-white/[0.06]">
+                                                                <p className="text-[11px] text-zinc-500 mb-0.5">USDC</p>
+                                                                <p className="text-sm font-medium text-emerald-400">
+                                                                    $
+                                                                    {parseFloat(selected.balances.usdc).toFixed(2)}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <p className="text-sm text-zinc-500">No wallet created yet</p>
+                                            )}
+                                        </section>
+
+                                        {/* Transactions section */}
+                                        {selected.transactions && selected.transactions.length > 0 && (
+                                            <section>
+                                                <h4 className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium mb-3 flex items-center gap-1.5">
+                                                    <History className="w-3 h-3" />
+                                                    Recent Transactions
+                                                </h4>
+                                                <div className="space-y-1 max-h-48 overflow-y-auto">
+                                                    {selected.transactions.map((tx, i) => (
+                                                        <div
+                                                            key={i}
+                                                            className="grid grid-cols-3 gap-2 items-center px-2 py-1.5 text-xs rounded hover:bg-white/[0.03]"
+                                                        >
+                                                            <span className="text-zinc-500">{tx.type}</span>
+                                                            <span className="text-white text-right">{tx.amount}</span>
+                                                            <span className="text-zinc-600 text-right">{tx.date}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </section>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                            {/* Action footer */}
+                            <div className="px-5 py-3 border-t border-white/[0.06] flex items-center gap-2">
+                                {selected.status === 'pending' && (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            className="bg-emerald-600 hover:bg-emerald-500 gap-1.5"
+                                            onClick={handleApprove}
+                                            disabled={actionLoading}
+                                        >
+                                            {actionLoading ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <CheckCircle className="w-3.5 h-3.5" />
+                                            )}
+                                            Approve
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="border-red-500/30 text-red-400 hover:bg-red-500/10 gap-1.5"
+                                            onClick={() => setRejectDialog({ open: true, investor: selected })}
+                                            disabled={actionLoading}
+                                        >
+                                            <XCircle className="w-3.5 h-3.5" />
+                                            Reject
+                                        </Button>
+                                    </>
+                                )}
+                                {selected.status === 'approved' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 gap-1.5"
+                                        onClick={() => setSponsorDialog({ open: true, investor: selected })}
+                                        disabled={actionLoading}
+                                    >
+                                        <Wallet className="w-3.5 h-3.5" />
+                                        Sponsor Wallet
+                                    </Button>
+                                )}
+                                {selected.stellarContractId && (
+                                    <a
+                                        href={`https://stellar.expert/explorer/testnet/contract/${selected.stellarContractId}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="ml-auto"
+                                    >
+                                        <Button size="sm" variant="outline" className="gap-1.5">
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                            Explorer
+                                        </Button>
+                                    </a>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* ── Reject dialog ── */}
+            <Dialog
+                open={rejectDialog.open}
+                onOpenChange={(open) => setRejectDialog({ open, investor: rejectDialog.investor })}
+            >
                 <DialogContent className="bg-slate-900 border-white/10">
                     <DialogHeader>
-                        <DialogTitle>Reject Investor</DialogTitle>
+                        <DialogTitle>Reject {rejectDialog.investor?.name}</DialogTitle>
                         <DialogDescription>
-                            Please provide a reason for rejecting {rejectModal.investor?.name}.
+                            This action cannot be undone. Please provide a reason.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="reason">Rejection Reason</Label>
-                            <Input
-                                id="reason"
-                                placeholder="e.g., Invalid documentation"
-                                value={rejectReason}
-                                onChange={(e) => setRejectReason(e.target.value)}
-                                className="bg-white/5 border-white/10"
-                            />
-                        </div>
+                    <div className="py-4">
+                        <Label htmlFor="reject-reason">Reason</Label>
+                        <Input
+                            id="reject-reason"
+                            placeholder="e.g., Invalid documentation, incomplete KYC…"
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            className="mt-2 bg-white/5 border-white/10"
+                        />
                     </div>
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setRejectModal({ open: false, investor: null })}>
+                        <Button variant="outline" onClick={() => setRejectDialog({ open: false, investor: null })}>
                             Cancel
                         </Button>
                         <Button
@@ -371,195 +617,56 @@ export function UserManagement() {
                             onClick={handleReject}
                             disabled={!rejectReason.trim() || actionLoading}
                         >
-                            {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                            {actionLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                             Reject
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Sponsor Modal */}
-            <Dialog open={sponsorModal.open} onOpenChange={(open) => setSponsorModal({ open, investor: sponsorModal.investor })}>
+            {/* ── Sponsor dialog ── */}
+            <Dialog
+                open={sponsorDialog.open}
+                onOpenChange={(open) => setSponsorDialog({ open, investor: sponsorDialog.investor })}
+            >
                 <DialogContent className="bg-slate-900 border-white/10">
                     <DialogHeader>
                         <DialogTitle>Sponsor Wallet</DialogTitle>
                         <DialogDescription>
-                            Send XLM to {sponsorModal.investor?.name}'s wallet to cover transaction fees.
+                            Send XLM to {sponsorDialog.investor?.name}'s wallet for transaction fees.
                         </DialogDescription>
                     </DialogHeader>
-                    {sponsorModal.result ? (
-                        <div className="space-y-4 py-4">
-                            {sponsorModal.result.success ? (
-                                <div className="p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                                    <p className="text-emerald-400 font-medium mb-2">✅ {sponsorModal.result.message}</p>
-                                    {sponsorModal.result.explorer && (
-                                        <a
-                                            href={sponsorModal.result.explorer}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="flex items-center gap-1 text-sm text-blue-400 hover:underline"
-                                        >
-                                            <ExternalLink className="w-4 h-4" />
-                                            View Transaction
-                                        </a>
-                                    )}
-                                </div>
+                    <div className="py-4 space-y-2">
+                        <Label htmlFor="xlm-amount">Amount (XLM)</Label>
+                        <Input
+                            id="xlm-amount"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            placeholder="10"
+                            value={sponsorAmount}
+                            onChange={(e) => setSponsorAmount(e.target.value)}
+                            className="bg-white/5 border-white/10"
+                        />
+                        <p className="text-xs text-zinc-500">Default: 10 XLM for transaction fees</p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setSponsorDialog({ open: false, investor: null })}>
+                            Cancel
+                        </Button>
+                        <Button className="bg-blue-600 hover:bg-blue-700" onClick={handleSponsor} disabled={actionLoading}>
+                            {actionLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
                             ) : (
-                                <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/20">
-                                    <p className="text-red-400">❌ {sponsorModal.result.message}</p>
-                                </div>
+                                <Wallet className="w-4 h-4 mr-2" />
                             )}
-                        </div>
-                    ) : (
-                        <div className="space-y-4 py-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="xlmAmount">Amount (XLM)</Label>
-                                <Input
-                                    id="xlmAmount"
-                                    type="number"
-                                    min="1"
-                                    max="1000"
-                                    placeholder="10"
-                                    value={sponsorAmount}
-                                    onChange={(e) => setSponsorAmount(e.target.value)}
-                                    className="bg-white/5 border-white/10"
-                                />
-                                <p className="text-xs text-muted-foreground">Default: 10 XLM for transaction fees</p>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setSponsorModal({ open: false, investor: null })}>
-                            {sponsorModal.result ? 'Close' : 'Cancel'}
+                            Send XLM
                         </Button>
-                        {!sponsorModal.result && (
-                            <Button
-                                className="bg-blue-600 hover:bg-blue-700"
-                                onClick={handleSponsor}
-                                disabled={actionLoading}
-                            >
-                                {actionLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Wallet className="w-4 h-4 mr-2" />}
-                                Send XLM
-                            </Button>
-                        )}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* User Detail Modal */}
-            <Dialog open={detailModal.open} onOpenChange={(open) => setDetailModal({ ...detailModal, open })}>
-                <DialogContent className="bg-slate-900 border-white/10 max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <User className="w-5 h-5" />
-                            {detailModal.investor?.name}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Complete investor profile and wallet information
-                        </DialogDescription>
-                    </DialogHeader>
-                    {detailModal.loading ? (
-                        <div className="flex justify-center py-8">
-                            <Loader2 className="w-8 h-8 animate-spin text-red-500" />
-                        </div>
-                    ) : detailModal.investor && (
-                        <div className="space-y-6 py-4">
-                            {/* Basic Info */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">Email</Label>
-                                    <p className="text-white">{detailModal.investor.email}</p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">Document</Label>
-                                    <p className="text-white">{detailModal.investor.document}</p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">Status</Label>
-                                    <p>{getStatusBadge(detailModal.investor.status)}</p>
-                                </div>
-                                <div>
-                                    <Label className="text-muted-foreground text-xs">Registered</Label>
-                                    <p className="text-white">{new Date(detailModal.investor.createdAt).toLocaleDateString()}</p>
-                                </div>
-                            </div>
-
-                            {/* Wallet Info */}
-                            <div className="p-4 bg-white/5 rounded-lg space-y-3">
-                                <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
-                                    <Wallet className="w-3 h-3" /> Wallet Address
-                                    <InfoTooltip content={HELP_CONTENT.userManagement.walletAddress.content} side="right" maxWidth="400px" />
-                                </Label>
-                                {detailModal.investor.stellarContractId ? (
-                                    <div className="flex items-center gap-2">
-                                        <code className="text-xs text-emerald-400 bg-black/30 px-2 py-1 rounded flex-1 overflow-hidden text-ellipsis">
-                                            {detailModal.investor.stellarContractId}
-                                        </code>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => copyToClipboard(detailModal.investor!.stellarContractId!)}
-                                        >
-                                            <Copy className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <p className="text-muted-foreground text-sm">No wallet created yet</p>
-                                )}
-
-                                {/* Balances */}
-                                {detailModal.investor.balances && (
-                                    <div className="grid grid-cols-2 gap-4 pt-2">
-                                        <div className="p-3 bg-black/30 rounded">
-                                            <p className="text-xs text-muted-foreground">XLM Balance</p>
-                                            <p className="text-lg font-semibold text-white">{parseFloat(detailModal.investor.balances.xlm).toFixed(2)}</p>
-                                        </div>
-                                        <div className="p-3 bg-black/30 rounded">
-                                            <p className="text-xs text-muted-foreground">USDC Balance</p>
-                                            <p className="text-lg font-semibold text-emerald-400">${parseFloat(detailModal.investor.balances.usdc).toFixed(2)}</p>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Recent Transactions */}
-                            {detailModal.investor.transactions && detailModal.investor.transactions.length > 0 && (
-                                <div>
-                                    <Label className="text-muted-foreground text-xs flex items-center gap-1 mb-2">
-                                        <History className="w-3 h-3" /> Recent Transactions
-                                    </Label>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                                        {detailModal.investor.transactions.map((tx, i) => (
-                                            <div key={i} className="flex items-center justify-between p-2 bg-white/5 rounded text-xs">
-                                                <span className="text-muted-foreground">{tx.type}</span>
-                                                <span className="text-white">{tx.amount}</span>
-                                                <span className="text-muted-foreground">{tx.date}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setDetailModal({ open: false, investor: null, loading: false })}>
-                            Close
-                        </Button>
-                        {detailModal.investor?.stellarContractId && (
-                            <Button asChild className="bg-red-600 hover:bg-red-700">
-                                <a
-                                    href={`https://stellar.expert/explorer/testnet/contract/${detailModal.investor.stellarContractId}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    <ExternalLink className="w-4 h-4 mr-2" />
-                                    View on Explorer
-                                </a>
-                            </Button>
-                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
     );
 }
+
+export default UserManagement;
