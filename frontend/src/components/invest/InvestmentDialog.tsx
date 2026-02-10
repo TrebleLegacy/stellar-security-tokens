@@ -13,7 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { QRCode } from "@/components/ui/qrcode";
 import { useInvestment } from '@/hooks/useInvestment';
-import { Copy, Check, AlertTriangle, Settings } from 'lucide-react';
+import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { useInvestmentFees } from '@/hooks/useInvestmentFees';
+import { Copy, Check, AlertTriangle, Settings, Wallet, ExternalLink } from 'lucide-react';
 import { authStorage } from '@/utils/authStorage';
 
 interface InvestmentDialogProps {
@@ -56,6 +58,8 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const [open, setOpen] = useState(false);
     const [instructions, setInstructions] = useState<any>(null);
     const { purchase, loading, error } = useInvestment();
+    const { usdcBalance, loading: balanceLoading } = useWalletBalance();
+    const { blockchainFee } = useInvestmentFees();
 
     // KYC gate — check before showing the investment form
     const user = authStorage.getUser<{ kycStatus?: string }>('investor') || {};
@@ -71,7 +75,14 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const isValidAmount = !isNaN(parsedAmount) && parsedAmount > 0;
     const isBelowMin = minInvestment !== undefined && isValidAmount && parsedAmount < minInvestment;
     const isAboveMax = maxInvestment !== undefined && isValidAmount && parsedAmount > maxInvestment;
-    const canSubmit = isValidAmount && !isBelowMin && !isAboveMax && !loading;
+
+    // Fee calculations
+    const totalDeduction = isValidAmount ? parsedAmount + blockchainFee : 0;
+    const tokensReceived = isValidAmount ? parsedAmount / (offer.unit_price || 1) : 0;
+    const hasInsufficientFunds = usdcBalance !== null && isValidAmount && totalDeduction > usdcBalance;
+    const shortfall = hasInsufficientFunds ? totalDeduction - (usdcBalance || 0) : 0;
+
+    const canSubmit = isValidAmount && !isBelowMin && !isAboveMax && !loading && !hasInsufficientFunds;
 
     const handleInvest = async () => {
         try {
@@ -98,7 +109,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     };
 
     return (
-        <Dialog open={open} onOpenChange={(val) => !val && handleClose()}>
+        <Dialog open={open} onOpenChange={(val) => val ? setOpen(true) : handleClose()}>
             <DialogTrigger asChild>
                 {trigger || <Button>Invest Now</Button>}
             </DialogTrigger>
@@ -137,6 +148,35 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                 ) : !instructions ? (
                     // STEP 1: AMOUNT INPUT
                     <div className="grid gap-4 py-4">
+                        {/* WALLET BALANCE STRIP */}
+                        <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/10">
+                            <div className="flex items-center gap-2">
+                                <Wallet className="h-4 w-4 text-[hsl(43_45%_55%)]" />
+                                <span className="text-sm text-muted-foreground">USDC Balance</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">
+                                    {balanceLoading ? (
+                                        <span className="inline-flex items-center gap-0.5 text-muted-foreground">
+                                            <span className="animate-pulse">•</span>
+                                            <span className="animate-pulse" style={{ animationDelay: '150ms' }}>•</span>
+                                            <span className="animate-pulse" style={{ animationDelay: '300ms' }}>•</span>
+                                        </span>
+                                    ) : usdcBalance !== null ? (
+                                        <span className="text-[hsl(43_45%_55%)]">${usdcBalance.toFixed(2)}</span>
+                                    ) : (
+                                        <span className="text-muted-foreground">—</span>
+                                    )}
+                                </span>
+                                <button
+                                    onClick={() => { handleClose(); window.location.href = '/wallet'; }}
+                                    className="text-xs text-muted-foreground hover:text-[hsl(43_45%_55%)] transition-colors flex items-center gap-0.5"
+                                >
+                                    <ExternalLink className="h-3 w-3" />
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="grid gap-2">
                             <Label htmlFor="amount">Amount (USDC)</Label>
                             <Input
@@ -155,8 +195,8 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                         key={qa}
                                         onClick={() => setAmount(qa.toString())}
                                         className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-all ${amount === qa.toString()
-                                                ? 'bg-[hsl(43_45%_55%/0.2)] text-[hsl(43_45%_55%)] border-[hsl(43_45%_55%/0.4)]'
-                                                : 'bg-white/[0.03] text-muted-foreground border-white/10 hover:bg-white/[0.06]'
+                                            ? 'bg-[hsl(43_45%_55%/0.2)] text-[hsl(43_45%_55%)] border-[hsl(43_45%_55%/0.4)]'
+                                            : 'bg-white/[0.03] text-muted-foreground border-white/10 hover:bg-white/[0.06]'
                                             }`}
                                     >
                                         ${qa >= 1000 ? `${qa / 1000}K` : qa}
@@ -164,16 +204,55 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 ))}
                             </div>
 
-                            {/* Dynamic validation feedback */}
+                            {/* FEE BREAKDOWN */}
+                            {isValidAmount && !isBelowMin && !isAboveMax && (
+                                <div className="mt-1 space-y-1.5 p-3 rounded-lg bg-white/[0.03] border border-white/8">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">Tokens received</span>
+                                        <span className="text-emerald-400 font-medium">
+                                            ~{tokensReceived.toFixed(2)} {offer.asset_code}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-muted-foreground">Blockchain fee</span>
+                                        <span className="text-slate-400">+{blockchainFee} USDC</span>
+                                    </div>
+                                    <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs font-semibold">
+                                        <span className="text-white">Total deduction</span>
+                                        <span className="text-white">{totalDeduction.toFixed(2)} USDC</span>
+                                    </div>
+
+                                    {/* Balance after */}
+                                    {usdcBalance !== null && !hasInsufficientFunds && (
+                                        <div className="flex justify-between text-xs pt-0.5">
+                                            <span className="text-muted-foreground">Balance after</span>
+                                            <span className="text-slate-500">${(usdcBalance - totalDeduction).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Insufficient funds warning */}
+                            {hasInsufficientFunds && (
+                                <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                                    <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                                    <div className="text-xs space-y-1">
+                                        <p className="text-red-400 font-medium">Insufficient USDC</p>
+                                        <p className="text-red-300/70">
+                                            You need <strong>${shortfall.toFixed(2)}</strong> more.{' '}
+                                            <button
+                                                onClick={() => { handleClose(); window.location.href = '/wallet'; }}
+                                                className="underline hover:text-red-300 transition-colors"
+                                            >
+                                                Deposit funds
+                                            </button>
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Min/Max validation */}
                             <div className="space-y-1">
-                                <p className="text-xs text-slate-500">
-                                    Exchange Rate: {offer.unit_price || 1} USDC = 1 {offer.asset_code}
-                                </p>
-                                {isValidAmount && !isBelowMin && !isAboveMax && (
-                                    <p className="text-xs text-emerald-400 font-medium">
-                                        You'll receive ~{(parsedAmount / (offer.unit_price || 1)).toFixed(2)} {offer.asset_code} tokens
-                                    </p>
-                                )}
                                 {isBelowMin && (
                                     <p className="text-xs text-yellow-400">
                                         Minimum investment: ${minInvestment!.toLocaleString()} USDC
@@ -231,10 +310,15 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
-                                    <Label className="text-xs text-slate-500 uppercase">Amount</Label>
+                                    <Label className="text-xs text-slate-500 uppercase">Total Amount</Label>
                                     <div className="flex items-center justify-between mt-1">
                                         <span className="font-bold text-white">{instructions.requiredAmount} USDC</span>
                                     </div>
+                                    {instructions.blockchainFee && (
+                                        <p className="text-[10px] text-slate-500 mt-1">
+                                            Includes {instructions.blockchainFee} USDC fee
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* MEMO DISPLAY is CRITICAL */}

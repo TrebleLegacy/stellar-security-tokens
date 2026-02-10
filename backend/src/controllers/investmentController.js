@@ -112,18 +112,19 @@ export const purchaseInvestment = async (req, res, next) => {
     // Fee Logic
     const grossAmount = parseFloat(usdcAmount);
     const feePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
-    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0); // Blockchain Fee (Investor pays)
+    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0); // Blockchain Fee (Investor pays ON TOP)
 
-    // Validation: Amount must cover Blockchain Fee
-    if (grossAmount <= fixedFee) {
+    // Validation: Investment amount must be positive
+    if (grossAmount <= 0) {
       return res.status(400).json({
         success: false,
-        error: `Investment amount (${grossAmount} USDC) is too low to cover the Blockchain Operation Fee (${fixedFee} USDC).`,
+        error: 'Investment amount must be greater than zero.',
       });
     }
 
-    // Investor pays Blockchain Fee (deducted from tokens received)
-    const tokenAmount = grossAmount - fixedFee;
+    // Investor pays Blockchain Fee ON TOP — full amount goes to tokens
+    const tokenAmount = grossAmount;
+    const totalDeduction = grossAmount + fixedFee; // Total deducted from wallet
 
     // Company pays Investment Fee (calculated on gross amount, charged later/accounted for)
     const investmentFeeAmount = grossAmount * (feePercent / 100);
@@ -156,10 +157,9 @@ export const purchaseInvestment = async (req, res, next) => {
       investor_id: investorId,
       offer_id: offerId || null,
       asset_code: assetCode,
-      usdc_amount: usdcAmount,
-      token_amount: tokenAmount,
-      memo: null, // Will be updated if not passed to create, but we should probably generate it now.
-      // Wait, the generateInvestmentMemo requires ID. We can create first, then generate memo, then update.
+      usdc_amount: totalDeduction, // Total wallet deduction (investment + fee)
+      token_amount: tokenAmount,   // Full investment amount in tokens
+      memo: null,
     });
 
     // Generate Memo using the new ID
@@ -186,20 +186,23 @@ export const purchaseInvestment = async (req, res, next) => {
           investment: {
             id: investment.id,
             status: investment.status,
-            usdcAmount: parseFloat(usdcAmount),
+            usdcAmount: grossAmount,
             feeAmount: fixedFee,
+            totalDeduction: totalDeduction,
             tokenAmount: tokenAmount,
             assetCode: assetCode,
-            memo: memo, // Return Memo to user
+            memo: memo,
           },
           paymentInstructions: {
             treasuryAddress: treasuryKeypair.publicKey(),
-            requiredAmount: usdcAmount,
+            requiredAmount: totalDeduction.toString(), // Investor pays investment + fee
+            investmentAmount: grossAmount.toString(),
+            blockchainFee: fixedFee.toString(),
             assetCode: 'USDC',
-            memo: memo, // Return Memo in instructions
+            memo: memo,
             memoType: 'text',
             windowMinutes: USDC_PAYMENT_WINDOW_MINUTES,
-            message: `Send ${usdcAmount} USDC to ${treasuryKeypair.publicKey()} with MEMO: ${memo}`,
+            message: `Send ${totalDeduction} USDC to ${treasuryKeypair.publicKey()} with MEMO: ${memo}`,
           },
         },
       });
@@ -481,3 +484,24 @@ export const getInvestmentStatus = async (req, res, next) => {
   }
 };
 
+/**
+ * Returns the current investment fee schedule
+ * GET /api/investments/fee-schedule
+ */
+export const getFeeSchedule = async (req, res, next) => {
+  try {
+    const blockchainFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0);
+    const investmentFeePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
+
+    res.json({
+      success: true,
+      data: {
+        blockchainFee,
+        investmentFeePercent,
+        description: 'Blockchain fee is added on top of the investment amount.',
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
