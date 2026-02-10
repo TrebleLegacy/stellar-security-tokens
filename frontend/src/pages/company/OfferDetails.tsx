@@ -18,7 +18,9 @@ import {
     AlertCircle,
     Building2,
     Briefcase,
-    Rocket
+    Rocket,
+    Shield,
+    UserCheck
 } from "lucide-react";
 import { offersApi } from "@/api/offers";
 import type { Offer } from '@/types';
@@ -273,93 +275,24 @@ export function OfferDetails() {
                 {/* Left Column: Details & Timeline */}
                 <div className="lg:col-span-2 space-y-8">
 
-                    {/* Status Timeline */}
+                    {/* Status Timeline — Vertical Stepper */}
                     <Card className="glass-panel border-white/5 bg-white/5">
                         <CardHeader>
                             <CardTitle className="text-base font-heading flex items-center gap-2">
                                 <Clock className="w-4 h-4 text-muted-foreground" />
-                                Application Status
+                                Offer Progress
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="py-6">
-                                <div className="flex items-center justify-between w-full">
-                                    <TimelineSpot
-                                        label="Created"
-                                        date={offer.created_at}
-                                        status="completed"
+                            <div className="space-y-0">
+                                {getTimelineSteps(offer, canLaunch, handleLaunch).map((step, index, arr) => (
+                                    <VerticalStep
+                                        key={step.id}
+                                        step={step}
+                                        isLast={index === arr.length - 1}
                                     />
-                                    <TimelineConnector
-                                        isActive={['pending_review', 'under_review', 'approved', 'active', 'closed'].includes(offer.status)}
-                                    />
-                                    <TimelineSpot
-                                        label="Review"
-                                        date={offer.status === 'pending_review' || offer.status === 'under_review' || offer.status === 'approved' || offer.status === 'active' || offer.status === 'closed' ? offer.updated_at : undefined}
-                                        status={
-                                            ['approved', 'active', 'closed'].includes(offer.status) ? 'completed' :
-                                                ['pending_review', 'under_review'].includes(offer.status) ? 'current' : 'pending'
-                                        }
-                                    />
-                                    <TimelineConnector
-                                        isActive={['approved', 'active', 'closed'].includes(offer.status) || (offer.status === 'approved' && !!offer.token)}
-                                    />
-                                    <TimelineSpot
-                                        label="Approved"
-                                        date={offer.reviewed_at}
-                                        status={
-                                            ['active', 'closed'].includes(offer.status) || (offer.status === 'approved' && !!offer.token) ? 'completed' :
-                                                offer.status === 'approved' ? 'current' :
-                                                    offer.status === 'rejected' ? 'error' : 'pending'
-                                        }
-                                    />
-                                    <TimelineConnector
-                                        isActive={['active', 'closed'].includes(offer.status) || (offer.status === 'approved' && !!offer.token)}
-                                    />
-                                    <TimelineSpot
-                                        label="Issued"
-                                        date={offer.token?.createdAt}
-                                        status={
-                                            ['active', 'closed'].includes(offer.status) || (offer.status === 'approved' && !!offer.token) ? 'completed' :
-                                                offer.status === 'approved' ? 'current' : 'pending'
-                                        }
-                                    />
-                                    <TimelineConnector
-                                        isActive={['active', 'closed'].includes(offer.status)}
-                                    />
-                                    <TimelineSpot
-                                        label={
-                                            offer.status === 'approved' && !!offer.token
-                                                ? (offer.offer_rules as any)?.admin_verified ? "Ready to Launch" : "In Final Verification"
-                                                : "Live"
-                                        }
-                                        status={
-                                            ['active', 'closed'].includes(offer.status) ? 'completed' :
-                                                (offer.status === 'approved' && !!offer.token) ? 'current' : 'pending'
-                                        }
-                                    />
-                                </div>
+                                ))}
                             </div>
-
-                            {canLaunch && (
-                                <div className="mt-6 p-4 bg-primary/10 border border-primary/30 rounded-xl animate-fade-in flex items-center justify-between gap-4">
-                                    <div className="space-y-0.5">
-                                        <h4 className="font-semibold text-primary flex items-center gap-2">
-                                            <Rocket className="w-4 h-4" />
-                                            Your token is ready!
-                                        </h4>
-                                        <p className="text-sm text-muted-foreground">
-                                            Launch it to the marketplace so investors can start purchasing.
-                                        </p>
-                                    </div>
-                                    <Button
-                                        onClick={handleLaunch}
-                                        className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 btn-glow rounded-full px-6 whitespace-nowrap"
-                                    >
-                                        <Rocket className="w-4 h-4 mr-2" />
-                                        Launch to Market
-                                    </Button>
-                                </div>
-                            )}
 
                             {offer.status === 'rejected' && offer.rejection_reason && (
                                 <div className="mt-6 p-4 bg-destructive/10 border border-destructive/20 rounded-lg animate-fade-in">
@@ -539,59 +472,178 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-function TimelineConnector({ isActive }: { isActive: boolean }) {
-    return (
-        <div className="flex-1 h-0.5 mx-2 relative">
-            {/* Background line (always visible) */}
-            <div className="absolute inset-x-0 h-full bg-white/10 rounded-full" />
+// ------------------------------------------------------------------
+// Vertical Stepper
+// ------------------------------------------------------------------
 
-            {/* Active filled line */}
-            <div className={cn(
-                "absolute inset-0 h-full bg-white rounded-full transition-all duration-700 ease-in-out origin-left",
-                isActive ? "opacity-100 scale-x-100" : "opacity-0 scale-x-0"
-            )} />
-        </div>
-    );
+interface TimelineStep {
+    id: string;
+    title: string;
+    subtitle: string;
+    date?: string;
+    status: 'completed' | 'current' | 'pending' | 'error';
+    actionBadge?: { label: string; type: 'admin' | 'user' };
+    cta?: { label: string; onClick: () => void };
 }
 
-function TimelineSpot({
-    label,
-    date,
-    status // 'completed' | 'current' | 'pending' | 'error'
-}: {
-    label: string,
-    date?: string,
-    status: 'completed' | 'current' | 'pending' | 'error'
-}) {
+function getTimelineSteps(offer: Offer, canLaunch: boolean, handleLaunch: () => void): TimelineStep[] {
+    const s = offer.status;
+    const hasToken = !!offer.token;
+    const isVerified = !!(offer.offer_rules as any)?.admin_verified;
+
+    return [
+        {
+            id: 'submitted',
+            title: 'Offer Submitted',
+            subtitle: 'Your offer was received and queued for platform review.',
+            date: offer.created_at,
+            status: 'completed',
+        },
+        {
+            id: 'review',
+            title: 'Platform Review',
+            subtitle:
+                ['approved', 'active', 'closed'].includes(s)
+                    ? 'Approved by the platform admin.'
+                    : s === 'rejected'
+                        ? 'Your offer was reviewed and not approved.'
+                        : 'Your offer is being reviewed by the platform admin.',
+            date: ['approved', 'active', 'closed'].includes(s) || s === 'rejected' ? offer.reviewed_at : undefined,
+            status:
+                ['approved', 'active', 'closed'].includes(s) ? 'completed' :
+                    s === 'rejected' ? 'error' :
+                        ['pending_review', 'under_review'].includes(s) ? 'current' : 'pending',
+            actionBadge: ['pending_review', 'under_review'].includes(s)
+                ? { label: 'Admin Action', type: 'admin' }
+                : undefined,
+        },
+        {
+            id: 'issuance',
+            title: 'Token Issuance',
+            subtitle:
+                ['active', 'closed'].includes(s) || (s === 'approved' && hasToken)
+                    ? `Token ${offer.asset_code} minted on Stellar.`
+                    : s === 'approved'
+                        ? 'Waiting for the platform admin to mint your token on Stellar.'
+                        : 'Your token will be minted on the Stellar network after approval.',
+            date: hasToken ? offer.token?.createdAt : undefined,
+            status:
+                ['active', 'closed'].includes(s) || (s === 'approved' && hasToken) ? 'completed' :
+                    s === 'approved' ? 'current' : 'pending',
+            actionBadge: s === 'approved' && !hasToken
+                ? { label: 'Admin Action', type: 'admin' }
+                : undefined,
+        },
+        {
+            id: 'launch',
+            title: 'Launch to Market',
+            subtitle:
+                ['active', 'closed'].includes(s)
+                    ? 'Your offer was launched to investors.'
+                    : canLaunch
+                        ? 'Your token is ready! Launch it so investors can start purchasing.'
+                        : s === 'approved' && hasToken && !isVerified
+                            ? 'Admin is performing final verification before you can launch.'
+                            : 'Once your token is issued and verified, you can launch it.',
+            status:
+                ['active', 'closed'].includes(s) ? 'completed' :
+                    (s === 'approved' && hasToken) ? 'current' : 'pending',
+            actionBadge:
+                canLaunch
+                    ? { label: 'Your Action', type: 'user' }
+                    : s === 'approved' && hasToken && !isVerified
+                        ? { label: 'Admin Action', type: 'admin' }
+                        : undefined,
+            cta: canLaunch ? { label: 'Launch to Market', onClick: handleLaunch } : undefined,
+        },
+        {
+            id: 'live',
+            title: 'Live',
+            subtitle:
+                s === 'active'
+                    ? 'Your token is visible to investors on the marketplace.'
+                    : s === 'closed'
+                        ? 'This offer has been closed.'
+                        : 'Your token will be visible to investors on the marketplace.',
+            status: ['active', 'closed'].includes(s) ? 'completed' : 'pending',
+        },
+    ];
+}
+
+function VerticalStep({ step, isLast }: { step: TimelineStep; isLast: boolean }) {
     return (
-        <div className="flex flex-col items-center gap-2 group cursor-default relative z-10 w-24">
-            <div className={cn(
-                "w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300",
-                status === 'completed' ? "bg-white border-white text-black shadow-[0_0_20px_rgba(255,255,255,0.3)] scale-110" :
-                    status === 'current' ? "bg-white border-white text-black shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-110" :
-                        status === 'error' ? "bg-destructive border-destructive text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]" :
-                            "bg-black/40 border-white/20 text-muted-foreground backdrop-blur-sm"
-            )}>
-                {status === 'completed' && <CheckCircle2 className="w-5 h-5" />}
-                {status === 'current' && <Loader2 className="w-5 h-5 animate-spin" />}
-                {status === 'error' && <XCircle className="w-5 h-5" />}
-                {status === 'pending' && <div className="w-2 h-2 rounded-full bg-white/30" />}
+        <div className="flex gap-4">
+            {/* Left: dot + connector line */}
+            <div className="flex flex-col items-center">
+                <div className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center border-2 shrink-0 transition-all duration-300",
+                    step.status === 'completed'
+                        ? "bg-white border-white text-black shadow-[0_0_12px_rgba(255,255,255,0.25)]"
+                        : step.status === 'current'
+                            ? "bg-primary/20 border-primary text-primary shadow-[0_0_16px_rgba(198,168,124,0.3)]"
+                            : step.status === 'error'
+                                ? "bg-destructive/20 border-destructive text-destructive"
+                                : "bg-white/5 border-white/15 text-muted-foreground"
+                )}>
+                    {step.status === 'completed' && <CheckCircle2 className="w-4 h-4" />}
+                    {step.status === 'current' && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {step.status === 'error' && <XCircle className="w-4 h-4" />}
+                    {step.status === 'pending' && <div className="w-1.5 h-1.5 rounded-full bg-white/25" />}
+                </div>
+                {!isLast && (
+                    <div className={cn(
+                        "w-0.5 flex-1 min-h-[24px] my-1 transition-colors duration-500",
+                        step.status === 'completed' ? "bg-white/40" : "bg-white/8"
+                    )} />
+                )}
             </div>
 
-            <div className="text-center mt-2">
+            {/* Right: content */}
+            <div className={cn("pb-6", isLast && "pb-0")}>
+                <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className={cn(
+                        "text-sm font-semibold",
+                        step.status === 'completed' ? "text-white" :
+                            step.status === 'current' ? "text-white" :
+                                step.status === 'error' ? "text-destructive" :
+                                    "text-muted-foreground"
+                    )}>
+                        {step.title}
+                    </h4>
+                    {step.actionBadge && (
+                        <span className={cn(
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider",
+                            step.actionBadge.type === 'admin'
+                                ? "bg-amber-500/15 text-amber-400 border border-amber-500/25"
+                                : "bg-sky-500/15 text-sky-400 border border-sky-500/25"
+                        )}>
+                            {step.actionBadge.type === 'admin'
+                                ? <Shield className="w-2.5 h-2.5" />
+                                : <UserCheck className="w-2.5 h-2.5" />}
+                            {step.actionBadge.label}
+                        </span>
+                    )}
+                    {step.date && (
+                        <span className="text-[10px] text-muted-foreground/60 font-mono">
+                            {new Date(step.date).toLocaleDateString()}
+                        </span>
+                    )}
+                </div>
                 <p className={cn(
-                    "text-xs font-bold uppercase tracking-wider transition-colors",
-                    status === 'completed' ? "text-white" :
-                        status === 'current' ? "text-white" :
-                            status === 'error' ? "text-destructive" :
-                                "text-muted-foreground"
+                    "text-xs mt-0.5 leading-relaxed max-w-md",
+                    step.status === 'current' ? "text-muted-foreground" : "text-muted-foreground/60"
                 )}>
-                    {label}
+                    {step.subtitle}
                 </p>
-                {date && (
-                    <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5">
-                        {new Date(date).toLocaleDateString()}
-                    </p>
+                {step.cta && (
+                    <Button
+                        onClick={step.cta.onClick}
+                        size="sm"
+                        className="mt-3 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 btn-glow rounded-full px-5 text-xs"
+                    >
+                        <Rocket className="w-3.5 h-3.5 mr-1.5" />
+                        {step.cta.label}
+                    </Button>
                 )}
             </div>
         </div>
