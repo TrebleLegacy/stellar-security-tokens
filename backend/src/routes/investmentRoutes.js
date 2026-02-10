@@ -2,7 +2,7 @@ import express from 'express';
 import { body, param } from 'express-validator';
 import { validate } from '../middleware/validator.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { purchaseInvestment, getInvestmentStatus } from '../controllers/investmentController.js';
+import { purchaseInvestment, getInvestmentStatus, getFeeSchedule } from '../controllers/investmentController.js';
 
 const router = express.Router();
 
@@ -56,6 +56,19 @@ const purchaseValidation = [
  *       401:
  *         description: Não autorizado
  */
+/**
+ * @swagger
+ * /api/investments/fee-schedule:
+ *   get:
+ *     summary: Get current investment fee schedule
+ *     description: Returns the current blockchain fee and platform fee percentages
+ *     tags: [Investments]
+ *     responses:
+ *       200:
+ *         description: Fee schedule
+ */
+router.get('/fee-schedule', getFeeSchedule);
+
 router.post('/purchase', purchaseValidation, authenticateToken, purchaseInvestment);
 
 /**
