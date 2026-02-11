@@ -25,6 +25,10 @@ interface InvestmentDialogProps {
         asset_code: string;
         unit_price?: number;
         offer_rules?: Record<string, any>;
+        total_supply?: number;
+        tokens_sold?: number;
+        maturity_date?: string;
+        investment_cutoff_date?: string;
     };
     trigger?: React.ReactNode;
 }
@@ -76,13 +80,28 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const isBelowMin = minInvestment !== undefined && isValidAmount && parsedAmount < minInvestment;
     const isAboveMax = maxInvestment !== undefined && isValidAmount && parsedAmount > maxInvestment;
 
+    // Remaining supply guard rail
+    const unitPrice = offer.unit_price || 1;
+    const totalSupply = offer.total_supply ?? 0;
+    const tokensSold = offer.tokens_sold ?? 0;
+    const remainingTokens = totalSupply - tokensSold;
+    const remainingUsdc = remainingTokens * unitPrice;
+    const isFullySubscribed = totalSupply > 0 && remainingTokens <= 0;
+    const isAboveRemaining = totalSupply > 0 && isValidAmount && parsedAmount > remainingUsdc;
+
+    // Maturity cutoff guard rail
+    const cutoffDate = offer.investment_cutoff_date ? new Date(offer.investment_cutoff_date) : null;
+    const isPastCutoff = cutoffDate ? new Date() >= cutoffDate : false;
+    const daysUntilCutoff = cutoffDate ? Math.ceil((cutoffDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
+    const isNearCutoff = daysUntilCutoff !== null && daysUntilCutoff > 0 && daysUntilCutoff <= 30;
+
     // Fee calculations
     const totalDeduction = isValidAmount ? parsedAmount + blockchainFee : 0;
-    const tokensReceived = isValidAmount ? parsedAmount / (offer.unit_price || 1) : 0;
+    const tokensReceived = isValidAmount ? parsedAmount / unitPrice : 0;
     const hasInsufficientFunds = usdcBalance !== null && isValidAmount && totalDeduction > usdcBalance;
     const shortfall = hasInsufficientFunds ? totalDeduction - (usdcBalance || 0) : 0;
 
-    const canSubmit = isValidAmount && !isBelowMin && !isAboveMax && !loading && !hasInsufficientFunds;
+    const canSubmit = isValidAmount && !isBelowMin && !isAboveMax && !isAboveRemaining && !isFullySubscribed && !isPastCutoff && !loading && !hasInsufficientFunds;
 
     const handleInvest = async () => {
         try {
@@ -251,7 +270,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 </div>
                             )}
 
-                            {/* Min/Max validation */}
+                            {/* Min/Max/Supply validation */}
                             <div className="space-y-1">
                                 {isBelowMin && (
                                     <p className="text-xs text-yellow-400">
@@ -261,6 +280,30 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 {isAboveMax && (
                                     <p className="text-xs text-yellow-400">
                                         Maximum investment: ${maxInvestment!.toLocaleString()} USDC
+                                    </p>
+                                )}
+                                {isAboveRemaining && !isFullySubscribed && (
+                                    <p className="text-xs text-orange-400">
+                                        Only ${remainingUsdc.toLocaleString(undefined, { maximumFractionDigits: 2 })} USDC remaining in this offer ({remainingTokens.toFixed(0)} tokens)
+                                    </p>
+                                )}
+                                {isFullySubscribed && (
+                                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                                        <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                                        <p className="text-xs text-red-400 font-medium">This offer is fully subscribed. No tokens remaining.</p>
+                                    </div>
+                                )}
+                                {isPastCutoff && (
+                                    <div className="flex items-start gap-2 p-2.5 rounded-lg bg-red-500/10 border border-red-500/20">
+                                        <AlertTriangle className="h-4 w-4 text-red-400 shrink-0 mt-0.5" />
+                                        <p className="text-xs text-red-400 font-medium">
+                                            This offer is no longer accepting investments — it is too close to maturity.
+                                        </p>
+                                    </div>
+                                )}
+                                {isNearCutoff && !isPastCutoff && (
+                                    <p className="text-xs text-amber-400">
+                                        ⏳ Investment window closes in {daysUntilCutoff} days. Act soon.
                                     </p>
                                 )}
                             </div>

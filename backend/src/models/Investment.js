@@ -220,4 +220,25 @@ export class Investment {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  /**
+   * Calcula total de tokens comprometidos/vendidos para uma oferta
+   * Inclui investimentos pendentes, recebidos e distribuídos (exclui failed/cancelled)
+   * @param {number} offerId - ID da oferta
+   * @returns {Promise<number>} Total de tokens vendidos/comprometidos
+   */
+  static async getTokensSoldByOffer(offerId) {
+    const result = await prisma.investment.aggregate({
+      where: {
+        offerId,
+        status: {
+          in: ['pending_payment', 'payment_received', 'distributed'],
+        },
+      },
+      _sum: {
+        tokenAmount: true,
+      },
+    });
+    return parseFloat(result._sum.tokenAmount || 0);
+  }
 }

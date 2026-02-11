@@ -109,6 +109,62 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
+    // --- SUPPLY CHECK: Prevent over-subscription ---
+    if (offerId) {
+      const offer = await (await import('../models/Offer.js')).Offer.findById(parseInt(offerId));
+      if (!offer) {
+        return res.status(404).json({
+          success: false,
+          error: 'Offer not found',
+        });
+      }
+
+      // Reject if offer is not active
+      if (offer.status !== 'active') {
+        return res.status(400).json({
+          success: false,
+          error: `Offer is not accepting investments (status: ${offer.status})`,
+        });
+      }
+
+      const totalSupply = parseFloat(offer.totalSupply);
+      const unitPrice = parseFloat(offer.unitPrice) || 1;
+      const tokensSold = await Investment.getTokensSoldByOffer(parseInt(offerId));
+      const remainingTokens = totalSupply - tokensSold;
+      const requestedTokens = parseFloat(usdcAmount) / unitPrice;
+
+      if (requestedTokens > remainingTokens) {
+        const remainingUsdc = remainingTokens * unitPrice;
+        return res.status(400).json({
+          success: false,
+          error: remainingTokens <= 0
+            ? 'This offer is fully subscribed. No tokens remaining.'
+            : `Requested amount exceeds remaining supply. Maximum investment: $${remainingUsdc.toFixed(2)} USDC (${remainingTokens.toFixed(0)} tokens remaining).`,
+          remaining_supply: remainingTokens,
+          remaining_usdc: remainingUsdc,
+        });
+      }
+
+      // --- MATURITY CUTOFF: Block investments too close to maturity ---
+      if (offer.maturityDate) {
+        const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 90);
+        const now = new Date();
+        const maturity = new Date(offer.maturityDate);
+        const daysUntilMaturity = Math.ceil((maturity - now) / (1000 * 60 * 60 * 24));
+
+        if (daysUntilMaturity < cutoffDays) {
+          return res.status(400).json({
+            success: false,
+            error: daysUntilMaturity <= 0
+              ? 'This offer has reached maturity and is no longer accepting investments.'
+              : `This offer closes for new investments ${cutoffDays} days before maturity. Only ${daysUntilMaturity} days remain.`,
+            days_until_maturity: daysUntilMaturity,
+            cutoff_days: cutoffDays,
+          });
+        }
+      }
+    }
+
     // Fee Logic
     const grossAmount = parseFloat(usdcAmount);
     const feePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
