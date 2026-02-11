@@ -3,7 +3,8 @@ import { Token } from '../models/Token.js';
 import { Investment } from '../models/Investment.js';
 import { StellarService } from '../services/stellar.service.js';
 import { PaymentService } from '../services/payment.service.js';
-import { getTreasuryKeypair } from '../config/stellar.js';
+import { getTreasuryPublicKey } from '../config/stellar.js';
+import { PasskeyWalletService } from '../services/passkeyWallet.service.js';
 import { addDistributionJob, isQueueAvailable } from '../services/distributionQueue.service.js';
 import { ConfigService } from '../services/config.service.js';
 import crypto from 'crypto';
@@ -79,29 +80,11 @@ export const purchaseInvestment = async (req, res, next) => {
         .catch(err => console.warn(`[JIT Onboarding] Non-critical failure during early trustline setup for ${investor.id}:`, err.message));
     }
 
-    // Issue 7 Fix: Check for existing pending investment from same investor/offer
+    // Cancel any stale pending investments for same investor/offer
     const existingPending = await Investment.findPendingByInvestorAndOffer(parseInt(investorId, 10), offerId);
     if (existingPending) {
-      const treasuryKeypair = getTreasuryKeypair();
-      return res.status(200).json({
-        success: true,
-        message: 'Existing pending investment found. Please complete payment.',
-        data: {
-          investment: {
-            id: existingPending.id,
-            status: existingPending.status,
-            usdcAmount: parseFloat(existingPending.usdcAmount),
-            tokenAmount: parseFloat(existingPending.tokenAmount),
-            assetCode: existingPending.assetCode,
-          },
-          paymentInstructions: {
-            treasuryAddress: treasuryKeypair.publicKey(),
-            requiredAmount: existingPending.usdcAmount.toString(),
-            assetCode: 'USDC',
-            message: `Send ${existingPending.usdcAmount} USDC to ${treasuryKeypair.publicKey()}`,
-          },
-        },
-      });
+      console.log(`[Investment] Cancelling stale pending investment #${existingPending.id} for investor ${investorId}`);
+      await Investment.updateStatus(existingPending.id, { status: 'cancelled' });
     }
 
     const token = await Token.findByAssetCode(assetCode);
@@ -209,8 +192,6 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
-    const treasuryKeypair = getTreasuryKeypair();
-
     // Criar registro de investimento primeiro
     const investment = await Investment.create({
       investor_id: investorId,
@@ -227,17 +208,74 @@ export const purchaseInvestment = async (req, res, next) => {
     // Update investment with the generated memo
     await Investment.updateStatus(investment.id, { memo: memo });
 
+    // --- SMART WALLET FLOW: Build SAC transfer for passkey signing ---
+    if (investorWallet.startsWith('C') && offerId) {
+      try {
+        // Resolve company wallet from offer
+        const offer = await (await import('../models/Offer.js')).Offer.findById(parseInt(offerId));
+        const companyWallet = offer?.company?.stellarContractId || offer?.company?.stellarPublicKey;
+
+        if (!companyWallet) {
+          throw new Error('Company wallet not found for this offer');
+        }
+
+        // Build SAC transfer: investor → company (total deduction)
+        const txData = await PasskeyWalletService.buildInvestmentTx(
+          investorWallet,
+          companyWallet,
+          totalDeduction
+        );
+
+        return res.status(200).json({
+          success: true,
+          message: 'Investment created. Sign with your passkey to complete.',
+          data: {
+            investment: {
+              id: investment.id,
+              status: investment.status,
+              usdcAmount: grossAmount,
+              feeAmount: fixedFee,
+              totalDeduction: totalDeduction,
+              tokenAmount: tokenAmount,
+              assetCode: assetCode,
+              memo: memo,
+            },
+            // Smart wallet transaction for passkey signing
+            transaction: {
+              xdr: txData.xdr,
+              networkPassphrase: txData.networkPassphrase,
+              walletId: txData.walletId,
+              companyWallet: companyWallet,
+            },
+          },
+        });
+      } catch (txError) {
+        console.error('[Investment] Failed to build smart wallet transfer:', txError);
+        // Cancel the investment if we can't build the transaction
+        await Investment.updateStatus(investment.id, {
+          status: 'failed',
+          error_message: `Transaction build failed: ${txError.message}`,
+        });
+        return res.status(500).json({
+          success: false,
+          error: `Failed to prepare investment transaction: ${txError.message}`,
+        });
+      }
+    }
+
+    // --- LEGACY FLOW: Manual USDC transfer (classic G-address accounts) ---
+    const treasuryAddress = getTreasuryPublicKey();
+
     // Verificar se pagamento USDC já foi recebido (Passando o Memo)
     const usdcPayment = await StellarService.verifyUSDCPayment(
-      investor.stellarContractId || investor.stellarPublicKey,
+      investorWallet,
       usdcAmount,
-      treasuryKeypair.publicKey(),
+      treasuryAddress,
       USDC_PAYMENT_WINDOW_MINUTES,
-      memo // Pass the expected Memo (Reliability Fix)
+      memo
     );
 
     if (!usdcPayment) {
-      // Pagamento ainda não recebido, retornar instruções COM O MEMO
       return res.status(202).json({
         success: true,
         message: 'Investment created. Please send USDC payment.',
@@ -253,15 +291,15 @@ export const purchaseInvestment = async (req, res, next) => {
             memo: memo,
           },
           paymentInstructions: {
-            treasuryAddress: treasuryKeypair.publicKey(),
-            requiredAmount: totalDeduction.toString(), // Investor pays investment + fee
+            treasuryAddress: treasuryAddress,
+            requiredAmount: totalDeduction.toString(),
             investmentAmount: grossAmount.toString(),
             blockchainFee: fixedFee.toString(),
             assetCode: 'USDC',
             memo: memo,
             memoType: 'text',
             windowMinutes: USDC_PAYMENT_WINDOW_MINUTES,
-            message: `Send ${totalDeduction} USDC to ${treasuryKeypair.publicKey()} with MEMO: ${memo}`,
+            message: `Send ${totalDeduction} USDC to ${treasuryAddress} with MEMO: ${memo}`,
           },
         },
       });
@@ -562,5 +600,125 @@ export const getFeeSchedule = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * Submit a signed investment SAC transfer transaction
+ * POST /api/investments/submit-tx
+ * 
+ * Called after the investor signs the XDR with their Passkey.
+ * Submits via fee-bumped sponsorship and updates the investment record.
+ */
+export const submitInvestmentTx = async (req, res, next) => {
+  try {
+    const { signedXdr, investmentId } = req.body;
+
+    if (!signedXdr || !investmentId) {
+      return res.status(400).json({
+        success: false,
+        error: 'signedXdr and investmentId are required',
+      });
+    }
+
+    // Verify investment exists and is pending
+    const investment = await Investment.findById(parseInt(investmentId));
+    if (!investment) {
+      return res.status(404).json({ success: false, error: 'Investment not found' });
+    }
+    if (investment.status !== 'pending_payment') {
+      return res.status(400).json({
+        success: false,
+        error: `Investment is not pending payment (status: ${investment.status})`,
+      });
+    }
+
+    // Add operations keypair signature and submit directly to Soroban RPC
+    // The frontend only signed the Soroban auth entries (passkey).
+    // We need to add the envelope signature (ops keypair = source account).
+    const { TransactionBuilder, xdr } = await import('@stellar/stellar-sdk');
+    const { getNetworkPassphrase, getOperationsKeypair } = await import('../config/stellar.js');
+
+    const networkPassphrase = getNetworkPassphrase();
+    const opsKeypair = getOperationsKeypair();
+    const tx = TransactionBuilder.fromXDR(signedXdr, networkPassphrase);
+
+    // === DIAGNOSTIC: Log inner TX details ===
+    console.log(`[Investment] Inner TX source: ${tx.source}`);
+    console.log(`[Investment] Inner TX fee: ${tx.fee}`);
+    console.log(`[Investment] Ops keypair: ${opsKeypair.publicKey()}`);
+    console.log(`[Investment] Source matches opsKeypair? ${tx.source === opsKeypair.publicKey()}`);
+    const innerOp = tx.operations?.[0];
+    if (innerOp?.type === 'invokeHostFunction') {
+      const authEntries = innerOp.auth || [];
+      console.log(`[Investment] Auth entries count: ${authEntries.length}`);
+      authEntries.forEach((entry, i) => {
+        try {
+          const creds = entry.credentials();
+          const credType = creds.switch().name;
+          console.log(`[Investment] Auth[${i}] cred type: ${credType}`);
+          if (credType === 'sorobanCredentialsAddress') {
+            const addr = creds.address();
+            console.log(`[Investment] Auth[${i}] address: ${addr.address().toString()}`);
+            console.log(`[Investment] Auth[${i}] nonce: ${addr.nonce().toString()}`);
+            console.log(`[Investment] Auth[${i}] expiration: ${addr.signatureExpirationLedger()}`);
+            console.log(`[Investment] Auth[${i}] sig type: ${addr.signature().switch().name}`);
+          }
+        } catch (e) {
+          console.log(`[Investment] Auth[${i}] parse error: ${e.message}`);
+        }
+      });
+    }
+    // === END DIAGNOSTIC ===
+
+    // Add the source account signature
+    tx.sign(opsKeypair);
+
+    console.log(`[Investment] Submitting passkey-signed TX for investment #${investmentId}...`);
+
+    // Submit via fee-bump sponsorship (wraps in fee-bump + submits to Horizon)
+    const result = await PasskeyWalletService.submitWithSponsorship(tx);
+
+    // Update investment status
+    await Investment.updateStatus(parseInt(investmentId), {
+      status: 'payment_received',
+      usdc_payment_hash: result.hash,
+    });
+
+    console.log(`[Investment] Smart wallet payment submitted for investment #${investmentId}: ${result.hash}`);
+
+    // Trigger token distribution
+    if (isQueueAvailable()) {
+      await addDistributionJob(parseInt(investmentId));
+    }
+
+    return res.json({
+      success: true,
+      message: 'Investment payment submitted successfully',
+      data: {
+        investmentId: parseInt(investmentId),
+        transactionHash: result.hash,
+        status: 'payment_received',
+      },
+    });
+  } catch (error) {
+    console.error('[Investment] Submit TX failed:', error);
+
+    // If we have an investmentId, mark the investment as failed
+    if (req.body?.investmentId) {
+      try {
+        await Investment.updateStatus(parseInt(req.body.investmentId), {
+          status: 'failed',
+          error_message: `Payment submission failed: ${error.message}`,
+        });
+      } catch (updateErr) {
+        console.error('[Investment] Failed to update investment status:', updateErr);
+      }
+    }
+
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to submit investment transaction',
+    });
   }
 };

@@ -34,5 +34,27 @@ export function useInvestment() {
         }
     };
 
-    return { purchase, loading, error };
+    const submitSignedTx = async (signedXdr: string, investmentId: number) => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await api.post('/investments/submit-tx', {
+                signedXdr,
+                investmentId,
+            });
+
+            if (!response.success) {
+                throw new Error(response.message || 'Transaction submission failed');
+            }
+
+            return response.data;
+        } catch (err: any) {
+            setError(err.message || 'Failed to submit investment transaction');
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return { purchase, submitSignedTx, loading, error };
 }
