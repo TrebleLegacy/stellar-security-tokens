@@ -1,6 +1,7 @@
 import { Offer } from '../models/Offer.js';
 import { Company } from '../models/Company.js';
 import { Token } from '../models/Token.js';
+import { Investment } from '../models/Investment.js';
 import { StellarService } from '../services/stellar.service.js';
 import { OfferService } from '../services/offer.service.js';
 import { ipfsService } from '../services/ipfs.service.js';
@@ -117,6 +118,16 @@ export class OfferController {
       legal_documents: OfferController.formatLegalDocuments(legalDocuments),
       offerRules: offerRules,
       offer_rules: offerRules,
+      // Supply tracking (computed, attached by controller)
+      tokensSold: offer._tokensSold ?? null,
+      tokens_sold: offer._tokensSold ?? null,
+      // Maturity cutoff (computed from maturityDate - default 90 days)
+      investmentCutoffDate: offer.maturityDate
+        ? new Date(new Date(offer.maturityDate).getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
+        : null,
+      investment_cutoff_date: offer.maturityDate
+        ? new Date(new Date(offer.maturityDate).getTime() - 90 * 24 * 60 * 60 * 1000).toISOString()
+        : null,
       // Relations
       company: offer.company || null,
       token: (offer.tokens && offer.tokens.length > 0) ? offer.tokens[0] : (offer.token || null),
@@ -599,10 +610,20 @@ export class OfferController {
         offer_type || null
       );
 
-      // Formatar ofertas com documentos IPFS
-      const formattedOffers = offers.map(offer =>
-        OfferController.formatOfferForResponse(offer)
+      // Compute tokens_sold for each offer in parallel
+      const tokensSoldMap = await Promise.all(
+        offers.map(async (offer) => {
+          const sold = await Investment.getTokensSoldByOffer(offer.id);
+          return { id: offer.id, sold };
+        })
       );
+      const soldLookup = Object.fromEntries(tokensSoldMap.map(e => [e.id, e.sold]));
+
+      // Formatar ofertas com documentos IPFS + supply data
+      const formattedOffers = offers.map(offer => {
+        offer._tokensSold = soldLookup[offer.id] || 0;
+        return OfferController.formatOfferForResponse(offer);
+      });
 
       res.json({
         success: true,
@@ -648,6 +669,9 @@ export class OfferController {
           error: 'Offer is not active',
         });
       }
+
+      // Compute tokens_sold for this offer
+      offer._tokensSold = await Investment.getTokensSoldByOffer(offer.id);
 
       res.json({
         success: true,
