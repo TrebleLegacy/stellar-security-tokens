@@ -117,6 +117,15 @@ export const getTreasuryKeypair = () => {
 };
 
 /**
+ * Get the treasury public key (works in both env and multisig modes)
+ * Use this when you only need the address, not signing capability
+ * @returns {string} Treasury public key
+ */
+export const getTreasuryPublicKey = () => {
+  return keyManager.getPublicKey('TREASURY');
+};
+
+/**
  * Obtém o keypair da conta de operações (Gas/Taxas) usando o KeyManager
  * @returns {Keypair} Keypair da conta de operações
  */
@@ -425,6 +434,7 @@ export default {
   getIssuerKeypair,
   getDistributorKeypair,
   getTreasuryKeypair,
+  getTreasuryPublicKey,
   getOperationsKeypair,
   createAsset,
   buildTransaction,

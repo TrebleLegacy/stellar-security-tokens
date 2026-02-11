@@ -2,7 +2,7 @@ import express from 'express';
 import { body, param } from 'express-validator';
 import { validate } from '../middleware/validator.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { purchaseInvestment, getInvestmentStatus, getFeeSchedule } from '../controllers/investmentController.js';
+import { purchaseInvestment, getInvestmentStatus, getFeeSchedule, submitInvestmentTx } from '../controllers/investmentController.js';
 
 const router = express.Router();
 
@@ -70,6 +70,13 @@ const purchaseValidation = [
 router.get('/fee-schedule', getFeeSchedule);
 
 router.post('/purchase', purchaseValidation, authenticateToken, purchaseInvestment);
+
+// Submit signed investment SAC transfer (smart wallet passkey flow)
+router.post('/submit-tx', [
+  body('signedXdr').isString().notEmpty().withMessage('Signed XDR is required'),
+  body('investmentId').isInt({ min: 1 }).withMessage('Valid investment ID is required'),
+  validate,
+], authenticateToken, submitInvestmentTx);
 
 /**
  * @swagger

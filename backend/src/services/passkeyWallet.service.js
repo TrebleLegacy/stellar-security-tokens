@@ -12,7 +12,8 @@ import {
   Account,
   Networks,
   Transaction,
-  FeeBumpTransaction
+  FeeBumpTransaction,
+  nativeToScVal
 } from '@stellar/stellar-sdk';
 import { StellarService } from './stellar.service.js';
 import logger from '../utils/logger.js';
@@ -564,6 +565,11 @@ export class PasskeyWalletService {
       log.error('Self-sponsorship failed:', error);
       if (error.response && error.response.data) {
         const resultCodes = error.response.data.extras?.result_codes;
+        const resultXdr = error.response.data.extras?.result_xdr;
+        const envelopeXdr = error.response.data.extras?.envelope_xdr;
+        log.error('[Sponsorship] Result codes:', JSON.stringify(resultCodes));
+        if (resultXdr) log.error('[Sponsorship] Result XDR:', resultXdr);
+        if (envelopeXdr) log.error('[Sponsorship] Envelope XDR (first 200 chars):', envelopeXdr.substring(0, 200));
         const detail = error.response.data.detail || JSON.stringify(resultCodes);
         throw new Error(`Sponsorship failed: ${detail} Codes: ${JSON.stringify(resultCodes)}`);
       }
@@ -885,6 +891,105 @@ export class PasskeyWalletService {
       xdr: tx.toXDR(),
       networkPassphrase,
       walletId: user.stellarContractId
+    };
+  }
+
+  /**
+   * Build an investment SAC transfer transaction to be signed by investor's Passkey.
+   * Transfers USDC from investor smart wallet → company wallet.
+   *
+   * @param {string} investorContractId - Investor's smart wallet contract ID (C...)
+   * @param {string} companyWallet - Company's wallet address (C... or G...)
+   * @param {number} amount - USDC amount to transfer
+   * @returns {Promise<Object>} Transaction XDR and network info
+   */
+  static async buildInvestmentTx(investorContractId, companyWallet, amount) {
+    const server = this.getServer();
+
+    // Validate inputs
+    if (!investorContractId || !investorContractId.match(/^C[A-Z0-9]{55}$/)) {
+      throw new Error('Invalid investor wallet address');
+    }
+    if (!companyWallet || !companyWallet.match(/^[GC][A-Z0-9]{55}$/)) {
+      throw new Error('Invalid company wallet address');
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new Error('Amount must be a positive number');
+    }
+
+    const tokenContractId = process.env.USDC_SAC_CONTRACT_ID || process.env.USDC_CONTRACT_ID;
+    if (!tokenContractId) {
+      throw new Error('USDC_SAC_CONTRACT_ID not configured');
+    }
+
+    const networkPassphrase = getNetworkPassphrase();
+    const opsKeypair = getOperationsKeypair();
+
+    // Build SAC transfer: investor → company
+    const investorAddress = Address.fromString(investorContractId);
+    const companyAddress = Address.fromString(companyWallet);
+    const amountBigInt = BigInt(Math.floor(parsedAmount * 10_000_000));
+
+    const contract = new Contract(tokenContractId);
+    const transferOp = contract.call(
+      'transfer',
+      xdr.ScVal.scvAddress(investorAddress.toScAddress()),
+      xdr.ScVal.scvAddress(companyAddress.toScAddress()),
+      nativeToScVal(amountBigInt, { type: 'i128' })
+    );
+
+    let tx = new TransactionBuilder(
+      await server.rpc.getAccount(opsKeypair.publicKey()),
+      { fee: BASE_FEE, networkPassphrase }
+    )
+      .addOperation(transferOp)
+      .setTimeout(180)
+      .build();
+
+    // Soroban Simulation & Preparation
+    log.info(`Simulating investment transfer: ${parsedAmount} USDC from ${investorContractId} → ${companyWallet}`);
+    tx = await StellarService.prepareSorobanTransaction(tx);
+
+    // Boost Soroban resource budget for smart wallet passkey auth.
+    // Simulation doesn't account for WebAuthn secp256r1 signature verification
+    // (auth entries don't exist yet), so we need a significant CPU buffer.
+    try {
+      const envelope = xdr.TransactionEnvelope.fromXDR(tx.toXDR('base64'), 'base64');
+      const txBody = envelope.value().tx();
+      const sorobanExt = txBody.ext();
+
+      if (sorobanExt && sorobanExt.switch() === 1) {
+        const sorobanData = sorobanExt.sorobanData();
+        const resources = sorobanData.resources();
+        const simInstructions = resources.instructions();
+        const boostedInstructions = Math.ceil(simInstructions * 3); // 3x buffer for passkey auth
+        log.info(`Boosting instructions: ${simInstructions} → ${boostedInstructions}`);
+
+        // Mutate the instructions directly on the XDR object
+        resources.instructions(boostedInstructions);
+
+        // Rebuild transaction with boosted resources and higher fee
+        const boostedFee = Math.ceil(parseInt(tx.fee) * 3).toString();
+        tx = TransactionBuilder.cloneFrom(tx, {
+          fee: boostedFee,
+          sorobanData: sorobanData,
+        })
+          .build();
+      }
+    } catch (boostErr) {
+      log.warn(`Could not boost resources (non-fatal): ${boostErr.message}`);
+    }
+
+    // NOTE: Do NOT sign here. The frontend's PasskeyKit.sign() uses
+    // AssembledTransaction.fromXDR() which strips envelope signatures.
+    // The ops keypair signature is added during submission instead.
+
+    return {
+      xdr: tx.toXDR(),
+      networkPassphrase,
+      walletId: investorContractId
     };
   }
 

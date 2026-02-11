@@ -15,8 +15,9 @@ import { QRCode } from "@/components/ui/qrcode";
 import { useInvestment } from '@/hooks/useInvestment';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useInvestmentFees } from '@/hooks/useInvestmentFees';
-import { Copy, Check, AlertTriangle, Settings, Wallet, ExternalLink } from 'lucide-react';
+import { Copy, Check, AlertTriangle, Settings, Wallet, ExternalLink, CheckCircle2, Loader2 } from 'lucide-react';
 import { authStorage } from '@/utils/authStorage';
+import { passkeyClient } from '@/lib/passkey';
 
 interface InvestmentDialogProps {
     offer: {
@@ -61,8 +62,11 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const [amount, setAmount] = useState('');
     const [open, setOpen] = useState(false);
     const [instructions, setInstructions] = useState<any>(null);
-    const { purchase, loading, error } = useInvestment();
-    const { usdcBalance, loading: balanceLoading } = useWalletBalance();
+    const [step, setStep] = useState<'form' | 'signing' | 'success'>('form');
+    const [txResult, setTxResult] = useState<{ investmentId: number; transactionHash: string } | null>(null);
+    const [signingError, setSigningError] = useState<string | null>(null);
+    const { purchase, submitSignedTx, loading, error } = useInvestment();
+    const { usdcBalance, loading: balanceLoading, refresh: refreshBalance } = useWalletBalance();
     const { blockchainFee } = useInvestmentFees();
 
     // KYC gate — check before showing the investment form
@@ -110,7 +114,23 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
 
             const result = await purchase(offer.id, usdcAmount, offer.asset_code);
 
-            if (result && result.paymentInstructions) {
+            if (result && result.transaction) {
+                // Smart wallet flow — sign with passkey and submit
+                setStep('signing');
+                setSigningError(null);
+                try {
+                    const signedXdr = await passkeyClient.signTransaction(result.transaction.xdr, result.transaction.walletId);
+                    const submitResult = await submitSignedTx(signedXdr, result.investment.id);
+                    setTxResult(submitResult);
+                    setStep('success');
+                    refreshBalance();
+                } catch (signErr: any) {
+                    console.error('Passkey signing failed:', signErr);
+                    setSigningError(signErr.message || 'Failed to sign transaction');
+                    setStep('form');
+                }
+            } else if (result && result.paymentInstructions) {
+                // Legacy flow — manual USDC transfer
                 setInstructions(result.paymentInstructions);
             } else {
                 setOpen(false);
@@ -125,6 +145,9 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
         setOpen(false);
         setInstructions(null);
         setAmount('');
+        setStep('form');
+        setTxResult(null);
+        setSigningError(null);
     };
 
     return (
@@ -136,7 +159,13 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                 <DialogHeader>
                     <DialogTitle>Invest in {offer.offer_name}</DialogTitle>
                     <DialogDescription className="text-slate-400">
-                        {instructions ? "Complete your investment by sending payment." : "Enter the amount of USDC you wish to invest."}
+                        {step === 'success'
+                            ? "Your investment has been confirmed."
+                            : step === 'signing'
+                                ? "Sign the transaction with your passkey."
+                                : instructions
+                                    ? "Complete your investment by sending payment."
+                                    : "Enter the amount of USDC you wish to invest."}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -163,6 +192,41 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 Go to Settings
                             </Button>
                         </div>
+                    </div>
+                ) : step === 'signing' ? (
+                    // SIGNING STATE — passkey prompt
+                    <div className="py-12 text-center space-y-4">
+                        <Loader2 className="h-10 w-10 text-blue-400 mx-auto animate-spin" />
+                        <div className="space-y-1">
+                            <p className="font-semibold text-white">Confirm with your Passkey</p>
+                            <p className="text-sm text-slate-400">
+                                Use your biometric (Face ID, fingerprint) to authorize this transaction.
+                            </p>
+                        </div>
+                    </div>
+                ) : step === 'success' ? (
+                    // SUCCESS STATE — investment confirmed
+                    <div className="py-8 text-center space-y-4">
+                        <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
+                        <div className="space-y-1">
+                            <p className="font-semibold text-lg text-white">Investment Confirmed!</p>
+                            <p className="text-sm text-slate-400">
+                                Your USDC has been transferred. Token distribution will follow shortly.
+                            </p>
+                        </div>
+                        {txResult && (
+                            <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-left">
+                                <Label className="text-xs text-slate-500 uppercase">Transaction Hash</Label>
+                                <code className="text-xs text-blue-400 break-all block mt-1">
+                                    {txResult.transactionHash}
+                                </code>
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button onClick={handleClose} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                                Done
+                            </Button>
+                        </DialogFooter>
                     </div>
                 ) : !instructions ? (
                     // STEP 1: AMOUNT INPUT
@@ -308,7 +372,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 )}
                             </div>
                         </div>
-                        {error && <p className="text-red-400 text-sm text-center">{error}</p>}
+                        {(error || signingError) && <p className="text-red-400 text-sm text-center">{signingError || error}</p>}
                         <DialogFooter>
                             <Button
                                 type="submit"
@@ -316,7 +380,12 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 onClick={handleInvest}
                                 className="w-full bg-[hsl(160_60%_40%)] hover:bg-[hsl(160_60%_35%)] text-white disabled:opacity-40"
                             >
-                                {loading ? 'Processing...' : 'Confirm Investment'}
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Processing...
+                                    </>
+                                ) : 'Confirm Investment'}
                             </Button>
                         </DialogFooter>
                     </div>
