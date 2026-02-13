@@ -74,6 +74,7 @@ enum DepositStatus {
   pending           // Awaiting payment
   received          // USDC received at treasury
   forwarding        // SAC transfer in progress
+  pending_approval  // Awaiting multisig admin approval
   completed         // USDC in user's wallet
   expired           // Memo expired (24h timeout)
   failed            // SAC transfer failed

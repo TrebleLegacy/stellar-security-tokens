@@ -1,10 +1,10 @@
 
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Key, Shield, Check, ArrowUpRight, ArrowDownLeft, Copy, ExternalLink, Wallet as WalletIcon, Coins, TrendingUp, Calendar } from 'lucide-react';
+import { Loader2, Key, Shield, Check, ArrowUpRight, ArrowDownLeft, Copy, ExternalLink, Wallet as WalletIcon, Coins, ArrowRight, AlertTriangle } from 'lucide-react';
 import { api } from '@/lib/api';
 import { passkeyClient } from '@/lib/passkey';
 import {
@@ -35,13 +35,12 @@ interface TokenizedAsset {
     tokenName: string;
     amount: number;
     currentValue: number;
-    interestEarned: number;
-    maturityDate: string;
-    annualRate?: number;
-    issuerName?: string;
+    issuerPublicKey?: string;
 }
+const STELLAR_EXPLORER = 'https://stellar.expert/explorer/testnet';
 
 export function Wallet() {
+    const navigate = useNavigate();
     const [user, setUser] = useState<any>(null);
     const [walletStatus, setWalletStatus] = useState<WalletStatus | null>(null);
     const [loading, setLoading] = useState(true);
@@ -140,17 +139,17 @@ export function Wallet() {
                     try {
                         const portfolioResponse = await api.get(`/investors/${storedUser.id}/portfolio`);
                         const portfolioData = portfolioResponse.data || portfolioResponse;
-                        const assets = Array.isArray(portfolioData) ? portfolioData : (portfolioData.investments || []);
+                        // Backend returns { success, data: { portfolio: [...] } }
+                        const assets = Array.isArray(portfolioData)
+                            ? portfolioData
+                            : (portfolioData.data?.portfolio || portfolioData.portfolio || portfolioData.investments || []);
 
                         setTokenizedAssets(assets.map((inv: any) => ({
                             assetCode: inv.assetCode || inv.asset_code || 'N/A',
-                            tokenName: inv.tokenName || inv.token_name || inv.assetCode || 'Security Token',
-                            amount: Number(inv.amount) || 0,
-                            currentValue: Number(inv.currentValue || inv.amount) || 0,
-                            interestEarned: Number(inv.interestEarned || inv.interest_earned) || 0,
-                            maturityDate: inv.maturityDate || inv.maturity_date || 'N/A',
-                            annualRate: inv.annualRate || inv.annual_rate,
-                            issuerName: inv.issuerName || inv.issuer_name,
+                            tokenName: inv.offerName || inv.offer_name || inv.assetCode || 'Security Token',
+                            amount: Number(inv.totalDistributed || inv.total_distributed || inv.amount) || 0,
+                            currentValue: Number(inv.totalDistributed || inv.total_distributed || 0) * Number(inv.unitPrice || inv.unit_price || 1),
+                            issuerPublicKey: inv.issuerPublicKey || inv.issuer_public_key || null,
                         })));
                     } catch (err) {
                         console.log('Could not fetch tokenized assets');
@@ -235,90 +234,78 @@ export function Wallet() {
         );
     }
 
+
+    /* ─── Loading pulse helper ─── */
+    const BalancePulse = () => (
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <span className="animate-pulse">•</span>
+            <span className="animate-pulse animation-delay-150">•</span>
+            <span className="animate-pulse animation-delay-300">•</span>
+        </span>
+    );
+
+    const renderBalance = (value: string | undefined, isLoading: boolean, hasBalances: boolean) => {
+        if (isLoading && !hasBalances) return <BalancePulse />;
+        if (value !== undefined) return value;
+        return <BalancePulse />;
+    };
+
     return (
-        <div className="space-y-8 max-w-3xl">
-            {/* Header */}
-            <div className="space-y-1 animate-fade-in">
+        <div className="space-y-8 max-w-3xl mx-auto pb-12">
+            {/* ═══ HEADER ═══ */}
+            <div className="animate-fade-in space-y-1">
                 <h2 className="text-3xl font-bold tracking-tight">Wallet</h2>
                 <p className="text-muted-foreground">Manage your Stellar wallet and assets</p>
             </div>
 
-            {/* Balance Cards */}
+            {/* ═══ BALANCE STATS ═══ */}
             {walletStatus?.walletAddress && (
-                <div className="grid gap-5 md:grid-cols-2 animate-fade-in-up animate-delay-1">
-                    <Card className="stat-card rounded-2xl">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                USDC Balance
-                                {balanceError && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
-                                        cached
-                                    </span>
-                                )}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-4xl font-bold value-accent">
-                                {balanceLoading && !walletStatus.balances ? (
-                                    <span className="inline-flex items-center gap-1">
-                                        <span className="animate-pulse">•</span>
-                                        <span className="animate-pulse animation-delay-150">•</span>
-                                        <span className="animate-pulse animation-delay-300">•</span>
-                                    </span>
-                                ) : walletStatus.balances?.usdc !== undefined ? (
-                                    `$${Number(walletStatus.balances.usdc).toFixed(2)}`
-                                ) : (
-                                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                                        <span className="animate-pulse">•</span>
-                                        <span className="animate-pulse animation-delay-150">•</span>
-                                        <span className="animate-pulse animation-delay-300">•</span>
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">Available for investment</p>
-                        </CardContent>
-                    </Card>
-                    <Card className="stat-card rounded-2xl">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                XLM Balance
-                                {balanceError && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">
-                                        cached
-                                    </span>
-                                )}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-4xl font-bold">
-                                {balanceLoading && !walletStatus.balances ? (
-                                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                                        <span className="animate-pulse">•</span>
-                                        <span className="animate-pulse animation-delay-150">•</span>
-                                        <span className="animate-pulse animation-delay-300">•</span>
-                                    </span>
-                                ) : walletStatus.balances?.xlm !== undefined ? (
-                                    Number(walletStatus.balances.xlm).toFixed(4)
-                                ) : (
-                                    <span className="inline-flex items-center gap-1 text-muted-foreground">
-                                        <span className="animate-pulse">•</span>
-                                        <span className="animate-pulse animation-delay-150">•</span>
-                                        <span className="animate-pulse animation-delay-300">•</span>
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">Network fees</p>
-                        </CardContent>
-                    </Card>
+                <div className="grid grid-cols-2 gap-4 animate-fade-in-up">
+                    <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                            <Coins className="h-3 w-3" /> USDC Balance
+                            {balanceError && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 ml-1">
+                                    cached
+                                </span>
+                            )}
+                        </p>
+                        <p className="text-2xl font-bold value-accent">
+                            {renderBalance(
+                                walletStatus.balances?.usdc !== undefined ? `$${Number(walletStatus.balances.usdc).toFixed(2)}` : undefined,
+                                balanceLoading,
+                                !!walletStatus.balances
+                            )}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Available for investment</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                            XLM Balance
+                            {balanceError && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 ml-1">
+                                    cached
+                                </span>
+                            )}
+                        </p>
+                        <p className="text-2xl font-bold">
+                            {renderBalance(
+                                walletStatus.balances?.xlm !== undefined ? Number(walletStatus.balances.xlm).toFixed(4) : undefined,
+                                balanceLoading,
+                                !!walletStatus.balances
+                            )}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground mt-1">Network fees</p>
+                    </div>
                 </div>
             )}
 
-            {/* Quick Actions */}
+            {/* ═══ QUICK ACTIONS ═══ */}
             {walletStatus?.walletAddress && (
-                <div className="flex gap-3 animate-fade-in-up animate-delay-2">
+                <div className="flex gap-3 animate-fade-in-up">
                     <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
                         <DialogTrigger asChild>
-                            <Button variant="default" className="flex-1 rounded-xl h-12 font-medium bg-[hsl(43_45%_55%)] hover:bg-[hsl(43_45%_45%)] text-white shadow-lg shadow-amber-900/10">
+                            <Button className="flex-1 h-12 rounded-xl font-medium bg-[hsl(43_45%_55%)] hover:bg-[hsl(43_45%_45%)] text-white shadow-lg shadow-amber-900/10">
                                 <ArrowDownLeft className="w-4 h-4 mr-2" />
                                 Deposit
                             </Button>
@@ -332,10 +319,10 @@ export function Wallet() {
                     <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
                         <DialogTrigger asChild>
                             <Button
-                                className="flex-1 h-14 bg-[hsl(217_91%_60%)] hover:bg-[hsl(217_91%_55%)] text-white rounded-xl shadow-lg shadow-[hsl(217_91%_60%/0.2)]"
+                                className="flex-1 h-12 bg-[hsl(217_91%_60%)] hover:bg-[hsl(217_91%_55%)] text-white rounded-xl shadow-lg shadow-[hsl(217_91%_60%/0.2)]"
                                 onClick={() => setWithdrawStep('form')}
                             >
-                                <ArrowUpRight className="w-5 h-5 mr-2" />
+                                <ArrowUpRight className="w-4 h-4 mr-2" />
                                 Withdraw
                             </Button>
                         </DialogTrigger>
@@ -471,175 +458,144 @@ export function Wallet() {
 
                     <Button
                         variant="outline"
-                        className="h-14 px-6 rounded-xl"
+                        className="h-12 px-5 rounded-xl border-white/10 hover:bg-white/5"
                         onClick={() => {
                             const address = walletStatus.walletAddress;
-                            // Soroban contracts start with 'C', classic accounts start with 'G'
                             const path = address?.startsWith('C') ? 'contract' : 'account';
                             window.open(
-                                walletStatus.explorer || `https://stellar.expert/explorer/testnet/${path}/${address}`,
+                                walletStatus.explorer || `${STELLAR_EXPLORER}/${path}/${address}`,
                                 '_blank'
                             );
                         }}
                     >
-                        <ExternalLink className="w-5 h-5 mr-2" />
+                        <ExternalLink className="w-4 h-4 mr-2" />
                         Explorer
                     </Button>
                 </div>
             )}
 
-            {/* Tokenized Securities */}
+            {/* ═══ ON-CHAIN ASSETS (streamlined) ═══ */}
             {walletStatus?.walletAddress && (
-                <Card className="glass-panel rounded-2xl animate-fade-in-up animate-delay-3">
-                    <CardHeader>
-                        <CardTitle className="text-xl flex items-center gap-2">
-                            <Coins className="w-5 h-5 text-[hsl(43_45%_55%)]" />
-                            Tokenized Securities
-                        </CardTitle>
-                        <CardDescription>Your security token holdings from investments</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {tokenizedAssets.length > 0 ? (
-                            <div className="space-y-3">
-                                {tokenizedAssets.map((asset, index) => (
-                                    <div
-                                        key={`${asset.assetCode}-${index}`}
-                                        className="activity-item p-4 rounded-xl"
-                                    >
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(43_45%_55%)] to-[hsl(43_45%_35%)] flex items-center justify-center text-white font-bold text-sm">
-                                                    {asset.assetCode.slice(0, 2)}
-                                                </div>
-                                                <div>
-                                                    <p className="font-medium">{asset.tokenName}</p>
-                                                    <p className="text-xs text-muted-foreground font-mono">{asset.assetCode}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-lg font-bold value-accent">
-                                                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(asset.currentValue)}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">{asset.amount.toLocaleString()} tokens</p>
-                                            </div>
+                <div className="space-y-3 animate-fade-in-up">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">On-Chain Assets</h3>
+                        <button
+                            onClick={() => navigate('/portfolio')}
+                            className="text-xs text-[hsl(43_45%_55%)] hover:text-[hsl(43_45%_65%)] flex items-center gap-1 transition-colors"
+                        >
+                            View portfolio <ArrowRight className="h-3 w-3" />
+                        </button>
+                    </div>
+                    {tokenizedAssets.length > 0 ? (
+                        <div className="rounded-xl border border-white/8 bg-white/[0.03] divide-y divide-white/5">
+                            {tokenizedAssets.map((asset, index) => (
+                                <div
+                                    key={`${asset.assetCode}-${index}`}
+                                    className="flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[hsl(43_45%_55%)] to-[hsl(43_45%_35%)] flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+                                            {asset.assetCode.slice(0, 2)}
                                         </div>
-                                        <div className="flex items-center gap-4 pt-3 border-t border-white/10">
-                                            <div className="flex items-center gap-1.5 text-sm">
-                                                <TrendingUp className="w-4 h-4 text-[hsl(160_60%_40%)]" />
-                                                <span className="value-success font-medium">
-                                                    +{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(asset.interestEarned)}
-                                                </span>
-                                                <span className="text-muted-foreground">earned</span>
-                                            </div>
-                                            {asset.maturityDate !== 'N/A' && (
-                                                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                                    <Calendar className="w-4 h-4" />
-                                                    <span>Matures {new Date(asset.maturityDate).toLocaleDateString()}</span>
-                                                </div>
-                                            )}
-                                            {asset.annualRate && (
-                                                <div className="flex items-center gap-1.5 text-sm">
-                                                    <span className="text-muted-foreground">APY:</span>
-                                                    <span className="value-success font-medium">{asset.annualRate}%</span>
-                                                </div>
-                                            )}
+                                        <div>
+                                            <p className="text-sm font-medium leading-tight">{asset.tokenName}</p>
+                                            <p className="text-[11px] text-muted-foreground font-mono">
+                                                {asset.amount.toLocaleString()} {asset.assetCode}
+                                            </p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <div className="p-5 rounded-2xl bg-muted/30 mb-4">
-                                    <Coins className="w-10 h-10 text-muted-foreground/50" />
+                                    <div className="flex items-center gap-3">
+                                        <p className="text-sm font-semibold">
+                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(asset.currentValue)}
+                                        </p>
+                                        {asset.issuerPublicKey && (
+                                            <a
+                                                href={`${STELLAR_EXPLORER}/asset/${asset.assetCode}-${asset.issuerPublicKey}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-muted-foreground hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                                                title="View on Stellar Expert"
+                                            >
+                                                <ExternalLink className="h-3.5 w-3.5" />
+                                            </a>
+                                        )}
+                                    </div>
                                 </div>
-                                <p className="text-lg font-medium mb-1">No tokenized assets yet</p>
-                                <p className="text-sm text-muted-foreground">Invest in security tokens to see them here.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-xl border border-white/8 bg-white/[0.03] py-8 text-center">
+                            <Coins className="w-6 h-6 text-muted-foreground/40 mx-auto mb-2" />
+                            <p className="text-sm text-muted-foreground">No assets yet</p>
+                        </div>
+                    )}
+                </div>
             )}
 
-            {/* Wallet Address & Security */}
-            <Card className="glass-panel rounded-2xl animate-fade-in-up animate-delay-3">
-                <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                        <Key className="w-5 h-5 text-[hsl(43_45%_55%)]" />
-                        Wallet Details
-                    </CardTitle>
-                    <CardDescription>Your blockchain wallet and security</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {/* Security Method */}
-                    <div className="activity-item flex items-center gap-4 p-4 rounded-xl">
-                        <div className="w-12 h-12 rounded-xl bg-[hsl(217_91%_60%/0.15)] flex items-center justify-center">
-                            <Shield className="w-6 h-6 text-[hsl(217_91%_60%)]" />
+            {/* ═══ WALLET DETAILS (compact footer) ═══ */}
+            <div className="space-y-3 animate-fade-in-up">
+                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Wallet Details</h3>
+
+                {walletStatus?.walletAddress ? (
+                    <div className="rounded-xl border border-white/8 bg-white/[0.03] divide-y divide-white/5">
+                        {/* Passkey status — single compact row */}
+                        <div className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                                <Shield className="w-4 h-4 text-[hsl(217_91%_60%)]" />
+                                <span className="text-sm">Passkey Authentication</span>
+                            </div>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${walletStatus.passkeyRegistered
+                                ? 'bg-[hsl(160_60%_40%/0.15)] text-[hsl(160_60%_40%)] border-[hsl(160_60%_40%/0.3)]'
+                                : 'bg-red-500/15 text-red-400 border-red-500/30'
+                                }`}>
+                                {walletStatus.passkeyRegistered ? 'Active' : 'Inactive'}
+                            </span>
                         </div>
-                        <div className="flex-1">
-                            <p className="font-medium">Passkey Authentication</p>
-                            <p className="text-sm text-muted-foreground">
-                                {walletStatus?.passkeyRegistered ? 'Active and secured by device biometric' : 'Not registered'}
+
+                        {/* Address — compact row with copy */}
+                        <div className="px-4 py-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-2">
+                                    <Key className="w-3.5 h-3.5 text-muted-foreground" />
+                                    <span className="text-[11px] text-muted-foreground uppercase tracking-wider">Deposit Address</span>
+                                </div>
+                                <span className="px-1.5 py-0.5 rounded text-[9px] bg-[hsl(217_91%_60%/0.15)] text-[hsl(217_91%_60%)]">
+                                    Stellar Testnet
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs font-mono text-muted-foreground break-all flex-1">
+                                    {walletStatus.walletAddress}
+                                </p>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 w-7 p-0 hover:bg-white/10 shrink-0"
+                                    onClick={() => navigator.clipboard.writeText(walletStatus.walletAddress!)}
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Chain warning — slim bar */}
+                        <div className="flex items-center gap-2.5 px-4 py-2.5 bg-red-500/5">
+                            <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                            <p className="text-[11px] text-red-300/80">
+                                Only send <strong>Stellar USDC</strong>. Other chains (Ethereum, Solana, Polygon) will result in permanent loss.
                             </p>
                         </div>
-                        <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${walletStatus?.passkeyRegistered
-                            ? 'bg-[hsl(160_60%_40%/0.15)] text-[hsl(160_60%_40%)] border-[hsl(160_60%_40%/0.3)]'
-                            : 'bg-red-500/15 text-red-400 border-red-500/30'
-                            }`}>
-                            {walletStatus?.passkeyRegistered ? 'Active' : 'Inactive'}
-                        </span>
                     </div>
-
-                    {/* Wallet Address */}
-                    {walletStatus?.walletAddress && (
-                        <div className="space-y-4 pt-4 border-t border-white/10">
-                            <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <p className="text-sm font-medium">Deposit Address</p>
-                                    <span className="px-2 py-0.5 rounded text-[10px] bg-[hsl(217_91%_60%/0.15)] text-[hsl(217_91%_60%)]">
-                                        Stellar Testnet
-                                    </span>
-                                </div>
-                                <div className="flex items-center justify-between gap-2 p-3 bg-black/30 rounded-lg border border-white/5">
-                                    <p className="text-xs font-mono text-muted-foreground break-all">{walletStatus.walletAddress}</p>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-8 w-8 p-0 hover:bg-white/10 shrink-0"
-                                        onClick={() => navigator.clipboard.writeText(walletStatus.walletAddress!)}
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Warning */}
-                            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl">
-                                <div className="flex items-start gap-3">
-                                    <Shield className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                                    <div>
-                                        <p className="font-semibold text-red-400 text-sm">Critical Warning</p>
-                                        <p className="text-xs text-red-300/80 mt-1 leading-relaxed">
-                                            Only send <strong>Stellar Network USDC</strong> (Native).
-                                            Do <strong>NOT</strong> send USDC from Ethereum, Solana, or Polygon directly.
-                                            Sending wrong chain assets will result in <strong>permanent loss of funds</strong>.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                ) : (
+                    <div className="rounded-xl border border-white/8 bg-white/[0.03] py-12 text-center">
+                        <div className="p-4 rounded-2xl bg-muted/30 inline-block mb-3">
+                            <WalletIcon className="w-8 h-8 text-muted-foreground/50" />
                         </div>
-                    )}
-
-                    {!walletStatus?.walletAddress && (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="p-5 rounded-2xl bg-muted/30 mb-4">
-                                <WalletIcon className="w-10 h-10 text-muted-foreground/50" />
-                            </div>
-                            <p className="text-lg font-medium mb-1">No wallet connected</p>
-                            <p className="text-sm text-muted-foreground">Complete registration to activate your wallet.</p>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        <p className="text-base font-medium mb-1">No wallet connected</p>
+                        <p className="text-sm text-muted-foreground">Complete registration to activate your wallet.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

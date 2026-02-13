@@ -179,17 +179,26 @@ function normalizeTokens(offers: Offer[]): ApprovalItem[] {
 }
 
 function normalizeMultisig(transactions: any[]): ApprovalItem[] {
-    return transactions.map((tx) => ({
-        id: `multisig-${tx.id}`,
-        originalId: tx.id,
-        type: 'multisig' as ApprovalType,
-        label: tx.operationType?.replace(/_/g, ' ') || `Tx #${tx.id}`,
-        subtitle: tx.description || `${tx.signatureStatus?.collected || 0}/${tx.thresholdRequired} signatures`,
-        status: tx.status,
-        normalizedStatus: normalizeStatus('multisig', tx.status),
-        createdAt: tx.createdAt,
-        raw: tx,
-    }));
+    return transactions.map((tx) => {
+        // Better label for deposit relays
+        let label = tx.operationType?.replace(/_/g, ' ') || `Tx #${tx.id}`;
+        let subtitle = tx.description || `${tx.signatureStatus?.collected || 0}/${tx.thresholdRequired} signatures`;
+        if (tx.operationType === 'treasury_payment' && tx.metadata?.subtype === 'deposit_relay') {
+            label = `💱 Relay: ${tx.metadata.investorName || 'Investor'}`;
+            subtitle = `${tx.metadata.amount || '?'} ${tx.metadata.assetCode || 'USDC'} → smart wallet`;
+        }
+        return {
+            id: `multisig-${tx.id}`,
+            originalId: tx.id,
+            type: 'multisig' as ApprovalType,
+            label,
+            subtitle,
+            status: tx.status,
+            normalizedStatus: normalizeStatus('multisig', tx.status),
+            createdAt: tx.createdAt,
+            raw: tx,
+        };
+    });
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────
