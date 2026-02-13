@@ -161,6 +161,15 @@ export function Approvals() {
     // Freighter for multisig
     const { device: freighterDevice, signTransaction: freighterSign, isSigning } = useFreighter();
 
+    // System wallets (for showing required signer info)
+    const [systemWallets, setSystemWallets] = useState<Array<{ name: string; publicKey: string }>>([]);
+    useEffect(() => {
+        api.get('/wallets').then((res: any) => {
+            const wallets = Array.isArray(res) ? res : res.data || [];
+            setSystemWallets(wallets.map((w: any) => ({ name: w.name, publicKey: w.publicKey })));
+        }).catch(() => { });
+    }, []);
+
     // Filtered items
     const filteredItems = filter === 'all' ? items : items.filter((i) => i.type === filter);
 
@@ -319,6 +328,28 @@ export function Approvals() {
     const handleIssueToken = async (item: ApprovalItem) => {
         setActionLoading(true);
         try {
+            // ─── Pre-flight: validate Freighter key before creating the issuance TX ───
+            if (!freighterDevice) {
+                toast.error('Connect Freighter before issuing a token.');
+                return;
+            }
+
+            const walletsRes = await api.get('/wallets');
+            const wallets: Array<{ name: string; publicKey: string }> = Array.isArray(walletsRes)
+                ? walletsRes
+                : walletsRes.data || [];
+            const issuer = wallets.find((w) => w.name === 'Issuer');
+            const distributor = wallets.find((w) => w.name === 'Distributor');
+            const requiredKeys = [issuer, distributor].filter(Boolean) as typeof wallets;
+
+            if (!requiredKeys.some((w) => w.publicKey === freighterDevice.publicKey)) {
+                const needed = requiredKeys
+                    .map((w) => `**${w.name}** (${w.publicKey.slice(0, 4)}…${w.publicKey.slice(-4)})`)
+                    .join(', ');
+                toast.error(`Wrong Freighter key. Switch to: ${needed}`, { duration: 8000 });
+                return;
+            }
+
             const response = await offersApi.issueToken(item.originalId);
             if (!response.success) {
                 toast.error(response.error || 'Failed to issue token');
@@ -715,6 +746,7 @@ export function Approvals() {
                             isSigning={isSigning}
                             freighterConnected={!!freighterDevice}
                             freighterPublicKey={freighterDevice?.publicKey || ''}
+                            systemWallets={systemWallets}
                             onApproveInvestor={() => handleApproveInvestor(selected)}
                             onRejectInvestor={() => setRejectDialog({ open: true, item: selected })}
                             onSponsorInvestor={() => setSponsorDialog({ open: true, item: selected })}
@@ -873,7 +905,7 @@ export function Approvals() {
                     }
                 }}
             >
-                <DialogContent className="bg-slate-900 border-white/10 max-w-md">
+                <DialogContent className="bg-slate-900 border-white/10 max-w-lg">
                     {signingResult && (
                         <>
                             <DialogHeader className="items-center text-center">
@@ -1056,6 +1088,7 @@ function DetailPanel({
     isSigning,
     freighterConnected,
     freighterPublicKey,
+    systemWallets,
     onApproveInvestor,
     onRejectInvestor,
     onSponsorInvestor,
@@ -1077,6 +1110,7 @@ function DetailPanel({
     isSigning: boolean;
     freighterConnected: boolean;
     freighterPublicKey: string;
+    systemWallets: Array<{ name: string; publicKey: string }>;
     onApproveInvestor: () => void;
     onRejectInvestor: () => void;
     onSponsorInvestor: () => void;
@@ -1205,14 +1239,53 @@ function DetailPanel({
                 {item.type === 'issuance' && (
                     <div className="space-y-2">
                         {item.raw.issuanceStep === 'issue' && (
-                            <Button
-                                className="w-full bg-blue-600 hover:bg-blue-500"
-                                disabled={actionLoading}
-                                onClick={onIssueToken}
-                            >
-                                <DollarSign className="w-4 h-4 mr-2" />
-                                Issue Token on Stellar
-                            </Button>
+                            <>
+                                {/* Required signer key hint */}
+                                {(() => {
+                                    const issuer = systemWallets.find(w => w.name === 'Issuer');
+                                    const distributor = systemWallets.find(w => w.name === 'Distributor');
+                                    const requiredKeys = [issuer, distributor].filter(Boolean) as typeof systemWallets;
+                                    const isKeyMatch = requiredKeys.some(w => w.publicKey === freighterPublicKey);
+                                    const matchedWallet = requiredKeys.find(w => w.publicKey === freighterPublicKey);
+
+                                    return requiredKeys.length > 0 ? (
+                                        <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs ${!freighterPublicKey
+                                            ? 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
+                                            : isKeyMatch
+                                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                                : 'bg-red-500/10 border-red-500/20 text-red-400'
+                                            }`}>
+                                            <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                                            <div>
+                                                {!freighterPublicKey ? (
+                                                    <p>Connect Freighter with one of the required keys:</p>
+                                                ) : isKeyMatch ? (
+                                                    <p>Connected as <strong>{matchedWallet?.name}</strong> ✓</p>
+                                                ) : (
+                                                    <p>Wrong key connected. Switch Freighter to:</p>
+                                                )}
+                                                {(!freighterPublicKey || !isKeyMatch) && (
+                                                    <div className="mt-1 space-y-0.5">
+                                                        {requiredKeys.map(w => (
+                                                            <p key={w.publicKey} className="font-mono">
+                                                                {w.name}: {w.publicKey.slice(0, 4)}…{w.publicKey.slice(-4)}
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : null;
+                                })()}
+                                <Button
+                                    className="w-full bg-blue-600 hover:bg-blue-500"
+                                    disabled={actionLoading}
+                                    onClick={onIssueToken}
+                                >
+                                    <DollarSign className="w-4 h-4 mr-2" />
+                                    Issue Token on Stellar
+                                </Button>
+                            </>
                         )}
                         {item.raw.issuanceStep === 'issuing' && (
                             <Button
