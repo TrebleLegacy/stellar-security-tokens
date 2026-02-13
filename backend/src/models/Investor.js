@@ -200,35 +200,66 @@ export class Investor {
    * @returns {Promise<Array>} Array com tokens e ofertas relacionadas
    */
   static async getPortfolio(investorId) {
-    const distributions = await prisma.tokenDistribution.findMany({
-      where: { investorId },
-      include: {
-        token: {
-          include: {
-            offer: true,
+    // Parallel fetch: distributions + interest earned per asset
+    const [distributions, interestByAsset] = await Promise.all([
+      prisma.tokenDistribution.findMany({
+        where: { investorId },
+        include: {
+          token: {
+            include: {
+              offer: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.interestPayment.groupBy({
+        by: ['assetCode'],
+        where: { investorId, status: 'completed' },
+        _sum: { usdcAmount: true },
+        _count: true,
+      }),
+    ]);
 
-    // Group by asset and calculate totals
+    // Build interest lookup
+    const interestMap = new Map();
+    for (const row of interestByAsset) {
+      interestMap.set(row.assetCode, {
+        totalEarned: Number(row._sum.usdcAmount || 0),
+        paymentCount: row._count,
+      });
+    }
+
+    // Group distributions by asset and enrich with offer + interest data
     const portfolioMap = new Map();
     for (const dist of distributions) {
       const assetCode = dist.assetCode;
       if (!portfolioMap.has(assetCode)) {
+        const offer = dist.token.offer;
+        const interest = interestMap.get(assetCode) || { totalEarned: 0, paymentCount: 0 };
         portfolioMap.set(assetCode, {
           id: dist.token.id,
           assetCode: dist.token.assetCode,
           totalSupply: dist.token.totalSupply,
           issuedAt: dist.token.createdAt,
-          offerId: dist.token.offer?.id || null,
-          offerName: dist.token.offer?.offerName || null,
-          description: dist.token.offer?.description || null,
-          offerType: dist.token.offer?.offerType || null,
-          annualInterestRate: dist.token.offer?.annualInterestRate || dist.token.annualInterestRate,
-          offerStatus: dist.token.offer?.status || null,
+          // Offer metadata
+          offerId: offer?.id || null,
+          offerName: offer?.offerName || null,
+          description: offer?.description || null,
+          offerType: offer?.offerType || null,
+          annualInterestRate: offer?.annualInterestRate || dist.token.annualInterestRate,
+          offerStatus: offer?.status || null,
+          maturityDate: offer?.maturityDate || null,
+          paymentType: offer?.paymentType || null,
+          unitPrice: offer?.unitPrice ? Number(offer.unitPrice) : 1,
+          paymentDay: offer?.paymentDay || null,
+          // On-chain data
+          issuerPublicKey: dist.token.issuerPublicKey || null,
+          sacContractId: dist.token.sacContractId || null,
+          // Calculated fields
           totalDistributed: 0,
+          interestEarned: interest.totalEarned,
+          interestPaymentCount: interest.paymentCount,
         });
       }
       const entry = portfolioMap.get(assetCode);
