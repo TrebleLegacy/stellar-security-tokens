@@ -164,11 +164,20 @@ export class DepositRelayService {
 
             // Use withdrawFromTreasury since the funds were deposited to Treasury
             // This method handles both XLM (native) and USDC correctly
+            const investor = deposit.investor;
             const txResult = await StellarService.withdrawFromTreasury(
                 destination,
                 deposit.actualAmount,
                 assetCode,
-                `Deposit relay ${deposit.memo}`
+                `Deposit relay: ${investor?.name || 'Investor'} — ${deposit.actualAmount} ${assetCode} (${deposit.memo})`,
+                {
+                    subtype: 'deposit_relay',
+                    depositId: deposit.id,
+                    depositMemo: deposit.memo,
+                    investorName: investor?.name,
+                    investorEmail: investor?.email,
+                    investorId: investor?.id,
+                }
             );
 
             // Handle multisig pending case

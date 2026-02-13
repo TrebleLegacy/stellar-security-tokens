@@ -7,7 +7,7 @@ import {
     Loader2, TrendingUp, Briefcase, Clock, Copy, Check,
     RefreshCw, AlertCircle, Hourglass, ExternalLink,
     ChevronDown, Calendar, Percent, DollarSign, ArrowRight,
-    Hash,
+    Hash, Coins,
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { authStorage } from '@/utils/authStorage';
@@ -224,12 +224,17 @@ function HoldingCard({ holding, index }: { holding: PortfolioHolding; index: num
                             </div>
                         </div>
                     </div>
-                    {/* Hero: holding value */}
+                    {/* Hero: holding value + expected payout */}
                     <div className="text-right">
                         <p className="text-lg font-bold">{formatCurrency(holdingValue)}</p>
                         <p className="text-xs text-muted-foreground">
                             {holding.totalDistributed.toLocaleString()} tokens
                         </p>
+                        {holding.annualInterestRate > 0 && (
+                            <p className="text-xs text-emerald-400 mt-0.5">
+                                → {formatCurrency(holdingValue * (1 + holding.annualInterestRate / 100))} at maturity
+                            </p>
+                        )}
                     </div>
                 </div>
             </div>
@@ -265,6 +270,40 @@ function HoldingCard({ holding, index }: { holding: PortfolioHolding; index: num
                     </span>
                 </div>
             </div>
+
+            {/* ── Maturity progress bar ── */}
+            {holding.maturityDate && (() => {
+                const maturity = new Date(holding.maturityDate).getTime();
+                const now = Date.now();
+                // Estimate start as 1 year before maturity (or use actual if available)
+                const totalDuration = 365 * 24 * 60 * 60 * 1000;
+                const start = maturity - totalDuration;
+                const elapsed = Math.max(0, now - start);
+                const progress = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+                const isMatured = now >= maturity;
+
+                return (
+                    <div className="mx-5 mb-4">
+                        <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Maturity Progress</span>
+                            <span className={`text-[10px] font-medium ${isMatured ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                                {isMatured ? 'Matured' : `${Math.round(progress)}%`}
+                            </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                            <div
+                                className={`h-full rounded-full transition-all duration-500 ${isMatured
+                                        ? 'bg-emerald-400'
+                                        : progress > 75
+                                            ? 'bg-amber-400'
+                                            : 'bg-[hsl(43_45%_55%)]'
+                                    }`}
+                                style={{ width: `${isMatured ? 100 : progress}%` }}
+                            />
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* ── Interest earned callout ── */}
             {holding.interestEarned > 0 && (
@@ -326,6 +365,7 @@ export function Portfolio() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [pendingOpen, setPendingOpen] = useState(false);
+    const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
 
     const {
         pendingInvestments,
@@ -341,30 +381,48 @@ export function Portfolio() {
             try {
                 const user = authStorage.getUser<{ id: number }>('investor');
                 if (!user?.id) throw new Error('User not found');
-                const response = await api.get(`/investors/${user.id}/portfolio`);
 
-                const data = response.data || response;
-                const raw = Array.isArray(data)
-                    ? data
-                    : (data.portfolio || data.investments || []);
+                // Fetch portfolio + wallet status in parallel
+                const [portfolioRes, walletRes] = await Promise.allSettled([
+                    api.get(`/investors/${user.id}/portfolio`),
+                    api.get(`/investors/${user.id}/wallet-status`),
+                ]);
 
-                setHoldings(raw.map((inv: any) => ({
-                    id: inv.id || 0,
-                    assetCode: inv.assetCode || inv.asset_code || 'N/A',
-                    offerName: inv.offerName || inv.offer_name || null,
-                    offerType: inv.offerType || inv.offer_type || null,
-                    offerId: inv.offerId || inv.offer_id || null,
-                    annualInterestRate: Number(inv.annualInterestRate || inv.annual_interest_rate || 0),
-                    maturityDate: inv.maturityDate || inv.maturity_date || null,
-                    paymentType: inv.paymentType || inv.payment_type || null,
-                    unitPrice: Number(inv.unitPrice || inv.unit_price || 1),
-                    totalDistributed: Number(inv.totalDistributed || inv.total_distributed || inv.amount || 0),
-                    interestEarned: Number(inv.interestEarned || inv.interest_earned || 0),
-                    interestPaymentCount: Number(inv.interestPaymentCount || 0),
-                    issuerPublicKey: inv.issuerPublicKey || inv.issuer_public_key || null,
-                    sacContractId: inv.sacContractId || inv.sac_contract_id || null,
-                    offerStatus: inv.offerStatus || inv.offer_status || null,
-                })));
+                // Process portfolio
+                if (portfolioRes.status === 'fulfilled') {
+                    const data = portfolioRes.value.data || portfolioRes.value;
+                    const raw = Array.isArray(data)
+                        ? data
+                        : (data.portfolio || data.investments || []);
+
+                    setHoldings(raw.map((inv: any) => ({
+                        id: inv.id || 0,
+                        assetCode: inv.assetCode || inv.asset_code || 'N/A',
+                        offerName: inv.offerName || inv.offer_name || null,
+                        offerType: inv.offerType || inv.offer_type || null,
+                        offerId: inv.offerId || inv.offer_id || null,
+                        annualInterestRate: Number(inv.annualInterestRate || inv.annual_interest_rate || 0),
+                        maturityDate: inv.maturityDate || inv.maturity_date || null,
+                        paymentType: inv.paymentType || inv.payment_type || null,
+                        unitPrice: Number(inv.unitPrice || inv.unit_price || 1),
+                        totalDistributed: Number(inv.totalDistributed || inv.total_distributed || inv.amount || 0),
+                        interestEarned: Number(inv.interestEarned || inv.interest_earned || 0),
+                        interestPaymentCount: Number(inv.interestPaymentCount || 0),
+                        issuerPublicKey: inv.issuerPublicKey || inv.issuer_public_key || null,
+                        sacContractId: inv.sacContractId || inv.sac_contract_id || null,
+                        offerStatus: inv.offerStatus || inv.offer_status || null,
+                    })));
+                } else {
+                    throw new Error(portfolioRes.reason?.message || 'Failed to load portfolio');
+                }
+
+                // Process wallet balance
+                if (walletRes.status === 'fulfilled') {
+                    const walletData = walletRes.value.data || walletRes.value;
+                    if (walletData.balances?.usdc !== undefined) {
+                        setUsdcBalance(walletData.balances.usdc);
+                    }
+                }
             } catch (err: any) {
                 console.error('Failed to fetch portfolio:', err);
                 setError(err.message);
@@ -399,7 +457,11 @@ export function Portfolio() {
 
     /* ─── Computed values ─── */
     const totalValue = holdings.reduce((sum, h) => sum + h.totalDistributed * h.unitPrice, 0);
-    const totalInterest = holdings.reduce((sum, h) => sum + h.interestEarned, 0);
+    const expectedPayout = holdings.reduce((sum, h) => {
+        const value = h.totalDistributed * h.unitPrice;
+        const apy = h.annualInterestRate || 0;
+        return sum + value * (1 + apy / 100);
+    }, 0);
     const pendingCount = pendingInvestments.length + processingInvestments.length;
 
     return (
@@ -411,22 +473,34 @@ export function Portfolio() {
                     <p className="text-muted-foreground">Your security token holdings</p>
                 </div>
 
-                {holdings.length > 0 && (
-                    <div className="grid grid-cols-3 gap-4">
-                        <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
-                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Portfolio Value</p>
-                            <p className="text-xl font-bold">{formatCurrency(totalValue)}</p>
-                        </div>
-                        <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
-                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Interest Earned</p>
-                            <p className="text-xl font-bold text-emerald-400">{formatCurrency(totalInterest)}</p>
-                        </div>
-                        <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
-                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Holdings</p>
-                            <p className="text-xl font-bold">{holdings.length}</p>
-                        </div>
+                <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                            <Coins className="h-3 w-3" /> USDC Balance
+                        </p>
+                        <p className="text-xl font-bold value-accent">
+                            {usdcBalance !== null ? `$${Number(usdcBalance).toFixed(2)}` : '—'}
+                        </p>
+                        {(usdcBalance === null || Number(usdcBalance) === 0) && (
+                            <button
+                                onClick={() => navigate('/wallet')}
+                                className="text-[11px] text-[hsl(43_45%_55%)] hover:text-[hsl(43_45%_65%)] mt-1 flex items-center gap-1 transition-colors"
+                            >
+                                Deposit <ArrowRight className="h-2.5 w-2.5" />
+                            </button>
+                        )}
                     </div>
-                )}
+                    <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Portfolio Value</p>
+                        <p className="text-xl font-bold">{formatCurrency(totalValue)}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                        <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1 flex items-center gap-1">
+                            <TrendingUp className="h-3 w-3" /> Expected Payout
+                        </p>
+                        <p className="text-xl font-bold text-emerald-400">{formatCurrency(expectedPayout)}</p>
+                    </div>
+                </div>
             </div>
 
             {/* ═══ PENDING INVESTMENTS — Collapsible ═══ */}

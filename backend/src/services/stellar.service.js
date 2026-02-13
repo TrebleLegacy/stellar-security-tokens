@@ -972,9 +972,10 @@ export class StellarService {
    * @param {string} amount - Valor a ser retirado
    * @param {string} assetCode - Código do asset (ex: 'USDC', 'XLM')
    * @param {string} description - Descrição da retirada
+   * @param {Object} [extraMetadata={}] - Additional metadata to store with the multisig transaction
    * @returns {Promise<Object>} Resultado da retirada
    */
-  static async withdrawFromTreasury(destination, amount, assetCode, description) {
+  static async withdrawFromTreasury(destination, amount, assetCode, description, extraMetadata = {}) {
     try {
       const treasuryPublicKey = keyManager.getTreasuryPublicKey();
       const issuerPublicKey = keyManager.getIssuerPublicKey();
@@ -1034,7 +1035,8 @@ export class StellarService {
             destination,
             amount: amountStr,
             assetCode,
-            type: 'soroban_treasury_transfer'
+            type: 'soroban_treasury_transfer',
+            ...extraMetadata
           }
         });
       } else {
@@ -1063,7 +1065,8 @@ export class StellarService {
             destination,
             amount: amountStr,
             assetCode,
-            type: 'classic_treasury_payment'
+            type: 'classic_treasury_payment',
+            ...extraMetadata
           }
         });
       }

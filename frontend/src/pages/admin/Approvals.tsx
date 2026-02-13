@@ -1755,7 +1755,11 @@ function MultisigDetail({ raw }: { raw: any }) {
         <>
             <DetailSection title="Transaction Info">
                 <div className="grid grid-cols-2 gap-4">
-                    <DetailRow label="Operation" value={OP_LABELS[raw.operationType] || raw.operationType} />
+                    <DetailRow label="Operation" value={
+                        raw.operationType === 'treasury_payment' && raw.metadata?.subtype === 'deposit_relay'
+                            ? '💱 Deposit Relay'
+                            : (OP_LABELS[raw.operationType] || raw.operationType)
+                    } />
                     <DetailRow label="Status" value={raw.status?.replace(/_/g, ' ')} />
                     <DetailRow label="Created" value={new Date(raw.createdAt).toLocaleString()} />
                     <DetailRow
@@ -1919,13 +1923,61 @@ function MultisigDetail({ raw }: { raw: any }) {
                             </div>
                         )}
                         {raw.operationType === 'treasury_payment' && (
-                            <div className="grid grid-cols-2 gap-4">
-                                <DetailRow label="Destination" value={raw.metadata.destination?.slice(0, 12) + '...'} />
-                                <DetailRow
-                                    label="Amount"
-                                    value={`${raw.metadata.amount} ${raw.metadata.assetCode || ''}`}
-                                />
-                            </div>
+                            raw.metadata?.subtype === 'deposit_relay' ? (
+                                <>
+                                    <div className="p-3 bg-blue-500/10 border border-blue-500/25 rounded-lg space-y-1 mb-3">
+                                        <p className="text-xs font-semibold text-blue-300 flex items-center gap-1.5">
+                                            💱 Investor Deposit Relay
+                                        </p>
+                                        <p className="text-[11px] text-blue-200/70">
+                                            Forwarding deposited funds from Treasury to the investor's smart wallet.
+                                        </p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <DetailRow label="Investor" value={raw.metadata.investorName || '—'} />
+                                        <DetailRow label="Email" value={raw.metadata.investorEmail || '—'} />
+                                        <DetailRow label="Amount" value={
+                                            <span className="text-blue-400 font-semibold">
+                                                {raw.metadata.amount} {raw.metadata.assetCode}
+                                            </span>
+                                        } />
+                                        {raw.metadata.depositMemo && (
+                                            <DetailRow label="Deposit Memo" value={
+                                                <code className="text-xs text-zinc-300 bg-black/30 px-2 py-0.5 rounded">
+                                                    {raw.metadata.depositMemo}
+                                                </code>
+                                            } />
+                                        )}
+                                        {raw.metadata.depositId && (
+                                            <DetailRow label="Deposit ID" value={`#${raw.metadata.depositId}`} />
+                                        )}
+                                    </div>
+                                    <DetailRow
+                                        label="Destination"
+                                        value={
+                                            raw.metadata.destination ? (
+                                                <code className="text-xs text-emerald-400 bg-black/30 px-2 py-1 rounded break-all">
+                                                    {raw.metadata.destination}
+                                                </code>
+                                            ) : '—'
+                                        }
+                                    />
+                                </>
+                            ) : (
+                                <div className="grid grid-cols-2 gap-4">
+                                    <DetailRow label="Destination" value={
+                                        raw.metadata.destination ? (
+                                            <code className="text-xs text-zinc-300 bg-black/30 px-2 py-1 rounded break-all">
+                                                {raw.metadata.destination}
+                                            </code>
+                                        ) : '—'
+                                    } />
+                                    <DetailRow
+                                        label="Amount"
+                                        value={`${raw.metadata.amount} ${raw.metadata.assetCode || ''}`}
+                                    />
+                                </div>
+                            )
                         )}
                         {raw.operationType === 'dividend_distribution' && (
                             <div className="grid grid-cols-2 gap-4">
