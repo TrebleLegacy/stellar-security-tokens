@@ -1,29 +1,82 @@
+
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Loader2, Wallet, TrendingUp, PieChart, Briefcase, Clock, Copy, Check, RefreshCw, AlertCircle, Hourglass, ExternalLink } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+    Loader2, TrendingUp, Briefcase, Clock, Copy, Check,
+    RefreshCw, AlertCircle, Hourglass, ExternalLink,
+    ChevronDown, Calendar, Percent, DollarSign, ArrowRight,
+    Hash,
+} from 'lucide-react';
 import { api } from '@/lib/api';
 import { authStorage } from '@/utils/authStorage';
 import { usePendingInvestments, type PendingInvestment } from '@/hooks/usePendingInvestments';
 
-interface Investment {
+/* ─── Types ─── */
+interface PortfolioHolding {
+    id: number;
     assetCode: string;
-    tokenName: string;
-    amount: number;
-    currentValue: number;
+    offerName: string | null;
+    offerType: string | null;
+    offerId: number | null;
+    annualInterestRate: number;
+    maturityDate: string | null;
+    paymentType: string | null;
+    unitPrice: number;
+    totalDistributed: number;
     interestEarned: number;
-    maturityDate: string;
+    interestPaymentCount: number;
+    issuerPublicKey: string | null;
+    sacContractId: string | null;
+    offerStatus: string | null;
 }
 
+const PAYMENT_LABELS: Record<string, string> = {
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    semi_annual: 'Semi-Annual',
+    annual: 'Annual',
+    bullet: 'Bullet',
+};
+
+const STELLAR_EXPLORER = 'https://stellar.expert/explorer/testnet';
+
+/* ─── Helpers ─── */
+function formatCurrency(value: number) {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function getMaturityLabel(date: string | null): string | null {
+    if (!date) return null;
+    const maturity = new Date(date);
+    const now = new Date();
+    const diffMs = maturity.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return 'Matured';
+    if (diffDays === 0) return 'Matures today';
+    if (diffDays <= 30) return `${diffDays}d remaining`;
+    if (diffDays <= 365) return `${Math.ceil(diffDays / 30)} months`;
+    return `${(diffDays / 365).toFixed(1)} years`;
+}
+
+function getMaturityAccent(date: string | null): string {
+    if (!date) return 'text-muted-foreground';
+    const diffDays = Math.ceil((new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) return 'text-muted-foreground';
+    if (diffDays <= 30) return 'text-amber-400';
+    return 'text-muted-foreground';
+}
+
+/* ─── Copy Button ─── */
 function CopyButton({ text, label }: { text: string; label: string }) {
     const [copied, setCopied] = useState(false);
-
     const handleCopy = async () => {
         await navigator.clipboard.writeText(text);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     };
-
     return (
         <Button
             variant="outline"
@@ -37,10 +90,11 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     );
 }
 
+/* ─── Pending Investment Card (kept compact) ─── */
 function PendingInvestmentCard({ investment, isProcessing }: { investment: PendingInvestment; isProcessing?: boolean }) {
     const statusConfig = isProcessing ? {
         label: 'Processing',
-        sublabel: 'Payment detected, distributing tokens...',
+        sublabel: 'Payment detected, distributing tokens…',
         bgClass: 'bg-blue-500/10 border-blue-500/30',
         textClass: 'text-blue-400',
         icon: RefreshCw,
@@ -75,28 +129,22 @@ function PendingInvestmentCard({ investment, isProcessing }: { investment: Pendi
                 </div>
             </div>
 
-            {/* Investment Details */}
+            {/* Amount row */}
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                     <p className="text-muted-foreground">Amount to Pay</p>
-                    <p className="font-semibold text-lg">
-                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(investment.usdcAmount)}
-                    </p>
+                    <p className="font-semibold text-lg">{formatCurrency(investment.usdcAmount)}</p>
                 </div>
                 <div>
                     <p className="text-muted-foreground">Tokens to Receive</p>
-                    <p className="font-semibold text-lg">
-                        {investment.tokenAmount.toLocaleString()} {investment.assetCode}
-                    </p>
+                    <p className="font-semibold text-lg">{investment.tokenAmount.toLocaleString()} {investment.assetCode}</p>
                 </div>
             </div>
 
-            {/* Payment Instructions (only for pending_payment) */}
+            {/* Payment Instructions (pending_payment only) */}
             {!isProcessing && investment.paymentInstructions && (
                 <div className="space-y-3 pt-2 border-t border-white/10">
                     <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
-
-                    {/* Memo - Most Important */}
                     <div className="bg-amber-500/5 p-3 rounded-lg border border-amber-500/20">
                         <div className="flex items-center justify-between mb-1">
                             <span className="text-xs font-medium text-amber-400 flex items-center gap-1">
@@ -106,8 +154,6 @@ function PendingInvestmentCard({ investment, isProcessing }: { investment: Pendi
                         </div>
                         <p className="font-mono text-sm break-all">{investment.paymentInstructions.memo}</p>
                     </div>
-
-                    {/* Treasury Address */}
                     <div className="bg-white/5 p-3 rounded-lg">
                         <div className="flex items-center justify-between mb-1">
                             <span className="text-xs text-muted-foreground">Treasury Address</span>
@@ -120,25 +166,24 @@ function PendingInvestmentCard({ investment, isProcessing }: { investment: Pendi
                 </div>
             )}
 
-            {/* Processing message + Stellar Expert link */}
+            {/* Processing message */}
             {isProcessing && (
                 <div className="pt-2 border-t border-white/10 space-y-2">
                     <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
                     {investment.usdcPaymentHash && (
                         <a
-                            href={`https://stellar.expert/explorer/testnet/tx/${investment.usdcPaymentHash}`}
+                            href={`${STELLAR_EXPLORER}/tx/${investment.usdcPaymentHash}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
                         >
                             <ExternalLink className="h-3 w-3" />
-                            View USDC payment on Stellar Expert
+                            View payment on Stellar Expert
                         </a>
                     )}
                 </div>
             )}
 
-            {/* Timestamp */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 Created {new Date(investment.createdAt).toLocaleString()}
@@ -147,10 +192,140 @@ function PendingInvestmentCard({ investment, isProcessing }: { investment: Pendi
     );
 }
 
+/* ─── Investment Holding Card (new rich card) ─── */
+function HoldingCard({ holding, index }: { holding: PortfolioHolding; index: number }) {
+    const navigate = useNavigate();
+    const maturityLabel = getMaturityLabel(holding.maturityDate);
+    const maturityAccent = getMaturityAccent(holding.maturityDate);
+    const paymentLabel = PAYMENT_LABELS[holding.paymentType || ''] || holding.paymentType || '—';
+    const holdingValue = holding.totalDistributed * holding.unitPrice;
+
+    return (
+        <div
+            className={`rounded-2xl border border-white/8 bg-white/[0.03] hover:bg-white/[0.05] transition-all duration-300 animate-fade-in-up`}
+            style={{ animationDelay: `${index * 80}ms` }}
+        >
+            {/* ── Card header ── */}
+            <div className="p-5 pb-4">
+                <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-[hsl(43_45%_55%)] to-[hsl(43_45%_35%)] flex items-center justify-center text-white font-bold text-sm shrink-0">
+                            {holding.assetCode.slice(0, 2)}
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-[15px] leading-tight">
+                                {holding.offerName || holding.assetCode}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-xs text-muted-foreground font-mono">{holding.assetCode}</span>
+                                <Badge className="text-[10px] px-1.5 py-0 bg-muted text-muted-foreground border border-white/10 capitalize">
+                                    {holding.offerType === 'collateral' ? 'Debt' : 'Equity'}
+                                </Badge>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Hero: holding value */}
+                    <div className="text-right">
+                        <p className="text-lg font-bold">{formatCurrency(holdingValue)}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {holding.totalDistributed.toLocaleString()} tokens
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Key metrics strip ── */}
+            <div className="mx-5 mb-4 p-3 rounded-xl bg-black/20 grid grid-cols-3 gap-3">
+                {/* APY */}
+                <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                        <Percent className="h-3 w-3" />
+                        <span className="text-[10px] uppercase tracking-wider">APY</span>
+                    </div>
+                    <span className="text-sm font-bold text-emerald-400">
+                        {holding.annualInterestRate ? `${parseFloat(String(holding.annualInterestRate))}%` : '—'}
+                    </span>
+                </div>
+                {/* Payout */}
+                <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                        <DollarSign className="h-3 w-3" />
+                        <span className="text-[10px] uppercase tracking-wider">Payout</span>
+                    </div>
+                    <span className="text-sm font-semibold">{paymentLabel}</span>
+                </div>
+                {/* Maturity */}
+                <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-0.5">
+                        <Calendar className="h-3 w-3" />
+                        <span className="text-[10px] uppercase tracking-wider">Maturity</span>
+                    </div>
+                    <span className={`text-sm font-semibold ${maturityAccent}`}>
+                        {maturityLabel || 'Perpetual'}
+                    </span>
+                </div>
+            </div>
+
+            {/* ── Interest earned callout ── */}
+            {holding.interestEarned > 0 && (
+                <div className="mx-5 mb-4 flex items-center justify-between p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+                    <div className="flex items-center gap-2 text-sm">
+                        <TrendingUp className="h-4 w-4 text-emerald-400" />
+                        <span className="text-muted-foreground">Interest Earned</span>
+                    </div>
+                    <div className="text-right">
+                        <span className="text-sm font-bold text-emerald-400">
+                            {formatCurrency(holding.interestEarned)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground ml-1.5">
+                            ({holding.interestPaymentCount} payments)
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Quick actions ── */}
+            <div className="px-5 pb-4 flex items-center gap-2">
+                {holding.offerId && (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs border-white/10 hover:bg-white/5 gap-1.5"
+                        onClick={() => navigate(`/market/${holding.offerId}`)}
+                    >
+                        <ArrowRight className="h-3 w-3" /> View Offer
+                    </Button>
+                )}
+                {holding.issuerPublicKey && (
+                    <a
+                        href={`${STELLAR_EXPLORER}/asset/${holding.assetCode}-${holding.issuerPublicKey}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs border-white/10 hover:bg-white/5 gap-1.5"
+                        >
+                            <Hash className="h-3 w-3" /> Stellar Expert
+                            <ExternalLink className="h-2.5 w-2.5 text-muted-foreground" />
+                        </Button>
+                    </a>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/* ═══════════════════════════════════════ */
+/*  MAIN PAGE                              */
+/* ═══════════════════════════════════════ */
 export function Portfolio() {
-    const [investments, setInvestments] = useState<Investment[]>([]);
+    const navigate = useNavigate();
+    const [holdings, setHoldings] = useState<PortfolioHolding[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [pendingOpen, setPendingOpen] = useState(false);
 
     const {
         pendingInvestments,
@@ -169,17 +344,26 @@ export function Portfolio() {
                 const response = await api.get(`/investors/${user.id}/portfolio`);
 
                 const data = response.data || response;
-                const investmentsList = Array.isArray(data)
+                const raw = Array.isArray(data)
                     ? data
                     : (data.portfolio || data.investments || []);
 
-                setInvestments(investmentsList.map((inv: any) => ({
+                setHoldings(raw.map((inv: any) => ({
+                    id: inv.id || 0,
                     assetCode: inv.assetCode || inv.asset_code || 'N/A',
-                    tokenName: inv.offerName || inv.tokenName || inv.token_name || inv.assetCode || 'Security Token',
-                    amount: Number(inv.totalDistributed || inv.amount) || 0,
-                    currentValue: Number(inv.currentValue || inv.totalDistributed || inv.amount) || 0,
-                    interestEarned: Number(inv.interestEarned || inv.interest_earned) || 0,
-                    maturityDate: inv.maturityDate || inv.maturity_date || 'N/A',
+                    offerName: inv.offerName || inv.offer_name || null,
+                    offerType: inv.offerType || inv.offer_type || null,
+                    offerId: inv.offerId || inv.offer_id || null,
+                    annualInterestRate: Number(inv.annualInterestRate || inv.annual_interest_rate || 0),
+                    maturityDate: inv.maturityDate || inv.maturity_date || null,
+                    paymentType: inv.paymentType || inv.payment_type || null,
+                    unitPrice: Number(inv.unitPrice || inv.unit_price || 1),
+                    totalDistributed: Number(inv.totalDistributed || inv.total_distributed || inv.amount || 0),
+                    interestEarned: Number(inv.interestEarned || inv.interest_earned || 0),
+                    interestPaymentCount: Number(inv.interestPaymentCount || 0),
+                    issuerPublicKey: inv.issuerPublicKey || inv.issuer_public_key || null,
+                    sacContractId: inv.sacContractId || inv.sac_contract_id || null,
+                    offerStatus: inv.offerStatus || inv.offer_status || null,
                 })));
             } catch (err: any) {
                 console.error('Failed to fetch portfolio:', err);
@@ -192,17 +376,19 @@ export function Portfolio() {
         fetchPortfolio();
     }, [processingInvestments.length]);
 
+    /* ─── Loading ─── */
     if (loading) {
         return (
             <div className="flex items-center justify-center h-[50vh]">
                 <div className="flex flex-col items-center gap-4">
                     <Loader2 className="w-10 h-10 animate-spin text-[hsl(43_45%_55%)]" />
-                    <p className="text-muted-foreground text-sm">Loading your portfolio...</p>
+                    <p className="text-muted-foreground text-sm">Loading your portfolio…</p>
                 </div>
             </div>
         );
     }
 
+    /* ─── Error ─── */
     if (error) {
         return (
             <div className="p-4 bg-red-500/10 text-red-400 rounded-xl border border-red-500/20 animate-fade-in">
@@ -211,154 +397,125 @@ export function Portfolio() {
         );
     }
 
-    const totalValue = investments.reduce((sum, inv) => sum + inv.currentValue, 0);
-    const totalInterest = investments.reduce((sum, inv) => sum + inv.interestEarned, 0);
+    /* ─── Computed values ─── */
+    const totalValue = holdings.reduce((sum, h) => sum + h.totalDistributed * h.unitPrice, 0);
+    const totalInterest = holdings.reduce((sum, h) => sum + h.interestEarned, 0);
+    const pendingCount = pendingInvestments.length + processingInvestments.length;
 
     return (
-        <div className="space-y-8">
-            {/* Header */}
-            <div className="space-y-1 animate-fade-in">
-                <h2 className="text-3xl font-bold tracking-tight">My Portfolio</h2>
-                <p className="text-muted-foreground">Track your security token investments</p>
+        <div className="space-y-8 max-w-3xl mx-auto pb-12">
+            {/* ═══ HEADER with inline stats ═══ */}
+            <div className="animate-fade-in space-y-4">
+                <div className="space-y-1">
+                    <h2 className="text-3xl font-bold tracking-tight">My Portfolio</h2>
+                    <p className="text-muted-foreground">Your security token holdings</p>
+                </div>
+
+                {holdings.length > 0 && (
+                    <div className="grid grid-cols-3 gap-4">
+                        <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Portfolio Value</p>
+                            <p className="text-xl font-bold">{formatCurrency(totalValue)}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Interest Earned</p>
+                            <p className="text-xl font-bold text-emerald-400">{formatCurrency(totalInterest)}</p>
+                        </div>
+                        <div className="rounded-xl bg-white/[0.03] border border-white/8 p-4">
+                            <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-1">Holdings</p>
+                            <p className="text-xl font-bold">{holdings.length}</p>
+                        </div>
+                    </div>
+                )}
             </div>
 
-            {/* Pending Investments Section */}
+            {/* ═══ PENDING INVESTMENTS — Collapsible ═══ */}
             {(hasPending || pendingLoading) && (
-                <Card className="glass-panel rounded-2xl border-amber-500/20 animate-fade-in-up">
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <div>
-                            <CardTitle className="text-xl flex items-center gap-2">
-                                <Hourglass className="h-5 w-5 text-amber-400" />
-                                Pending Investments
-                            </CardTitle>
-                            <CardDescription>
-                                {pendingInvestments.length} awaiting payment, {processingInvestments.length} processing
-                            </CardDescription>
+                <div className="rounded-2xl border border-amber-500/20 bg-white/[0.02] animate-fade-in-up overflow-hidden">
+                    {/* Disclosure header */}
+                    <button
+                        onClick={() => setPendingOpen(!pendingOpen)}
+                        className="w-full flex items-center justify-between p-5 hover:bg-white/[0.02] transition-colors text-left"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Hourglass className="h-5 w-5 text-amber-400" />
+                            <div>
+                                <h3 className="font-semibold text-base">Pending Investments</h3>
+                                <p className="text-xs text-muted-foreground">
+                                    {pendingInvestments.length} awaiting payment, {processingInvestments.length} processing
+                                </p>
+                            </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                            {pendingCount > 0 && (
+                                <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-xs">
+                                    {pendingCount}
+                                </Badge>
+                            )}
                             {lastUpdated && (
-                                <span className="text-xs text-muted-foreground">
-                                    Updated {lastUpdated.toLocaleTimeString()}
+                                <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                                    {lastUpdated.toLocaleTimeString()}
                                 </span>
                             )}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={refreshPending}
-                                disabled={pendingLoading}
-                                className="h-8 gap-2 border-white/10"
-                            >
-                                <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
-                                Refresh
-                            </Button>
+                            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${pendingOpen ? 'rotate-180' : ''}`} />
                         </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {/* Processing investments first (more urgent) */}
-                        {processingInvestments.map(inv => (
-                            <PendingInvestmentCard key={inv.id} investment={inv} isProcessing />
-                        ))}
-                        {/* Pending payment investments */}
-                        {pendingInvestments.map(inv => (
-                            <PendingInvestmentCard key={inv.id} investment={inv} />
-                        ))}
-                        {pendingLoading && pendingInvestments.length === 0 && processingInvestments.length === 0 && (
-                            <div className="flex items-center justify-center py-4">
-                                <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            )}
+                    </button>
 
-            {/* Summary Cards */}
-            <div className="grid gap-5 md:grid-cols-3">
-                <Card className="stat-card rounded-2xl animate-fade-in-up animate-delay-1">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Portfolio Value</CardTitle>
-                        <div className="icon-bg icon-bg-accent">
-                            <Wallet className="h-5 w-5 text-[hsl(43_45%_55%)]" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold value-accent">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalValue)}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="stat-card rounded-2xl animate-fade-in-up animate-delay-2">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Total Interest Earned</CardTitle>
-                        <div className="icon-bg icon-bg-success">
-                            <TrendingUp className="h-5 w-5 text-[hsl(160_60%_40%)]" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold value-success">
-                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totalInterest)}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="stat-card rounded-2xl animate-fade-in-up animate-delay-3">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Active Investments</CardTitle>
-                        <div className="icon-bg icon-bg-primary">
-                            <PieChart className="h-5 w-5 text-[hsl(217_91%_60%)]" />
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-3xl font-bold">{investments.length}</div>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Investment List */}
-            <Card className="glass-panel rounded-2xl animate-fade-in-up animate-delay-4">
-                <CardHeader>
-                    <CardTitle className="text-xl">My Investments</CardTitle>
-                    <CardDescription>Your security token holdings</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    {investments.length > 0 ? (
-                        <div className="space-y-3">
-                            {investments.map((inv, index) => (
-                                <div
-                                    key={`${inv.assetCode}-${index}`}
-                                    className="activity-item flex items-center justify-between p-4 rounded-xl"
+                    {/* Collapsible content */}
+                    {pendingOpen && (
+                        <div className="px-5 pb-5 space-y-4 animate-fade-in">
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={refreshPending}
+                                    disabled={pendingLoading}
+                                    className="h-7 gap-1.5 text-xs text-muted-foreground"
                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[hsl(43_45%_55%)] to-[hsl(43_45%_35%)] flex items-center justify-center text-white font-bold text-sm">
-                                            {inv.assetCode.slice(0, 2)}
-                                        </div>
-                                        <div>
-                                            <p className="font-medium">{inv.tokenName}</p>
-                                            <p className="text-sm text-muted-foreground font-mono">{inv.assetCode}</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-semibold">
-                                            {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(inv.currentValue)}
-                                        </p>
-                                        <p className="text-sm value-success">
-                                            +{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(inv.interestEarned)} earned
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="p-5 rounded-2xl bg-muted/30 mb-4">
-                                <Briefcase className="w-10 h-10 text-muted-foreground/50" />
+                                    <RefreshCw className={`h-3 w-3 ${pendingLoading ? 'animate-spin' : ''}`} />
+                                    Refresh
+                                </Button>
                             </div>
-                            <p className="text-lg font-medium mb-1">No investments yet</p>
-                            <p className="text-sm text-muted-foreground">Visit the Marketplace to invest in security tokens.</p>
+                            {processingInvestments.map(inv => (
+                                <PendingInvestmentCard key={inv.id} investment={inv} isProcessing />
+                            ))}
+                            {pendingInvestments.map(inv => (
+                                <PendingInvestmentCard key={inv.id} investment={inv} />
+                            ))}
+                            {pendingLoading && pendingCount === 0 && (
+                                <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                                </div>
+                            )}
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
+            )}
+
+            {/* ═══ INVESTMENT HOLDINGS ═══ */}
+            {holdings.length > 0 ? (
+                <div className="space-y-4">
+                    {holdings.map((holding, index) => (
+                        <HoldingCard key={holding.assetCode} holding={holding} index={index} />
+                    ))}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+                    <div className="p-5 rounded-2xl bg-muted/30 mb-5">
+                        <Briefcase className="w-10 h-10 text-muted-foreground/50" />
+                    </div>
+                    <p className="text-lg font-medium mb-1">No investments yet</p>
+                    <p className="text-sm text-muted-foreground mb-5">
+                        Explore our marketplace to invest in security tokens.
+                    </p>
+                    <Button
+                        className="bg-[hsl(160_60%_40%)] hover:bg-[hsl(160_60%_35%)] text-white rounded-xl px-6"
+                        onClick={() => navigate('/market')}
+                    >
+                        Browse Marketplace <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                </div>
+            )}
         </div>
     );
 }
