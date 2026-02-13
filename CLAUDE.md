@@ -152,3 +152,25 @@ This folder contains the **full scraped Stellar developer docs** including:
 - **Horizon Testnet**: `https://horizon-testnet.stellar.org`
 - **Stellar Lab**: `https://lab.stellar.org`
 
+---
+
+## Browser Testing Protocol
+
+> ⚠️ **CRITICAL: Passkey Login Required**
+>
+> All logins on this platform use **passkeys (WebAuthn)**. The browser subagent **cannot** complete passkey authentication.
+> **YOU MUST always prompt the user to login FIRST before taking browser control.**
+
+### Login URLs
+
+| Portal | URL | Auth Method |
+|--------|-----|-------------|
+| **Admin** | `https://dev.radox.net/admin/login` | Passkey (Freighter) |
+| **Company / Investor** | `https://dev.radox.net/login` | Passkey |
+
+### Pre-Browser Checklist
+
+1. **Ask the user** to login to the target portal in their browser
+2. **Wait for confirmation** that they are logged in and on the correct page
+3. **Only then** launch the browser subagent to inspect/interact with the page
+4. If the subagent encounters a login page, **stop immediately** and ask the user to re-authenticate

@@ -1281,6 +1281,7 @@ router.get('/investors/:id/details', authenticateToken, requirePlatformAdmin, as
       success: true,
       data: {
         ...investor,
+        status: investor.kycStatus, // Map kycStatus → status for frontend consistency
         walletAddress: investor.stellarContractId,
         balances,
         transactions,

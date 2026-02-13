@@ -16,7 +16,11 @@ import {
     Inbox,
     DollarSign,
     Clock,
+    ExternalLink,
+    ArrowRight,
+    Circle,
 } from 'lucide-react';
+import { getStellarExplorerTxUrl } from '@/utils/stellar';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -117,6 +121,28 @@ export function Approvals() {
     const [filter, setFilter] = useState<ApprovalType | 'all'>('all');
     const [selected, setSelected] = useState<ApprovalItem | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+
+    // Signing progress state — stepped indicator
+    type SigningStep = 'fetching_xdr' | 'awaiting_freighter' | 'submitting_signature' | 'processing_stellar' | 'done' | 'error';
+    const [signingProgress, setSigningProgress] = useState<{ step: SigningStep; label: string } | null>(null);
+
+    // Success result dialog state
+    interface SigningResult {
+        success: boolean;
+        txHash?: string;
+        operationType?: string;
+        description?: string;
+        signingRole?: string;
+        signatureCount?: number;
+        thresholdRequired?: number;
+        remainingSignatures?: number;
+        autoSubmitted?: boolean;
+        investorPublicKey?: string;
+        investorName?: string;
+        assetCode?: string;
+        error?: string;
+    }
+    const [signingResult, setSigningResult] = useState<SigningResult | null>(null);
 
     // Reject dialog state
     const [rejectDialog, setRejectDialog] = useState<{ open: boolean; item: ApprovalItem | null }>({
@@ -417,46 +443,97 @@ export function Approvals() {
         const signingRole = getRoleName(freighterDevice.publicKey);
 
         setActionLoading(true);
+        setSigningProgress({ step: 'fetching_xdr', label: 'Fetching transaction...' });
         try {
             console.log('[Approvals] Step 1: Fetching XDR for tx', item.originalId);
             const xdrRes = await api.get(`/admin/transactions/${item.originalId}/xdr`);
-            console.log('[Approvals] Step 1 result:', { success: xdrRes.success, hasXdr: !!xdrRes.data?.xdr });
             if (!xdrRes.success) throw new Error('Failed to get transaction XDR');
 
             const { xdr, networkPassphrase } = xdrRes.data;
-            console.log('[Approvals] Step 2: Opening Freighter to sign...', { networkPassphrase: networkPassphrase?.slice(0, 20) });
+            setSigningProgress({ step: 'awaiting_freighter', label: 'Sign in Freighter...' });
             const signResult = await freighterSign(xdr, networkPassphrase);
-            console.log('[Approvals] Step 2 result:', { signed: !!signResult, publicKey: signResult?.publicKey?.slice(0, 8) });
-            if (!signResult) throw new Error('Signing cancelled or Freighter returned null');
+            if (!signResult) {
+                setSigningProgress(null);
+                setActionLoading(false);
+                toast.info('Signing cancelled.');
+                return;
+            }
 
-            console.log('[Approvals] Step 3: Submitting signature to backend...');
+            setSigningProgress({ step: 'submitting_signature', label: 'Submitting signature...' });
             const submitRes = await api.post(`/admin/transactions/${item.originalId}/sign`, {
                 publicKey: signResult.publicKey,
                 signature: signResult.signature,
             });
-            console.log('[Approvals] Step 3 result:', submitRes);
+            console.log('[Approvals] Sign result:', submitRes);
 
             if (submitRes.success) {
                 const data = submitRes.data;
                 const remainingAfter = data?.remainingSignatures ?? (tx.thresholdRequired - (data?.signatureCount || 1));
 
                 if (data?.autoSubmitted && data?.submitResult?.success) {
-                    toast.success(`Signed as ${signingRole} — transaction submitted to Stellar! Hash: ${data.submitResult.hash?.slice(0, 12)}…`);
+                    // Fully signed and auto-submitted
+                    setSigningProgress({ step: 'done', label: 'Transaction executed!' });
+                    setSigningResult({
+                        success: true,
+                        txHash: data.submitResult.hash,
+                        operationType: tx.operationType,
+                        description: tx.description,
+                        signingRole,
+                        signatureCount: data.signatureCount,
+                        thresholdRequired: tx.thresholdRequired,
+                        remainingSignatures: 0,
+                        autoSubmitted: true,
+                        investorPublicKey: tx.metadata?.investorPublicKey,
+                        investorName: tx.metadata?.investorName,
+                        assetCode: tx.metadata?.assetCode,
+                    });
                 } else if (remainingAfter <= 0) {
-                    toast.success(`Signed as ${signingRole} — all signatures collected! Submitting…`);
+                    // All signatures collected, pending submission
+                    setSigningProgress({ step: 'done', label: 'Signatures complete!' });
+                    setSigningResult({
+                        success: true,
+                        operationType: tx.operationType,
+                        description: tx.description,
+                        signingRole,
+                        signatureCount: data.signatureCount,
+                        thresholdRequired: tx.thresholdRequired,
+                        remainingSignatures: 0,
+                        autoSubmitted: false,
+                    });
                 } else {
+                    // Partially signed — more signers needed
                     const nextSigners = remaining.filter((k: string) => k !== signResult.publicKey);
                     const nextRoles = nextSigners.map((k: string) => getRoleName(k)).join(', ');
-                    toast.success(`Signed as ${signingRole} (${data?.signatureCount || 1}/${tx.thresholdRequired}). Switch Freighter to ${nextRoles} to continue.`);
+                    setSigningProgress({ step: 'done', label: 'Signature recorded' });
+                    setSigningResult({
+                        success: true,
+                        operationType: tx.operationType,
+                        description: tx.description,
+                        signingRole,
+                        signatureCount: data.signatureCount,
+                        thresholdRequired: tx.thresholdRequired,
+                        remainingSignatures: remainingAfter,
+                    });
+                    toast.info(`Switch Freighter to ${nextRoles} to continue.`);
                 }
             } else {
                 console.warn('[Approvals] Submit returned non-success:', submitRes);
-                toast.error(submitRes.error || 'Signature submission failed');
+                setSigningProgress({ step: 'error', label: 'Submission failed' });
+                setSigningResult({
+                    success: false,
+                    error: submitRes.error || 'Signature submission failed',
+                    operationType: tx.operationType,
+                    description: tx.description,
+                });
             }
             await refresh();
         } catch (err: any) {
             console.error('[Approvals] handleSignMultisig error:', err);
-            toast.error(err.message || 'Failed to sign');
+            setSigningProgress({ step: 'error', label: 'Failed' });
+            setSigningResult({
+                success: false,
+                error: err.message || 'Failed to sign',
+            });
         } finally {
             setActionLoading(false);
         }
@@ -741,6 +818,193 @@ export function Approvals() {
                             Send XLM
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Signing progress overlay ── */}
+            {signingProgress && signingProgress.step !== 'done' && signingProgress.step !== 'error' && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                    <div className="bg-slate-900 border border-white/10 rounded-xl p-8 flex flex-col items-center gap-6 min-w-[340px] shadow-2xl">
+                        {/* Step indicators */}
+                        <div className="flex flex-col gap-3 w-full">
+                            {[
+                                { key: 'fetching_xdr', label: 'Fetching transaction' },
+                                { key: 'awaiting_freighter', label: 'Sign in Freighter' },
+                                { key: 'submitting_signature', label: 'Submitting signature' },
+                            ].map((s, i) => {
+                                const steps = ['fetching_xdr', 'awaiting_freighter', 'submitting_signature'];
+                                const currentIdx = steps.indexOf(signingProgress.step);
+                                const stepIdx = i;
+                                const isActive = stepIdx === currentIdx;
+                                const isDone = stepIdx < currentIdx;
+
+                                return (
+                                    <div key={s.key} className="flex items-center gap-3">
+                                        {isDone ? (
+                                            <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0" />
+                                        ) : isActive ? (
+                                            <Loader2 className="w-5 h-5 text-blue-400 animate-spin shrink-0" />
+                                        ) : (
+                                            <Circle className="w-5 h-5 text-zinc-600 shrink-0" />
+                                        )}
+                                        <span className={`text-sm ${isDone ? 'text-zinc-400 line-through' : isActive ? 'text-white font-medium' : 'text-zinc-600'}`}>
+                                            {s.label}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="text-xs text-zinc-500 text-center">
+                            {signingProgress.step === 'awaiting_freighter'
+                                ? 'Approve the transaction in your Freighter extension'
+                                : signingProgress.label}
+                        </p>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Signing result dialog ── */}
+            <Dialog
+                open={!!signingResult}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setSigningResult(null);
+                        setSigningProgress(null);
+                    }
+                }}
+            >
+                <DialogContent className="bg-slate-900 border-white/10 max-w-md">
+                    {signingResult && (
+                        <>
+                            <DialogHeader className="items-center text-center">
+                                {signingResult.success ? (
+                                    <div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-3">
+                                        <CheckCircle className="w-8 h-8 text-emerald-400" />
+                                    </div>
+                                ) : (
+                                    <div className="w-16 h-16 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mx-auto mb-3">
+                                        <XCircle className="w-8 h-8 text-red-400" />
+                                    </div>
+                                )}
+                                <DialogTitle className="text-lg">
+                                    {signingResult.success
+                                        ? signingResult.remainingSignatures === 0 && signingResult.autoSubmitted
+                                            ? 'Transaction Executed'
+                                            : signingResult.remainingSignatures === 0
+                                                ? 'All Signatures Collected'
+                                                : 'Signature Recorded'
+                                        : 'Transaction Failed'
+                                    }
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-zinc-400">
+                                    {signingResult.description || signingResult.operationType?.replace(/_/g, ' ') || 'Multisig transaction'}
+                                </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-4 py-4">
+                                {/* Signature progress */}
+                                {signingResult.success && signingResult.signatureCount != null && signingResult.thresholdRequired != null && (
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-zinc-400">Signatures</span>
+                                            <span className="text-white font-medium">
+                                                {signingResult.signatureCount}/{signingResult.thresholdRequired}
+                                            </span>
+                                        </div>
+                                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                                            <div
+                                                className="h-full bg-gradient-to-r from-purple-500 to-emerald-500 rounded-full transition-all duration-500"
+                                                style={{ width: `${(signingResult.signatureCount / signingResult.thresholdRequired) * 100}%` }}
+                                            />
+                                        </div>
+                                        {signingResult.signingRole && (
+                                            <p className="text-xs text-zinc-500">
+                                                Signed as <span className="text-purple-400 font-medium">{signingResult.signingRole}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Remaining signatures notice */}
+                                {signingResult.success && signingResult.remainingSignatures != null && signingResult.remainingSignatures > 0 && (
+                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                                        <Clock className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
+                                        <p className="text-xs text-yellow-300">
+                                            {signingResult.remainingSignatures} more signature{signingResult.remainingSignatures > 1 ? 's' : ''} required.
+                                            Switch Freighter to the next signer.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* TX hash + Stellar Expert link */}
+                                {signingResult.txHash && (
+                                    <div className="p-3 rounded-lg bg-white/5 border border-white/10 space-y-2">
+                                        <span className="text-[11px] text-zinc-500 uppercase tracking-wider font-medium">Transaction Hash</span>
+                                        <a
+                                            href={getStellarExplorerTxUrl(signingResult.txHash)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 group"
+                                        >
+                                            <code className="text-xs text-emerald-400 font-mono truncate flex-1">
+                                                {signingResult.txHash}
+                                            </code>
+                                            <ExternalLink className="w-3.5 h-3.5 text-zinc-500 group-hover:text-emerald-400 transition-colors shrink-0" />
+                                        </a>
+                                        <p className="text-[11px] text-zinc-600">
+                                            View on Stellar Expert ↗
+                                        </p>
+                                    </div>
+                                )}
+
+                                {/* Error message */}
+                                {!signingResult.success && signingResult.error && (
+                                    <div className="flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                                        <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
+                                        <p className="text-xs text-red-300">{signingResult.error}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter className="flex-col gap-2 sm:flex-col">
+                                {/* Contextual navigation based on operation type */}
+                                {signingResult.success && signingResult.autoSubmitted && signingResult.txHash && (
+                                    <>
+                                        {signingResult.operationType === 'token_distribute' && signingResult.investorPublicKey && (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                                                onClick={() => {
+                                                    const explorerUrl = `https://stellar.expert/explorer/testnet/contract/${signingResult.investorPublicKey}`;
+                                                    window.open(explorerUrl, '_blank');
+                                                }}
+                                            >
+                                                <Wallet className="w-4 h-4 mr-2" />
+                                                {signingResult.investorName ? `View ${signingResult.investorName}'s Wallet` : 'View Investor Wallet'}
+                                                <ArrowRight className="w-4 h-4 ml-auto" />
+                                            </Button>
+                                        )}
+                                        <Button
+                                            variant="outline"
+                                            className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+                                            onClick={() => {
+                                                window.open(getStellarExplorerTxUrl(signingResult.txHash!), '_blank');
+                                            }}
+                                        >
+                                            <ExternalLink className="w-4 h-4 mr-2" />
+                                            Open in Stellar Expert
+                                        </Button>
+                                    </>
+                                )}
+                                <Button
+                                    className="w-full"
+                                    onClick={() => { setSigningResult(null); setSigningProgress(null); }}
+                                >
+                                    Done
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    )}
                 </DialogContent>
             </Dialog>
         </div>
