@@ -165,9 +165,10 @@ export const getInvestorBalance = async (req, res, next) => {
 export const getInvestorPayments = async (req, res, next) => {
   try {
     const { investorId } = req.params;
-    const { assetCode, limit = 100, offset = 0 } = req.query;
+    const { assetCode, type, limit = 100, offset = 0 } = req.query;
 
-    const investor = await Investor.findById(parseInt(investorId, 10));
+    const parsedId = parseInt(investorId, 10);
+    const investor = await Investor.findById(parsedId);
     if (!investor) {
       return res.status(404).json({
         success: false,
@@ -175,21 +176,81 @@ export const getInvestorPayments = async (req, res, next) => {
       });
     }
 
-    const where = { investorId: parseInt(investorId, 10) };
-    if (assetCode) where.assetCode = assetCode;
+    const baseWhere = { investorId: parsedId };
+    if (assetCode) baseWhere.assetCode = assetCode;
 
-    const [payments, total] = await Promise.all([
-      prisma.interestPayment.findMany({
-        where,
-        take: parseInt(limit, 10),
-        skip: parseInt(offset, 10),
-        orderBy: [
-          { paymentDate: 'desc' },
-          { createdAt: 'desc' },
-        ],
-      }),
-      prisma.interestPayment.count({ where }),
+    // Fetch all 4 sources in parallel
+    const [interestPayments, investments, deposits, distributions] = await Promise.all([
+      (!type || type === 'interest') ? prisma.interestPayment.findMany({
+        where: baseWhere,
+        orderBy: [{ paymentDate: 'desc' }, { createdAt: 'desc' }],
+      }) : [],
+      (!type || type === 'purchase') ? prisma.investment.findMany({
+        where: baseWhere,
+        include: { offer: { select: { offerName: true } } },
+        orderBy: { createdAt: 'desc' },
+      }) : [],
+      (!type || type === 'deposit') ? prisma.deposit.findMany({
+        where: { investorId: parsedId },
+        orderBy: { createdAt: 'desc' },
+      }) : [],
+      (!type || type === 'distribution') ? prisma.tokenDistribution.findMany({
+        where: baseWhere,
+        orderBy: { createdAt: 'desc' },
+      }) : [],
     ]);
+
+    // Normalize into unified shape
+    const all = [
+      ...interestPayments.map(p => ({
+        id: `ip-${p.id}`,
+        type: 'Interest Payment',
+        amount: parseFloat(p.usdcAmount || 0),
+        date: p.paymentDate || p.createdAt,
+        status: p.status || 'completed',
+        assetCode: p.assetCode,
+        txHash: p.transactionHash || null,
+        details: { paymentType: p.paymentType, isBullet: p.isBulletPayment },
+      })),
+      ...investments.map(inv => ({
+        id: `inv-${inv.id}`,
+        type: 'Token Purchase',
+        amount: parseFloat(inv.usdcAmount || 0),
+        date: inv.createdAt,
+        status: inv.status,
+        assetCode: inv.assetCode,
+        txHash: inv.distributionTxHash || inv.usdcPaymentHash || null,
+        details: { offerName: inv.offer?.offerName || null, tokenAmount: parseFloat(inv.tokenAmount || 0) },
+      })),
+      ...deposits.map(d => ({
+        id: `dep-${d.id}`,
+        type: 'USDC Deposit',
+        amount: parseFloat(d.actualAmount || d.expectedAmount || 0),
+        date: d.createdAt,
+        status: d.status,
+        assetCode: 'USDC',
+        txHash: d.incomingTxHash || d.outgoingTxHash || null,
+        details: null,
+      })),
+      ...distributions.map(td => ({
+        id: `td-${td.id}`,
+        type: 'Token Distribution',
+        amount: parseFloat(td.amount || 0),
+        date: td.createdAt,
+        status: td.approvalStatus || 'completed',
+        assetCode: td.assetCode,
+        txHash: td.transactionHash || null,
+        details: null,
+      })),
+    ];
+
+    // Sort by date descending
+    all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Paginate
+    const parsedLimit = parseInt(limit, 10);
+    const parsedOffset = parseInt(offset, 10);
+    const paginated = all.slice(parsedOffset, parsedOffset + parsedLimit);
 
     res.json({
       success: true,
@@ -199,19 +260,12 @@ export const getInvestorPayments = async (req, res, next) => {
           name: investor.name,
           email: investor.email,
         },
-        payments,
+        transactions: paginated,
         pagination: {
-          total,
-          limit: parseInt(limit, 10),
-          offset: parseInt(offset, 10),
-          count: payments.length,
-        },
-        summary: {
-          totalInterestReceived: payments.reduce(
-            (sum, p) => sum + parseFloat(p.usdcAmount || 0),
-            0
-          ),
-          totalPayments: total,
+          total: all.length,
+          limit: parsedLimit,
+          offset: parsedOffset,
+          count: paginated.length,
         },
       },
     });
