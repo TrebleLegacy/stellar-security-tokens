@@ -1,7 +1,7 @@
 import express from 'express';
 import { body, param } from 'express-validator';
 import { validate } from '../middleware/validator.js';
-import { authenticateToken, generateToken } from '../middleware/auth.js';
+import { authenticateToken, generateToken, generateRefreshToken, setRefreshCookie } from '../middleware/auth.js';
 import { requirePlatformAdmin, requireAdminRole } from '../middleware/authorize.js';
 import { PlatformAdminController } from '../controllers/platformAdminController.js';
 import { InvestmentMetricsController } from '../controllers/investmentMetricsController.js';
@@ -197,6 +197,10 @@ router.post('/freighter/verify', async (req, res) => {
       userType: 'platform_admin',
       role: admin.role
     });
+
+    // Generate refresh token and set httpOnly cookie
+    const refreshToken = await generateRefreshToken('platform_admin', admin.id);
+    setRefreshCookie(res, refreshToken, 'platform_admin');
 
     console.log(`[Freighter Auth] Login successful for ${admin.email}`);
 

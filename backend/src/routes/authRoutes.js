@@ -2,7 +2,15 @@ import crypto from 'crypto';
 import express from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validator.js';
-import { generateToken, authenticateToken } from '../middleware/auth.js';
+import {
+  generateToken,
+  authenticateToken,
+  generateRefreshToken,
+  setRefreshCookie,
+  clearRefreshCookie,
+  rotateRefreshToken,
+  getRefreshTokenFromCookies,
+} from '../middleware/auth.js';
 import { Investor } from '../models/Investor.js';
 import { CompanyUser } from '../models/CompanyUser.js';
 import prisma from '../config/prisma.js';
@@ -204,7 +212,7 @@ router.post('/passkey-login/discover', [
       });
     }
 
-    // Generate JWT token
+    // Generate JWT access token (short-lived)
     const token = generateToken({
       userId: user.id,
       email: user.email,
@@ -212,9 +220,13 @@ router.post('/passkey-login/discover', [
       role: user.userType === 'investor' ? 'investor' : user.role,
       ...(user.userType === 'company' ? {
         companyId: user.companyId,
-        companyUserId: user.companyUserId || user.id // For offer creation FK
+        companyUserId: user.companyUserId || user.id
       } : {})
     });
+
+    // Generate refresh token (long-lived, stored in httpOnly cookie)
+    const refreshToken = await generateRefreshToken(user.userType, user.id);
+    setRefreshCookie(res, refreshToken, user.userType);
 
     const userData = {
       id: user.id,
@@ -236,6 +248,55 @@ router.post('/passkey-login/discover', [
         token,
         user: userData,
         userType: user.userType
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: Refresh access token using httpOnly cookie
+ *     description: Reads the refresh token from the httpOnly cookie, rotates it, and returns a new access token.
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: New access token issued
+ *       401:
+ *         description: No valid refresh token
+ */
+router.post('/refresh', async (req, res, next) => {
+  try {
+    const cookieData = getRefreshTokenFromCookies(req.cookies || {});
+
+    if (!cookieData) {
+      return res.status(401).json({
+        success: false,
+        error: 'No refresh token provided',
+      });
+    }
+
+    const result = await rotateRefreshToken(cookieData.token);
+
+    if (!result) {
+      // Clear the invalid cookie
+      clearRefreshCookie(res, cookieData.userType);
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or expired refresh token. Please login again.',
+      });
+    }
+
+    // Set new refresh cookie
+    setRefreshCookie(res, result.refreshToken, result.userType);
+
+    res.json({
+      success: true,
+      data: {
+        token: result.accessToken,
       },
     });
   } catch (error) {
@@ -269,6 +330,10 @@ router.post('/logout', authenticateToken, async (req, res, next) => {
         console.warn('[Auth] Failed to blocklist token (Redis unavailable)');
       }
     }
+
+    // Also revoke the refresh token and clear the cookie
+    const userType = req.user?.userType || 'investor';
+    clearRefreshCookie(res, userType);
 
     res.json({
       success: true,

@@ -1,23 +1,34 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { PieChart, ArrowLeftRight, Settings, LogOut, Wallet, Store } from 'lucide-react';
+import { PieChart, ArrowLeftRight, Settings, LogOut, Wallet, Store, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { NotificationBell } from '@/components/NotificationBell';
 import { MobileSidebar, MenuToggleButton, useMobileSidebar } from '@/components/MobileSidebar';
 import { authStorage } from '@/utils/authStorage';
+import { useAuthRefresh } from '@/hooks/useAuthRefresh';
 
 export function DashboardLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const { isOpen, open, close } = useMobileSidebar();
+    const { isLoading, isAuthenticated } = useAuthRefresh('investor');
 
-    // Auth guard - redirect to login if no token
+    // Auth guard - redirect to login only after refresh attempt completes
     useEffect(() => {
-        if (!authStorage.isAuthenticated('investor')) {
+        if (!isLoading && !isAuthenticated) {
             navigate('/login', { replace: true });
         }
-    }, [navigate]);
+    }, [isLoading, isAuthenticated, navigate]);
+
+    // Show loading while restoring session
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+        );
+    }
 
     // Close mobile sidebar on route change
     useEffect(() => {
@@ -104,11 +115,7 @@ export function DashboardLayout() {
                     <div className="flex items-center gap-2 md:gap-4">
                         <NotificationBell />
                         <div className="text-sm text-muted-foreground hidden sm:block">
-                            {authStorage.getUser<any>('investor')?.email === 'test-investor@stellar-tokens.local' && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_LOGIN === 'true') ? (
-                                <>Connected: <span className="text-emerald-400">Dev Investor (Auto-sign)</span></>
-                            ) : (
-                                <>Connected: <span className="text-emerald-400">Passkey Wallet</span></>
-                            )}
+                            Connected: <span className="text-emerald-400">Passkey Wallet</span>
                         </div>
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-purple-500" />
                     </div>

@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FileText, BarChart3, Settings, LogOut, Building2, Wallet, Files, Coins } from 'lucide-react';
+import { LayoutDashboard, FileText, BarChart3, Settings, LogOut, Building2, Wallet, Files, Coins, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -8,19 +8,30 @@ import { useEffect, useState } from 'react';
 import { companiesApi } from '@/api/companies';
 import type { Company } from '@/types';
 import { authStorage } from '@/utils/authStorage';
+import { useAuthRefresh } from '@/hooks/useAuthRefresh';
 
 export function CompanyLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const { isOpen, open, close } = useMobileSidebar();
     const [company, setCompany] = useState<Company | null>(null);
+    const { isLoading, isAuthenticated } = useAuthRefresh('company');
 
-    // Auth guard - redirect to login if no token
+    // Auth guard - redirect to login only after refresh attempt completes
     useEffect(() => {
-        if (!authStorage.isAuthenticated('company')) {
+        if (!isLoading && !isAuthenticated) {
             navigate('/login', { replace: true });
         }
-    }, [navigate]);
+    }, [isLoading, isAuthenticated, navigate]);
+
+    // Show loading while restoring session
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+        );
+    }
 
     // Close mobile sidebar on route change
     useEffect(() => {
