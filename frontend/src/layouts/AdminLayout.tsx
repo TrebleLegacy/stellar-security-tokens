@@ -1,11 +1,12 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet, AlertTriangle, Building2, FileText, Siren, Coins, Info, CheckCircle2, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet, AlertTriangle, Building2, FileText, Siren, Coins, Info, CheckCircle2, ClipboardCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
 import { MobileSidebar, MenuToggleButton, useMobileSidebar } from '@/components/MobileSidebar';
 import { useEffect } from 'react';
 import { authStorage } from '@/utils/authStorage';
+import { useAuthRefresh } from '@/hooks/useAuthRefresh';
 import {
     Dialog,
     DialogContent,
@@ -176,13 +177,23 @@ export function AdminLayout() {
     const navigate = useNavigate();
     const location = useLocation();
     const { isOpen, open, close } = useMobileSidebar();
+    const { isLoading, isAuthenticated } = useAuthRefresh('admin');
 
-    // Auth guard - redirect to admin login if no token
+    // Auth guard - redirect to admin login only after refresh attempt completes
     useEffect(() => {
-        if (!authStorage.isAuthenticated('admin')) {
+        if (!isLoading && !isAuthenticated) {
             navigate('/admin/login', { replace: true });
         }
-    }, [navigate]);
+    }, [isLoading, isAuthenticated, navigate]);
+
+    // Show loading while restoring session
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+            </div>
+        );
+    }
 
     // Close mobile sidebar on route change
     useEffect(() => {
@@ -283,11 +294,7 @@ export function AdminLayout() {
                     <div className="flex items-center gap-2 md:gap-4">
                         <NotificationBell />
                         <div className="text-sm text-muted-foreground hidden sm:block">
-                            {authStorage.getUser<any>('admin')?.email === 'admin@stellar-tokens.local' && (import.meta.env.DEV || import.meta.env.VITE_ENABLE_TEST_LOGIN === 'true') ? (
-                                <>Admin Status: <span className="text-emerald-400 font-medium">Dev Admin (Auto-sign)</span></>
-                            ) : (
-                                <>Role: <span className="text-red-400">Platform Admin</span></>
-                            )}
+                            Role: <span className="text-red-400">Platform Admin</span>
                         </div>
                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-red-500 to-orange-500" />
                     </div>

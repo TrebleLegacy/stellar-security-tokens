@@ -1,30 +1,31 @@
 /**
  * Centralized auth storage utility for multi-session support.
  * 
- * This allows simultaneous login as admin, company, and investor
- * in the same browser by using separate localStorage keys for each user type.
+ * SECURITY: Access tokens are stored IN MEMORY (not localStorage) to prevent XSS theft.
+ * User data (non-sensitive) remains in localStorage for persistence across page reloads.
+ * Refresh tokens are in httpOnly cookies (managed by the browser, invisible to JS).
+ * 
+ * On page reload, the access token is lost — the app calls /api/auth/refresh
+ * to get a new one using the httpOnly cookie.
  */
 
 export type UserType = 'admin' | 'company' | 'investor';
 
 interface StorageKeys {
-    token: string;
     user: string;
 }
 
+// In-memory token store (NOT persisted — that's the point)
+const tokenStore = new Map<UserType, string>();
+
 const STORAGE_KEYS: Record<UserType, StorageKeys> = {
-    admin: { token: 'admin_token', user: 'admin_user' },
-    company: { token: 'company_token', user: 'company_user' },
-    investor: { token: 'investor_token', user: 'investor_user' },
+    admin: { user: 'admin_user' },
+    company: { user: 'company_user' },
+    investor: { user: 'investor_user' },
 };
 
-// Legacy keys for backward compatibility
-const LEGACY_KEYS = {
-    token: 'token',
-    user: 'user',
-    userType: 'userType',
-    admin: 'admin',
-};
+// Legacy keys to clean up
+const LEGACY_KEYS = ['token', 'user', 'userType', 'admin', 'admin_token', 'company_token', 'investor_token'];
 
 /**
  * Detect user type from current URL path.
@@ -39,7 +40,6 @@ export function detectUserType(): UserType {
 
 /**
  * Get the storage keys for a given user type.
- * If no user type is provided, it's auto-detected from the current path.
  */
 function getKeys(userType?: UserType): StorageKeys {
     const type = userType ?? detectUserType();
@@ -47,68 +47,36 @@ function getKeys(userType?: UserType): StorageKeys {
 }
 
 /**
- * Migrate legacy session data to new type-specific keys.
- * Called once on first access to ensure backward compatibility.
+ * Clean up any legacy token keys from localStorage.
+ * Called once on module load.
  */
-function migrateLegacySession(): void {
-    const legacyToken = localStorage.getItem(LEGACY_KEYS.token);
-    if (!legacyToken) return; // No legacy session to migrate
-
-    const legacyUserType = localStorage.getItem(LEGACY_KEYS.userType);
-    const legacyUser = localStorage.getItem(LEGACY_KEYS.user);
-    const legacyAdmin = localStorage.getItem(LEGACY_KEYS.admin);
-
-    // Determine which user type this legacy session belongs to
-    let targetType: UserType = 'investor';
-    let userData = legacyUser;
-
-    if (legacyUserType === 'admin' || legacyAdmin) {
-        targetType = 'admin';
-        userData = legacyAdmin || legacyUser;
-    } else if (legacyUserType === 'company') {
-        targetType = 'company';
-    }
-
-    // Migrate to new keys
-    const newKeys = STORAGE_KEYS[targetType];
-    localStorage.setItem(newKeys.token, legacyToken);
-    if (userData) {
-        localStorage.setItem(newKeys.user, userData);
-    }
-
-    // Clear legacy keys after migration
-    localStorage.removeItem(LEGACY_KEYS.token);
-    localStorage.removeItem(LEGACY_KEYS.user);
-    localStorage.removeItem(LEGACY_KEYS.userType);
-    localStorage.removeItem(LEGACY_KEYS.admin);
-
-    console.log(`[authStorage] Migrated legacy session to ${targetType}`);
+function cleanupLegacyKeys(): void {
+    LEGACY_KEYS.forEach(key => localStorage.removeItem(key));
 }
 
-// Run migration once on module load
-migrateLegacySession();
+// Run cleanup once on module load
+cleanupLegacyKeys();
 
 export const authStorage = {
     /**
-     * Get the auth token for the specified user type.
-     * Auto-detects user type from path if not provided.
+     * Get the access token from in-memory store.
+     * Returns null if not present (e.g., after page reload — caller should refresh).
      */
     getToken(userType?: UserType): string | null {
-        const keys = getKeys(userType);
-        return localStorage.getItem(keys.token);
+        const type = userType ?? detectUserType();
+        return tokenStore.get(type) || null;
     },
 
     /**
-     * Set the auth token for the specified user type.
+     * Set the access token in memory only (NOT localStorage).
      */
     setToken(token: string, userType?: UserType): void {
-        const keys = getKeys(userType);
-        localStorage.setItem(keys.token, token);
+        const type = userType ?? detectUserType();
+        tokenStore.set(type, token);
     },
 
     /**
-     * Get the user object for the specified user type.
-     * Returns null if not found or invalid JSON.
+     * Get the user object from localStorage.
      */
     getUser<T = unknown>(userType?: UserType): T | null {
         const keys = getKeys(userType);
@@ -122,7 +90,7 @@ export const authStorage = {
     },
 
     /**
-     * Set the user object for the specified user type.
+     * Set the user object in localStorage (non-sensitive data only).
      */
     setUser(user: object, userType?: UserType): void {
         const keys = getKeys(userType);
@@ -131,34 +99,38 @@ export const authStorage = {
 
     /**
      * Clear auth data for the specified user type.
-     * Auto-detects user type from path if not provided.
      */
     clear(userType?: UserType): void {
-        const keys = getKeys(userType);
-        localStorage.removeItem(keys.token);
+        const type = userType ?? detectUserType();
+        tokenStore.delete(type);
+        const keys = getKeys(type);
         localStorage.removeItem(keys.user);
     },
 
     /**
      * Clear auth data for all user types.
-     * Useful for a complete logout from all sessions.
      */
     clearAll(): void {
+        tokenStore.clear();
         Object.values(STORAGE_KEYS).forEach(keys => {
-            localStorage.removeItem(keys.token);
             localStorage.removeItem(keys.user);
-        });
-        // Also clear legacy keys for backward compatibility
-        Object.values(LEGACY_KEYS).forEach(key => {
-            localStorage.removeItem(key);
         });
     },
 
     /**
-     * Check if a user is authenticated for the specified user type.
+     * Check if a user has an in-memory token OR user data in storage.
+     * Note: After page reload, token is gone but user data persists.
+     * The caller should attempt a refresh if hasUser but no token.
      */
     isAuthenticated(userType?: UserType): boolean {
         return !!this.getToken(userType);
+    },
+
+    /**
+     * Check if user data exists (survives page reload).
+     */
+    hasUser(userType?: UserType): boolean {
+        return !!this.getUser(userType);
     },
 };
 

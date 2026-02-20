@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import { initSentry, sentryRequestHandler, sentryErrorHandler } from './config/sentry.js';
 import investorRoutes from './routes/investorRoutes.js';
 import tokenRoutes from './routes/tokenRoutes.js';
@@ -84,6 +85,7 @@ app.use(cors({
     credentials: true
 }));
 app.use(hpp()); // HTTP Parameter Pollution protection
+app.use(cookieParser());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '100kb' })); // Limit body size to prevent large payload attacks
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
