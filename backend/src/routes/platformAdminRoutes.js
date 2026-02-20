@@ -512,12 +512,12 @@ router.get('/', requirePlatformAdmin, PlatformAdminController.getPlatformAdmins)
  *         description: Configurações atualizadas
  */
 router.get('/system-config', authenticateToken, requirePlatformAdmin, PlatformAdminController.getSystemConfig);
-router.put('/system-config', authenticateToken, requirePlatformAdmin, [
+router.put('/system-config', [
   body('settings').isArray({ min: 1 }).withMessage('Settings must be a non-empty array'),
   body('settings.*.key').isString().notEmpty().withMessage('Each setting must have a key'),
   body('settings.*.value').isString().withMessage('Each setting must have a string value'),
   validate,
-], PlatformAdminController.updateSystemConfig);
+], authenticateToken, requirePlatformAdmin, PlatformAdminController.updateSystemConfig);
 
 /**
  * @swagger
