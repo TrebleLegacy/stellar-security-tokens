@@ -183,7 +183,7 @@ router.post('/sync', requirePlatformAdmin, syncTokens);
  *               assetCode:
  *                 type: string
  */
-router.post('/freeze', requirePlatformAdmin, stellarKeyAndAssetValidation, freezeAccount);
+router.post('/freeze', stellarKeyAndAssetValidation, requirePlatformAdmin, freezeAccount);
 
 /**
  * @swagger
@@ -194,9 +194,9 @@ router.post('/freeze', requirePlatformAdmin, stellarKeyAndAssetValidation, freez
  *     security:
  *       - bearerAuth: []
  */
-router.post('/unfreeze', requirePlatformAdmin, stellarKeyAndAssetValidation, unfreezeAccount);
+router.post('/unfreeze', stellarKeyAndAssetValidation, requirePlatformAdmin, unfreezeAccount);
 
-router.post('/clawback', requirePlatformAdmin, clawbackValidation, clawbackTokens);
+router.post('/clawback', clawbackValidation, requirePlatformAdmin, clawbackTokens);
 
 /**
  * @swagger
@@ -207,7 +207,7 @@ router.post('/clawback', requirePlatformAdmin, clawbackValidation, clawbackToken
  *     security:
  *       - bearerAuth: []
  */
-router.post('/disable-clawback', requirePlatformAdmin, stellarKeyAndAssetValidation, disableClawback);
+router.post('/disable-clawback', stellarKeyAndAssetValidation, requirePlatformAdmin, disableClawback);
 
 /**
  * @swagger
@@ -242,7 +242,7 @@ router.get('/:assetCode/holders', requirePlatformAdmin, listAssetHolders);
  *                 type: string
  *                 example: QWE
  */
-router.post('/deploy-sac', requirePlatformAdmin, deploySACValidation, deploySAC);
+router.post('/deploy-sac', deploySACValidation, requirePlatformAdmin, deploySAC);
 
 export default router;
 
