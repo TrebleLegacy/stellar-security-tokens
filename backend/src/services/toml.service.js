@@ -47,24 +47,57 @@ ACCOUNTS=[
 
         // Add currencies section
         for (const token of tokens) {
+            const offer = token.offer;
+
+            // Build rich conditions string with terms + IPFS doc links
+            const conditionsParts = ['Restricted to authorized investors only.'];
+
+            if (offer) {
+                if (offer.annualInterestRate) {
+                    conditionsParts.push(`Annual interest rate: ${offer.annualInterestRate}%.`);
+                }
+                if (offer.maturityDate) {
+                    conditionsParts.push(`Maturity: ${new Date(offer.maturityDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}.`);
+                }
+                if (offer.paymentType) {
+                    const paymentLabels = { monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: 'Semi-Annual', annual: 'Annual', bullet: 'Bullet (At Maturity)' };
+                    conditionsParts.push(`Payments: ${paymentLabels[offer.paymentType] || offer.paymentType}.`);
+                }
+
+                // Embed IPFS document URLs directly in conditions for explorer visibility
+                const docs = offer.legalDocuments || {};
+                const docLinks = [];
+                if (docs.contract && docs.contract.hash) {
+                    docLinks.push(`Contract: ${ipfsService.getGatewayUrl(docs.contract.hash)}`);
+                }
+                if (docs.prospectus && docs.prospectus.hash) {
+                    docLinks.push(`Prospectus: ${ipfsService.getGatewayUrl(docs.prospectus.hash)}`);
+                }
+                if (docs.terms && docs.terms.hash) {
+                    docLinks.push(`Terms: ${ipfsService.getGatewayUrl(docs.terms.hash)}`);
+                }
+                if (docLinks.length > 0) {
+                    conditionsParts.push(`Legal documents: ${docLinks.join(' | ')}`);
+                }
+            }
+
             toml += `[[CURRENCIES]]
 code="${token.assetCode}"
 issuer="${token.issuerPublicKey}"
 display_decimals=7
 name="${token.assetCode} Security Token"
 desc="${token.description || 'Stellar Security Token'}"
-conditions="Restricted to authorized investors only."
+conditions="${conditionsParts.join(' ')}"
 is_asset_withheld=false
 is_stackable=false
 `;
 
-            // If we have an offer related, we can add more info and IPFS documents
-            if (token.offer) {
+            // If we have an offer related, add structured IPFS fields for programmatic consumers
+            if (offer) {
                 toml += `status="live"\n`;
 
-                const docs = token.offer.legalDocuments || {};
+                const docs = offer.legalDocuments || {};
 
-                // Add IPFS document links if they exist
                 if (docs.contract && docs.contract.hash) {
                     toml += `ipfs_contract_hash="${docs.contract.hash}"\n`;
                     toml += `ipfs_contract_url="${ipfsService.getGatewayUrl(docs.contract.hash)}"\n`;
