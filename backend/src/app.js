@@ -24,6 +24,8 @@ import { swaggerUi, swaggerSpec } from './config/swagger.js';
 
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { globalLimiter, authLimiter, apiLimiter, strictLimiter } from './middleware/rateLimit.js';
+import logger from './utils/logger.js';
+const log = logger.scope('App');
 import path from 'path';
 
 // Load env vars if not already loaded
@@ -78,7 +80,7 @@ app.use(cors({
         if (isAllowed) {
             callback(null, true);
         } else {
-            console.warn(`[CORS] Blocked origin: ${origin}`);
+            log.warn(`Blocked origin: ${origin}`);
             callback(new Error('Not allowed by CORS'));
         }
     },
@@ -124,7 +126,7 @@ app.get('/.well-known/stellar.toml', async (req, res) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.send(tomlContent);
     } catch (error) {
-        console.error('Error generating stellar.toml:', error);
+        log.error('Error generating stellar.toml:', error);
         res.status(500).send('# Error generating stellar.toml');
     }
 });
@@ -133,30 +135,57 @@ app.get('/.well-known/stellar.toml', async (req, res) => {
  * @swagger
  * /health:
  *   get:
- *     summary: Health check endpoint
+ *     summary: Liveness probe — confirms the API process is running
  *     tags: [Health]
  *     responses:
  *       200:
- *         description: API is running
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: API is running
- *                 timestamp:
- *                   type: string
- *                   format: date-time
+ *         description: API is alive
  */
 app.get('/health', (req, res) => {
     res.json({
-        success: true,
-        message: 'API is running',
+        status: 'ok',
+        uptime: Math.floor(process.uptime()),
+        timestamp: new Date().toISOString(),
+    });
+});
+
+/**
+ * @swagger
+ * /ready:
+ *   get:
+ *     summary: Readiness probe — checks DB and Redis connectivity
+ *     tags: [Health]
+ *     responses:
+ *       200:
+ *         description: All dependencies healthy
+ *       503:
+ *         description: One or more dependencies are down
+ */
+app.get('/ready', async (req, res) => {
+    const checks = { db: false, redis: false };
+
+    // Check Postgres
+    try {
+        const prisma = (await import('./config/prisma.js')).default;
+        await prisma.$queryRaw`SELECT 1`;
+        checks.db = true;
+    } catch { /* db down */ }
+
+    // Check Redis
+    try {
+        const { getRedisClient } = await import('./config/redis.js');
+        const client = getRedisClient();
+        if (client?.isOpen) {
+            await client.ping();
+            checks.redis = true;
+        }
+    } catch { /* redis down */ }
+
+    const healthy = checks.db && checks.redis;
+    res.status(healthy ? 200 : 503).json({
+        status: healthy ? 'ready' : 'degraded',
+        checks,
+        uptime: Math.floor(process.uptime()),
         timestamp: new Date().toISOString(),
     });
 });

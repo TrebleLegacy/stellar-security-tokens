@@ -660,6 +660,20 @@ router.get('/fee-logs', authenticateToken, requirePlatformAdmin, PlatformAdminCo
  *         required: true
  *         schema:
  *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               role:
+ *                 type: string
+ *                 enum: [admin, manager, super_admin]
  *     responses:
  *       200:
  *         description: Admin atualizado
