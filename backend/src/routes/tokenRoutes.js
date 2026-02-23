@@ -193,6 +193,23 @@ router.post('/freeze', stellarKeyAndAssetValidation, requirePlatformAdmin, freez
  *     tags: [Tokens]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - investorPublicKey
+ *               - assetCode
+ *             properties:
+ *               investorPublicKey:
+ *                 type: string
+ *               assetCode:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Conta descongelada com sucesso
  */
 router.post('/unfreeze', stellarKeyAndAssetValidation, requirePlatformAdmin, unfreezeAccount);
 
@@ -206,6 +223,23 @@ router.post('/clawback', clawbackValidation, requirePlatformAdmin, clawbackToken
  *     tags: [Tokens]
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - investorPublicKey
+ *               - assetCode
+ *             properties:
+ *               investorPublicKey:
+ *                 type: string
+ *               assetCode:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Clawback desabilitado com sucesso
  */
 router.post('/disable-clawback', stellarKeyAndAssetValidation, requirePlatformAdmin, disableClawback);
 
