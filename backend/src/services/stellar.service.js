@@ -238,65 +238,6 @@ export class StellarService {
     }
   }
 
-  /**
-   * Cria conta de distribuição
-   * Financia a conta via Friendbot (testnet) e verifica sua criação
-   * @returns {Promise<Object>} Resultado da criação da conta
-   * @returns {boolean} returns.success - Indica sucesso
-   * @returns {string} returns.publicKey - Chave pública da conta
-   * @returns {string} returns.secretKey - Chave secreta da conta
-   * @returns {boolean} returns.alreadyExists - Se a conta já existia
-   * @throws {Error} Se houver erro ao criar ou financiar a conta
-   */
-  static async createDistributionAccount() {
-    try {
-      const distributorPublicKey = keyManager.getDistributorPublicKey();
-
-      try {
-        const account = await stellarServer.loadAccount(distributorPublicKey);
-        log.info('Distribution account already exists:', distributorPublicKey);
-        return {
-          success: true,
-          publicKey: distributorPublicKey,
-          alreadyExists: true,
-        };
-      } catch (error) {
-        if (error.status !== 404) {
-          throw error;
-        }
-      }
-
-      if (process.env.STELLAR_NETWORK === 'testnet') {
-        const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(distributorPublicKey)}`;
-
-        try {
-          const response = await fetch(friendbotUrl);
-          if (!response.ok) {
-            throw new Error(`Friendbot failed: ${response.statusText}`);
-          }
-          await response.json();
-        } catch (error) {
-          throw new Error(`Failed to fund distribution account via Friendbot: ${error.message}`);
-        }
-      } else {
-        try {
-          await stellarServer.loadAccount(distributorPublicKey);
-        } catch (error) {
-          throw new Error(`Distribution account not found on ${process.env.STELLAR_NETWORK || 'mainnet'}. Please fund it manually.`);
-        }
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      return {
-        success: true,
-        publicKey: distributorPublicKey,
-      };
-    } catch (error) {
-      log.error('Error creating distribution account:', error);
-      throw new Error(`Distribution account creation failed: ${error.message}`);
-    }
-  }
 
   /**
    * Unlock a token for DEX trading by clearing AUTH_REQUIRED flag on the Issuer.
@@ -379,67 +320,6 @@ export class StellarService {
     }
   }
 
-  /**
-   * Cria conta Stellar para investidor
-   * Gera um novo keypair aleatório e financia via Friendbot (testnet)
-   * @returns {Promise<Object>} Resultado da criação da conta
-   * @returns {boolean} returns.success - Indica sucesso
-   * @returns {string} returns.publicKey - Chave pública da conta criada
-   * @returns {string} returns.secretKey - Chave secreta da conta criada
-   * @throws {Error} Se houver erro ao criar ou financiar a conta
-   */
-  static async createInvestorAccount() {
-    try {
-      const keypair = Keypair.random();
-
-      // Em ambiente de teste, não usar Friendbot
-      if (process.env.NODE_ENV === 'test') {
-        return {
-          success: true,
-          publicKey: keypair.publicKey(),
-          secretKey: keypair.secret(),
-        };
-      }
-
-      if (process.env.STELLAR_NETWORK === 'testnet') {
-        const friendbotUrl = `https://friendbot.stellar.org?addr=${encodeURIComponent(keypair.publicKey())}`;
-
-        try {
-          const response = await fetch(friendbotUrl);
-          if (!response.ok) {
-            throw new Error(`Friendbot failed: ${response.statusText}`);
-          }
-          await response.json();
-        } catch (error) {
-          log.warn(`[StellarService] Friendbot failed, falling back to sponsorship: ${error.message}`);
-          // Fallback to sponsorship even on testnet if friendbot fails
-          await this.setupSponsoredAccount(keypair.publicKey());
-        }
-      } else {
-        // Mainnet: Sponsored Activation via Operations
-        await this.setupSponsoredAccount(keypair.publicKey());
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 5000)); // Increased wait for propagation
-
-      try {
-        await stellarServer.loadAccount(keypair.publicKey());
-      } catch (error) {
-        log.error(`[StellarService] Critical: Account ${keypair.publicKey()} was not found on the network after creation/funding attempt.`);
-        log.error(`[StellarService] This may be due to Horizon lag or Friendbot failure. Check: https://stellar.expert/explorer/testnet/account/${keypair.publicKey()}`);
-        throw new Error(`Account ${keypair.publicKey()} was not created successfully on ${process.env.STELLAR_NETWORK || 'testnet'}.`);
-      }
-
-      return {
-        success: true,
-        publicKey: keypair.publicKey(),
-        secretKey: keypair.secret(),
-      };
-    } catch (error) {
-      log.error('Error creating investor account:', error);
-      throw new Error(`Investor account creation failed: ${error.message}`);
-    }
-  }
 
   /**
    * Emite tokens de segurança e transfere para a conta distribuidora
@@ -1281,13 +1161,13 @@ export class StellarService {
   /**
    * Configura uma trustline patrocinada para um investidor.
    * Utiliza CAP-33 (Sponsorship) para cobrir o reserve de 0.5 XLM.
+   * Returns unsigned XDR for the frontend/caller to sign.
    * 
    * @param {string} investorPublicKey - Chave pública do investidor
    * @param {string} assetCode - Código do asset
-   * @param {string} [investorSecret] - Chave secreta (apenas para modo custodial)
    * @returns {Promise<Object>} Resultado da transação ou XDR para assinatura
    */
-  static async setupSponsoredTrustline(investorPublicKey, assetCode, investorSecret = null) {
+  static async setupSponsoredTrustline(investorPublicKey, assetCode) {
     try {
       const issuerPublicKey = keyManager.getIssuerPublicKey();
       const operationsKeypair = getOperationsKeypair();
@@ -1355,21 +1235,7 @@ export class StellarService {
       // Sign with Sponsor (Operations)
       transaction.sign(operationsKeypair);
 
-      // 4. Se tiver a secret (Custodial), assinar e submeter
-      if (investorSecret) {
-        const investorKeypair = Keypair.fromSecret(investorSecret);
-        transaction.sign(investorKeypair);
-
-        const result = await stellarServer.submitTransaction(transaction);
-        return {
-          success: true,
-          hash: result.hash,
-          ledger: result.ledger,
-          sponsored: true
-        };
-      }
-
-      // 5. Se não tiver secret (Non-custodial), retornar XDR para o frontend assinar
+      // Return unsigned XDR for the frontend/caller to sign
       return {
         success: true,
         requiresSignature: true,
@@ -1383,40 +1249,7 @@ export class StellarService {
     }
   }
 
-  /**
-   * Ativa uma conta Stellar via patrocínio (Sponsorship).
-   * @param {string} destination - Chave pública da conta a ser criada
-   * @returns {Promise<Object>} Resultado da transação
-   */
-  static async setupSponsoredAccount(destination) {
-    try {
-      const operationsKeypair = getOperationsKeypair();
-      const operationsAccount = await this.getAccountRPC(operationsKeypair.publicKey());
 
-      const transaction = new TransactionBuilder(operationsAccount, {
-        fee: BASE_FEE,
-        networkPassphrase: getNetworkPassphrase(),
-      })
-        .addOperation(Operation.beginSponsoringFutureReserves({
-          sponsoredID: destination,
-        }))
-        .addOperation(Operation.createAccount({
-          destination,
-          startingBalance: '0',
-        }))
-        .addOperation(Operation.endSponsoringFutureReserves({
-          source: destination,
-        }))
-        .setTimeout(30)
-        .build();
-
-      transaction.sign(operationsKeypair);
-      return await stellarServer.submitTransaction(transaction);
-    } catch (error) {
-      log.error(`[StellarService] Sponsored account activation failed for ${destination}:`, error);
-      throw error;
-    }
-  }
 
 
   /**
