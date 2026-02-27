@@ -34,7 +34,7 @@ Services contain the core business logic of the platform. Each service encapsula
 | [[depositRelay.service]] | 7KB | ~180 | USDC deposit forwarding |
 | [[ipfs.service]] | 5KB | ~120 | IPFS/Pinata integration |
 | [[alert.service]] | 4KB | ~100 | System alerts |
-| [[kyc.service]] | 4KB | ~100 | KYC processing |
+
 | [[notification.service]] | 4KB | ~100 | In-app notifications |
 | [[maintenance.service]] | 4KB | ~100 | Maintenance tasks |
 | [[toml.service]] | 3KB | ~80 | TOML file handling |
@@ -53,7 +53,6 @@ Services contain the core business logic of the platform. Each service encapsula
 | Function | Purpose |
 |----------|---------|
 | `createIssuerAccount()` | Setup issuer with compliance flags |
-| `createDistributionAccount()` | Setup distributor account |
 | `issueSecurityToken()` | Mint new tokens |
 | `distributeTokens()` | Send tokens to investors (G... or C...) |
 | `deploySACForAsset()` | Deploy Stellar Asset Contract |

@@ -49,7 +49,6 @@ describe('StellarService Unit Tests', async () => {
 
       const methods = [
         'createIssuerAccount',
-        'createDistributionAccount',
         'unlockToken',
         'issueSecurityToken',
         'distributeTokens',

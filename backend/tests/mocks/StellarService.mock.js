@@ -18,22 +18,6 @@ export class MockStellarService {
         };
     }
 
-    static async createDistributionAccount() {
-        return {
-            success: true,
-            publicKey: 'GBDISTRIBMOCK123456789012345678901234567890123456789012',
-            secretKey: 'SBDISTRIBMOCKSECRET12345678901234567890123456789012345',
-        };
-    }
-
-    static async createInvestorAccount() {
-        return {
-            success: true,
-            publicKey: 'GBINVESTORMOCK12345678901234567890123456789012345678901',
-            secretKey: 'SBINVESTORMOCKSECRET1234567890123456789012345678901234',
-        };
-    }
-
     static async issueSecurityToken(code, amount, options = {}) {
         return {
             success: true,
