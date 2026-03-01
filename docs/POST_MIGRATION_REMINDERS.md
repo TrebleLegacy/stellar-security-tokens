@@ -23,6 +23,8 @@ This document tracks items that need to be addressed **after** the initial Mainn
 ### 🌐 Frontend & Marketing
 - [ ] **Landing Page**: Develop a professional landing page for the main domain.
 - [ ] **Redirect**: The current "Functional App" should be a subdomain (e.g., `app.radox.net`).
+- [ ] **Separate Login Pages**: Make `/login` investor-only (no Company tab). Create `/company/login` as a separate route shared only with vetted partners.
+- [ ] **Company Invite System**: Replace self-service company registration with an invite flow. Landing page has a "For Companies → Request Access" form. Admin reviews and sends invite link (`/company/register?invite=<token>`). Prevents confused investors from landing in the company flow.
 
 ### 📦 Infrastructure
 - [ ] **Target: Google Cloud Platform** (Cloud Run or GCE for backend, Cloud SQL for Postgres, Memorystore for Redis).
