@@ -6,7 +6,8 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from '@/components/ui/button';
-import { Copy, Check, Loader2, AlertCircle, RefreshCw, ArrowLeft, Building2, Wallet, AlertTriangle } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Copy, Check, Loader2, AlertCircle, RefreshCw, ArrowLeft, Building2, Wallet, AlertTriangle, QrCode } from 'lucide-react';
 import { QRCode } from '@/components/ui/qrcode';
 import { investorsApi } from '@/api/investors';
 
@@ -22,7 +23,7 @@ interface DepositInfo {
     status: string;
 }
 
-type DepositSource = 'exchange' | 'wallet' | null;
+type DepositSource = 'exchange' | 'wallet' | 'pix' | null;
 
 export function DepositDialog({ investorId, walletAddress }: DepositDialogProps) {
     const [copied, setCopied] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export function DepositDialog({ investorId, walletAddress }: DepositDialogProps)
     const [deposit, setDeposit] = useState<DepositInfo | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [source, setSource] = useState<DepositSource>(null);
+    const [pixAmount, setPixAmount] = useState('');
 
     const handleCopy = async (text: string, id: string) => {
         await navigator.clipboard.writeText(text);
@@ -77,9 +79,10 @@ export function DepositDialog({ investorId, walletAddress }: DepositDialogProps)
                     Deposit USDC
                 </DialogTitle>
                 <DialogDescription className="text-gray-400">
-                    {source === null && 'How are you sending?'}
-                    {source === 'exchange' && 'Send USDC from your exchange to this address.'}
-                    {source === 'wallet' && 'Send USDC directly from your Stellar wallet.'}
+                    {source === null && 'Where is your USDC right now?'}
+                    {source === 'exchange' && 'Copy the address and memo below into your exchange withdrawal.'}
+                    {source === 'wallet' && 'Scan or copy the address below to send USDC.'}
+                    {source === 'pix' && 'Deposit Brazilian Reais via PIX — converted to USDC automatically.'}
                 </DialogDescription>
             </DialogHeader>
 
@@ -132,17 +135,17 @@ export function DepositDialog({ investorId, walletAddress }: DepositDialogProps)
                         </div>
                     </button>
 
-                    {/* PIX — Coming Soon */}
+                    {/* PIX */}
                     <button
-                        disabled
-                        className="flex flex-col items-center gap-3 p-5 rounded-xl border border-white/5 bg-white/[0.01] opacity-50 cursor-not-allowed col-span-2"
+                        onClick={() => setSource('pix')}
+                        className="flex flex-col items-center gap-3 p-5 rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/20 transition-all group col-span-2"
                     >
-                        <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-xl bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
                             <span className="text-xl">🇧🇷</span>
                         </div>
                         <div className="text-center">
-                            <p className="text-sm font-medium text-gray-500">PIX</p>
-                            <p className="text-[10px] text-gray-600 mt-0.5">Coming soon</p>
+                            <p className="text-sm font-medium text-white">PIX</p>
+                            <p className="text-[10px] text-gray-500 mt-0.5">Deposit in BRL, receive USDC</p>
                         </div>
                     </button>
                 </div>
@@ -236,6 +239,51 @@ export function DepositDialog({ investorId, walletAddress }: DepositDialogProps)
                         <AlertTriangle className="w-3.5 h-3.5 text-amber-500/70 shrink-0 mt-0.5" />
                         <span>Only send <strong className="text-gray-400">Stellar USDC</strong> to this address.</span>
                     </div>
+                </div>
+
+                /* Step 2: PIX — BRL Deposit */
+            ) : source === 'pix' ? (
+                <div className="flex flex-col items-center space-y-5 py-2">
+                    {/* Amount input */}
+                    <div className="w-full space-y-2">
+                        <label className="text-[10px] font-medium uppercase tracking-wider text-gray-500 px-1">Amount in BRL</label>
+                        <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-medium">R$</span>
+                            <Input
+                                type="number"
+                                placeholder="0.00"
+                                value={pixAmount}
+                                onChange={(e) => setPixAmount(e.target.value)}
+                                className="pl-10 bg-white/5 border-white/10 rounded-xl h-12 text-lg font-mono"
+                            />
+                        </div>
+                        {pixAmount && Number(pixAmount) > 0 && (
+                            <p className="text-[11px] text-gray-500 px-1">
+                                ≈ ${(Number(pixAmount) / 5.8).toFixed(2)} USDC <span className="text-gray-600">(estimated)</span>
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Mock PIX QR placeholder */}
+                    <div className="w-full rounded-xl border-2 border-dashed border-white/10 py-10 flex flex-col items-center gap-3">
+                        <QrCode className="w-12 h-12 text-gray-600" />
+                        <p className="text-sm text-gray-500 font-medium">PIX QR Code</p>
+                        <p className="text-[10px] text-gray-600 text-center max-w-[200px]">
+                            Partner integration in progress. This will generate a PIX QR code for instant payment.
+                        </p>
+                    </div>
+
+                    {/* Generate button (disabled) */}
+                    <Button
+                        disabled
+                        className="w-full h-11 rounded-xl bg-green-600/50 text-white cursor-not-allowed"
+                    >
+                        Generate PIX Code
+                    </Button>
+
+                    <p className="text-[10px] text-gray-600 text-center">
+                        Payment is confirmed instantly. USDC appears in your wallet within minutes.
+                    </p>
                 </div>
             ) : null}
         </DialogContent>
