@@ -1,6 +1,6 @@
 # Database Backup & Recovery Guide
 
-This document describes backup procedures for the Stellar Security Tokens platform.
+This document describes backup procedures for the Radox platform.
 
 > [!CAUTION]
 > **Critical Data**: The database contains investor/company passkey credentials. Loss of this data means users lose access to their smart wallets permanently.

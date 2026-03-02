@@ -1,4 +1,4 @@
-# Stellar Multisig Reference for Security Tokens Platform
+# Stellar Multisig Reference — Radox Platform
 
 This document summarizes the key Stellar concepts relevant to our Ledger/Multisig implementation.
 
@@ -123,10 +123,10 @@ const transaction = new StellarSdk.TransactionBuilder(account, opts)
 
 1. **KEY_MANAGEMENT_MODE=env**: Current behavior, single key from .env
 2. **KEY_MANAGEMENT_MODE=multisig**: Production mode
-   - No secret keys in .env
-   - Only public keys configured
-   - All transactions go through pending queue
-   - Requires Ledger signatures
+   - Only `OPERATIONS_SECRET_KEY` remains (hot wallet for gas station)
+   - Issuer/Treasury/Distributor use public keys only
+   - All privileged transactions go through pending queue
+   - Requires Ledger/Freighter signatures
 
 ### Signature Flow
 ```

@@ -2,6 +2,8 @@
 
 This document tracks items that need to be addressed **after** the initial Mainnet launch and validation.
 
+> **See also:** [MAINNET_CHECKLIST.md](MAINNET_CHECKLIST.md) for pre-launch tasks. [STELLAR_MULTISIG_REFERENCE.md](STELLAR_MULTISIG_REFERENCE.md) for multisig setup details.
+
 ## 🚨 Pre-Launch Checklist (Critical)
 
 ### 📧 Email Infrastructure
@@ -35,16 +37,18 @@ This document tracks items that need to be addressed **after** the initial Mainn
 - [x] ~~**Pinata Routes**: Routing works in production. Dev "broken links" are expected (mock hashes).~~
 
 ## 1. Business Logic & Fees
-- [x] ~~**Fee Recovery**: Using CAP-33 sponsorship — XLM is **locked** (not spent), recoverable if accounts are merged. Platform Fees (1% on sales, issuance fees, dividend fees) offset operational costs.~~
-- [x] ~~**Fee Buffer**: Stellar base fee is 100 stroops; implementation uses adequate buffers for network surges.~~
+
+> ✅ **Completed:** Fee recovery uses CAP-33 sponsorship (XLM locked, not spent). Stellar base fee uses adequate buffers.
 
 ## 2. Infrastructure & Monitoring
-- [ ] **Treasury Monitoring**: TODO — Add cron job or external monitor (UptimeRobot, Grafana) to alert when Treasury balance < 100 XLM. If depleted, sponsored account creation fails.
-- [x] ~~**Rate Limiting**: Redis-backed multi-tier system (`strictLimiter` on investor creation, `authLimiter` on login). See `middleware/rateLimit.js`.~~
+- [ ] **Treasury Monitoring**: Add cron job or external monitor (UptimeRobot, Grafana) to alert when Treasury balance < 100 XLM.
+
+> ✅ **Completed:** Redis-backed multi-tier rate limiting in `middleware/rateLimit.js`.
 
 ## 3. Features to Build
-- [ ] **Fiat On-Ramp**: Build the prompt/flow for users to deposit Fiat (PIX), which allows switching from "Sponsored Activation" to "Deposit-based Activation" in the future if desired.
-- [x] ~~**Smart Contract Verification**: N/A — Using SDF `passkey-kit` Smart Wallet (pre-verified) + SAC (protocol-native). No custom contracts.~~
+- [ ] **Fiat On-Ramp**: PIX deposit flow to transition from sponsor-only to deposit-based activation.
+
+> ✅ **Completed:** No custom Soroban contracts needed — using SDF `passkey-kit` Smart Wallet (pre-verified) + SAC (protocol-native).
 
 ## 3.1 Company Features
 - [ ] **Full Company KYC**: Current registration only requires company name. Implement full KYC flow to collect and verify:
@@ -59,29 +63,25 @@ This document tracks items that need to be addressed **after** the initial Mainn
 - [ ] **AlertService External Integrations**: Add Slack/Discord webhooks, Email, SMS for CRITICAL/ERROR alerts. Currently just logs. See [alert.service.js L44](file:///Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens/backend/src/services/alert.service.js#L44).
 
 ## 4. Housekeeping
-- [x] ~~**Clean `.env`**: `.env` is the dev config (loaded by Docker Compose automatically), `.env.production` for mainnet. Tests use an isolated `stellar_tokens_test` database with a safety guard in `cleanDatabase()`.~~
-- [ ] **Rename Git Repository**: Current repo is `stellar-security-tokens`. Rename to `radox` (or `radox-platform`) on GitHub/GitLab to match the new branding. Update all remote URLs, CI/CD pipelines, and documentation references.
+- [ ] **Rename Git Repository**: Rename `stellar-security-tokens` → `radox` (or `radox-platform`) on GitHub. Update remotes and CI/CD.
+
+> ✅ **Completed:** `.env` is dev config, `.env.production` for mainnet. Tests use isolated `stellar_tokens_test` database.
 
 ## 5. Security Hardening
-- [x] ~~**Admin Seeding Scripts**: Added `NODE_ENV=production` check to `seed.js`, `checkAndCreateAdmin.js`, and `create_admin.js` — scripts now refuse to run in production. Use `createAdmin.js` with CLI args for prod.~~
-- [ ] **CORS Configuration**: Once domain is finalized, ensure `FRONTEND_URL` env var is set to the exact production domain (e.g., `https://app.tokenizadora.com`). Consider restricting to specific origins in `backend/src/app.js`.
-- [x] ~~**Request Body Size Limit**: Added `express.json({ limit: '100kb' })` in `app.js`. (100kb allows file uploads while preventing DoS).~~
-- [ ] **Refresh Tokens**: Implement short-lived access tokens (15 min) + long-lived refresh tokens (7 days) to reduce exposure if a token is stolen. Currently using single 24h JWT.
-- [x] ~~**Token Blocklist**: Implemented Redis-backed blocklist in `config/redis.js`. Added `POST /api/auth/logout` endpoint + `authenticateToken` now checks blocklist. Tokens are invalidated server-side on logout.~~
-- [ ] **Security Audit Logging**: Log security-relevant events (logins, failed auth attempts, password changes, admin actions, sensitive operations) to a dedicated audit log for compliance and incident investigation. Consider using a structured logging library (winston/pino) with a separate audit transport.
-- [ ] **Cold Issuer Wallet Strategy (Phased)**: **Critical for Mainnet**. Refactor the Issuer Account to use **Multisig (2-of-2)**.
-    - **Phase 1 (MVP)**: Use **Admin Passkeys** as the second signer.
-        - *Benefit*: Fast to implement (uses existing infra), very secure (Secure Enclave).
-        - *Trade-off*: Admin is tied to their specific device.
-    - **Phase 2 (Growth)**: Migrate Admin signer to **Ledger (Hardware Wallet)** via Freighter.
-        - *Benefit*: Portability, physical governance (can lock device in safe), platform independent.
+- [ ] **CORS Configuration**: Set `FRONTEND_URL` to production domain (e.g., `https://app.radox.net`). Restrict origins in `backend/src/app.js`.
+- [ ] **Refresh Tokens**: Implement 15-min access + 7-day refresh tokens (currently single 24h JWT).
+- [ ] **Security Audit Logging**: Dedicated audit log for logins, failed auth, admin actions. Consider winston/pino with separate transport.
+- [ ] **Cold Issuer Wallet** (Phased):
+    - Phase 1 (MVP): Admin Passkeys as 2nd signer.
+    - Phase 2: Ledger hardware wallet via Freighter.
+- [ ] **HttpOnly Cookies**: Migrate JWT from `localStorage` to `HttpOnly Secure` cookies.
 
-- [ ] **HttpOnly Cookies**: Migrate from `localStorage` to `HttpOnly Secure` cookies for JWT storage. This mitigates XSS risks where malicious scripts could steal the token from localStorage.
+> ✅ **Completed:** Admin seeding scripts have `NODE_ENV=production` guard. Body limit `100kb` in `app.js`. Redis-backed token blocklist with `POST /api/auth/logout`.
 
 ## Scalability & Reliability
-- [x] ~~**USDC Deposit Safety (UX)**: Added explicit warnings in the Deposit UI: **"Send only Stellar Network USDC. Do not send ERC-20/SPL tokens directly."** to prevent user fund loss.~~
-- [x] ~~**Memo Validation**: Enforced unique Memo checks for all deposits. Backend now relaxes sender validation if Memo matches (supporting Exchanges).~~
-- [ ] **Channel Accounts (Worker Pool)**: Implement Channel Accounts for the `Distributor` wallet to prevent `Bad Sequence Number` errors during high-volume token distributions.
+- [ ] **Channel Accounts (Worker Pool)**: Implement for Distributor wallet to prevent `Bad Sequence Number` errors during high-volume distributions.
+
+> ✅ **Completed:** USDC deposit safety warnings in UI. Unique memo validation for all deposits (supports exchanges).
 
 ## 6. Key Management (Pre-Mainnet Critical)
 
@@ -96,7 +96,7 @@ This document tracks items that need to be addressed **after** the initial Mainn
 
 **Phase 1 (Before Mainnet)**:
 - [ ] Convert Treasury account to **2-of-2 multisig** requiring both Pedro & Gabriel signatures
-- [ ] Remove `TREASURY_SECRET_KEY` from `.env` after conversion
+- [ ] Migrate `OPERATIONS_SECRET_KEY` from `.env` to Google Secret Manager (only secret key that remains)
 - [ ] Queue Treasury transactions via admin UI, require second admin passkey confirmation
 - [ ] Same for Issuer account if token operations need governance
 
@@ -179,8 +179,8 @@ This means recovery IS possible without any data loss to the user.
 - **Rate limit recovery attempts** — prevent enumeration attacks
 
 ### Code References
-- Contract ID derivation: `StellarService.deriveSmartWalletAddress()`
-- WebAuthn verification: `authController.verifyPasskeyAssertion()`
+- Contract ID derivation: `PasskeyWalletService.deployWallet()` inline (L157-175 in `passkeyWallet.service.js`)
+- WebAuthn verification: `WebAuthnService.verifyAuthentication()` (in `webauthn.service.js`)
 - Factory contract: `FACTORY_CONTRACT_ID` env variable
 
 ### Benefit

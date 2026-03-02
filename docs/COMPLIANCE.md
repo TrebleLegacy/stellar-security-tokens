@@ -23,3 +23,7 @@ Platform Admins have special powers to maintain order:
 - **Fee Management**: Setting global rates (see monetization).
 - **Asset Approval**: Only Admins can approve a new token for the marketplace.
 - **Emergency Action**: Admins can intervene if there is technical failure or fraud (e.g., freezing a bad actor's wallet).
+
+---
+
+> **See also:** [AUTHENTICATION.md](AUTHENTICATION.md) for auth flows · [MONETIZATION.md](MONETIZATION.md) for fee management · [TOKENIZATION.md](TOKENIZATION.md) for asset lifecycle

@@ -132,8 +132,8 @@ The `PaymentMonitor` service watches the ledger for the specific memo.
 
 ```mermaid
 flowchart LR
-    P[USDC Detected with Memo] --> Q[(Bull Queue)]
-    Q --> Job[Processor]
+    P[USDC Detected with Memo] --> Q[distributionQueue]
+    Q --> Job[processDistribution]
     
     subgraph Settlement Logic
         Job --> Auth[JIT Authorize Investor]
@@ -148,3 +148,7 @@ flowchart LR
 
 - **JIT Authorization**: The issuer account "whitelists" the investor *immediately* before sending tokens.
 - **Dual Support**: Supports both legacy wallets (Standard payments) and the new 100% XLM-free smart wallets (Contract transfers).
+
+---
+
+> **See also:** [TOKENIZATION.md](TOKENIZATION.md) for token lifecycle · [INVESTMENT_FLOW.md](INVESTMENT_FLOW.md) for user journey · [AUTHENTICATION.md](AUTHENTICATION.md) for passkey details

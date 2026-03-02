@@ -7,7 +7,7 @@ How investors get paid.
 Unlike traditional banks that take days to process dividends, our platform automates this via the Blockchain.
 
 ### 1. Revenue Collection
-The Issuer (Company) deposits the interest/dividend payment in USDC into the **Distribution Account**.
+The Issuer (Company) deposits the interest/dividend payment in USDC into the **Treasury Account**.
 
 ### 2. The Snapshot
 On the scheduled payment date (e.g., 1st of the Month), the system takes a "Snapshot".
@@ -27,5 +27,9 @@ The system sends USDC directly to the wallet of every token holder.
 
 ## Payment Types
 - **Monthly Interest**: Regular income (e.g., Real Estate rent).
-- **Bullet**: One-time payment at the end (e.g., Loan repayment).
-- **Quarterly/Semi-Annual**: Flexible schedules.
+- **Quarterly/Semi-Annual/Annual**: Periodic schedules based on offer configuration.
+- **Bullet**: One-time principal + interest payment at maturity (e.g., Loan repayment).
+
+---
+
+> **See also:** [INVESTMENT_FLOW.md](INVESTMENT_FLOW.md) for purchase flow · [MONETIZATION.md](MONETIZATION.md) for fee structure · [TOKENIZATION.md](TOKENIZATION.md) for token lifecycle

@@ -24,3 +24,7 @@ When they click "Confirm Investment":
 The Investor now holds the tokens.
 - They can see them in their Portfolio.
 - They start accruing interest/dividends immediately according to the asset's schedule.
+
+---
+
+> **See also:** [PAYMENTS.md](PAYMENTS.md) for dividend distribution · [MONETIZATION.md](MONETIZATION.md) for fee details · [SYSTEM_FLOW.md](SYSTEM_FLOW.md) for technical diagrams

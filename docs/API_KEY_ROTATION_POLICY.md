@@ -3,7 +3,7 @@
 ## Scope
 
 The `TRUSTED_API_KEY` env var grants **unlimited rate-limit bypass** via the `X-API-KEY` header.
-It is checked in [`rateLimit.js`](file:///Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens/backend/src/middleware/rateLimit.js#L154-L157).
+It is checked in [`rateLimit.js`](file:///Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens/backend/src/middleware/rateLimit.js#L149-L162).
 
 ## Rules
 

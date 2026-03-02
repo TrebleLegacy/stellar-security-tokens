@@ -32,3 +32,7 @@ When an Investor buys into an Offer:
 
 ## Why Stellar?
 We use the Stellar network because it is fast, cheap (fractions of a cent per transaction), and built specifically for asset issuance.
+
+---
+
+> **See also:** [SYSTEM_FLOW.md](SYSTEM_FLOW.md) for technical diagrams · [INVESTMENT_FLOW.md](INVESTMENT_FLOW.md) for purchase journey · [STELLAR_MULTISIG_REFERENCE.md](STELLAR_MULTISIG_REFERENCE.md) for account security

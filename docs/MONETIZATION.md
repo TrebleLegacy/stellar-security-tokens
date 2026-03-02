@@ -1,6 +1,6 @@
 # Monetization & Fee System
 
-This document outlines the fee structure implemented in the Stellar Security Tokens platform.
+This document outlines the fee structure implemented in the Radox platform.
 
 ## Overview
 
@@ -65,11 +65,16 @@ Content-Type: application/json
 All collected fees are recorded in the `FeeLog` database table for auditing and reporting.
 
 - **Admin Endpoint**: `GET /api/platform-admins/fee-logs`
-- **Schema**:
-  - `id`: UUID
-  - `relatedId`: ID of the investment or payment
-  - `type`: `INVESTMENT_FEE` or `DIVIDEND_FEE`
-  - `amount`: USDC amount collected
+- **Schema** (matches `fee_logs` Prisma table):
+  - `id`: Auto-increment integer
+  - `sourceId`: ID of the related investment, payment, or offer
+  - `category`: `ISSUANCE`, `WITHDRAWAL`, `DIVIDEND` (VARCHAR 50)
+  - `amount`: USDC amount collected (Decimal 20,7)
   - `assetCode`: Asset involved (e.g., REIT01)
   - `description`: Detailed breakdown (e.g., "Investment Fee: 1.5% + 5.0 USDC Fixed")
+  - `transactionHash`: On-chain transaction hash (optional)
   - `createdAt`: Timestamp
+
+---
+
+> **See also:** [INVESTMENT_FLOW.md](INVESTMENT_FLOW.md) for purchase flow · [PAYMENTS.md](PAYMENTS.md) for dividend distribution · [MAINNET_CHECKLIST.md](MAINNET_CHECKLIST.md) for production fee config

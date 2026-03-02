@@ -1,6 +1,6 @@
-# Mainnet Migration Checklist
+# Radox — Mainnet Migration Checklist
 
-This document details all specific actions required to transition the **Stellar Security Tokens** platform from Testnet to Mainnet (Production).
+This document details all specific actions required to transition the **Radox** platform from Testnet to Mainnet (Production).
 
 ## ✅ Code Changes (Already Complete)
 
@@ -12,7 +12,7 @@ This document details all specific actions required to transition the **Stellar 
 
 ### Hardcoded Values
 - [x] **Asset Code:** Configurable via env vars.
-- [x] **USDC Issuer:** Uses `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` (Circle's official issuer, same for testnet/mainnet).
+- [x] **USDC Issuer:** Auto-detected based on `STELLAR_NETWORK`. Mainnet: `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`.
 
 ---
 
@@ -27,15 +27,15 @@ Create a production `.env` file with the following changes:
 | `STELLAR_HORIZON_URL` | `https://horizon-testnet.stellar.org` | `https://horizon.stellar.org` |
 | `SOROBAN_RPC_URL` | `https://soroban-testnet.stellar.org` | `https://soroban-rpc.mainnet.stellar.org` |
 | `VITE_STELLAR_NETWORK` | `testnet` | `public` |
-| `VITE_SOROBAN_RPC_URL` | *(Testnet URL)* | `https://soroban-rpc.mainnet.stellar.org` |
+| `VITE_SOROBAN_RPC_URL` | *(Testnet URL)* | `https://soroban-rpc.mainnet.stellar.gateway.fm` |
 | `VITE_STELLAR_NETWORK_PASSPHRASE`| `Test SDF Network ; September 2015` | `Public Global Stellar Network ; September 2015` |
 
 ### Keys & Accounts (Action Required)
-> **WARNING:** Do not use Testnet keys on Mainnet. Generate new keys offline.
+> **NOTE:** The platform uses `KEY_MANAGEMENT_MODE=multisig` — only public keys + the Operations hot wallet key are needed. Issuer/Treasury/Distributor sign via Freighter/Ledger.
 
-- [ ] **`ISSUER_SECRET_KEY`**: Rotated to Mainnet Key (Funded with XLM).
-- [ ] **`DISTRIBUTOR_SECRET_KEY`**: Rotated to Mainnet Key (Funded with XLM).
-- [ ] **`TREASURY_SECRET_KEY`**: Rotated to Mainnet Key (Funded with XLM).
+- [ ] **Generate new mainnet keypairs** for Issuer, Distributor, Treasury, Operations. Fund each with XLM.
+- [ ] **`OPERATIONS_SECRET_KEY`**: Migrate to Google Secret Manager (only secret key in `.env`).
+- [ ] **All `*_PUBLIC_KEY` vars**: Update in `.env.production` with mainnet public keys.
 
 ### Smart Contracts (Passkey Wallet)
 - [ ] **`FACTORY_CONTRACT_ID`**: Deploy Factory to Mainnet and update this ID.
@@ -44,11 +44,11 @@ Create a production `.env` file with the following changes:
 ### Infrastructure & Security
 - [ ] **`DB_SSL`**: Set to `true` (Required for cloud databases).
 - [ ] **`JWT_SECRET`**: Generate with `openssl rand -hex 32`.
-- [ ] **`WEBAUTHN_RP_ID`**: Change `localhost` to your domain (e.g., `yourdomain.com`).
-- [ ] **`WEBAUTHN_ORIGIN`**: Change to `https://dashboard.yourdomain.com`.
-- [ ] **`FRONTEND_URL`**: Update to `https://dashboard.yourdomain.com`.
-- [ ] **`API_URL`**: Update to `https://api.yourdomain.com`.
-- [ ] **`VITE_API_URL`**: Update in frontend to `https://api.yourdomain.com/api`.
+- [ ] **`WEBAUTHN_RP_ID`**: Change to your production domain (e.g., `radox.net`).
+- [ ] **`WEBAUTHN_ORIGIN`**: Change to `https://radox.net`.
+- [ ] **`FRONTEND_URL`**: Update to `https://radox.net`.
+- [ ] **`API_URL`**: Update to `https://api.radox.net`.
+- [ ] **`VITE_API_URL`**: Update in frontend to `https://api.radox.net/api`.
 
 ### Third Party Services
 - [ ] **Launchtube**: Get Mainnet JWT from Stellar Discord #launchtube.
@@ -131,8 +131,8 @@ npm run multisig:setup    # Configure production signers
   This sets `masterWeight: 0` preventing any further minting.
 
 - [ ] **Remove secret keys from production .env** when using multisig mode
-  - Only public keys needed when `KEY_MANAGEMENT_MODE=multisig`
-  - All transactions require Ledger signatures
+  - Only public keys + `OPERATIONS_SECRET_KEY` needed when `KEY_MANAGEMENT_MODE=multisig`
+  - Issuer/Treasury/Distributor transactions require Ledger/Freighter signatures
 
 ### Post-Launch Verification
 ```bash

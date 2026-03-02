@@ -1,4 +1,4 @@
-# Stellar Security Token Best Practices Audit
+# Radox — Stellar Security Best Practices Audit
 
 **Audit Date:** 2026-01-17  
 **Auditor:** AI CTO / Cyber Security Review  
@@ -31,10 +31,12 @@ The platform follows **most Stellar best practices** for security token issuance
 **Status:** ✅ **Compliant**
 
 The platform correctly separates:
-- **Issuer Account** (`STELLAR_ISSUER_SECRET_KEY`) - Creates assets with compliance flags
-- **Distribution Account** (`STELLAR_DISTRIBUTOR_SECRET_KEY`) - Holds inventory, distributes to investors
-- **Treasury Account** (`STELLAR_TREASURY_SECRET_KEY`) - Receives USDC payments
-- **Operations Account** (`STELLAR_OPERATIONS_SECRET_KEY`) - Gas station for fee bumps
+- **Issuer Account** (`ISSUER_PUBLIC_KEY`) — Creates assets with compliance flags
+- **Distribution Account** (`DISTRIBUTOR_PUBLIC_KEY`) — Holds inventory, distributes to investors
+- **Treasury Account** (`TREASURY_PUBLIC_KEY`) — Receives USDC payments
+- **Operations Account** (`OPERATIONS_SECRET_KEY`) — Gas station for fee bumps (only secret key in `.env`)
+
+> **Note:** In `multisig` mode (production), `KeyManager` throws on secret key access for Issuer/Treasury/Distributor. Those accounts sign via Freighter/Ledger.
 
 **Code Reference:**
 ```javascript
