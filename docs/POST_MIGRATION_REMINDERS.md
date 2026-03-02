@@ -19,6 +19,7 @@ This document tracks items that need to be addressed **after** the initial Mainn
 - [ ] **Factory Contract**: Deploy smart wallet factory to mainnet. Update `FACTORY_CONTRACT_ID`.
 - [ ] **SAC Contract IDs**: Look up mainnet XLM and USDC SAC IDs on Stellar Expert.
 - [ ] **Pusher**: Set up Pusher account for real-time notifications.
+- [ ] **Operations Secret Key → Vault**: The Operations hot wallet (`OPERATIONS_SECRET_KEY`) is the **only** secret key in `.env`. Before mainnet, migrate it to **Google Secret Manager** (or equivalent vault) so it's never stored in plaintext. Issuer/Treasury/Distributor are already cold (Freighter/multisig only).
 
 ### 🌐 Frontend & Marketing
 - [ ] **Landing Page**: Develop a professional landing page for the main domain.

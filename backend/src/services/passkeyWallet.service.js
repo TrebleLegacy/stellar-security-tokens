@@ -327,42 +327,6 @@ export class PasskeyWalletService {
 
 
   /**
-   * Get user by passkey credential ID
-   * 
-   * @param {string} userType - Type of user: 'investor' or 'company_user'
-   * @param {string} credentialId - The WebAuthn credential ID
-   * @returns {Promise<Object|null>} User data or null
-   */
-  static async getUserByCredentialId(userType, credentialId) {
-    const model = this.#getPrismaModel(userType);
-
-    if (!model) {
-      throw new Error(`Invalid user type: ${userType}`);
-    }
-
-    const baseSelect = {
-      id: true,
-      name: true,
-      email: true,
-      stellarContractId: true,
-      stellarPublicKey: true,
-      emailVerified: true,
-    };
-
-    // Add type-specific fields
-    const select = userType === UserType.INVESTOR
-      ? { ...baseSelect, kycStatus: true }
-      : { ...baseSelect, companyId: true, role: true, isActive: true };
-
-    const user = await prisma[model].findFirst({
-      where: { passkeyCredentialId: credentialId },
-      select,
-    });
-
-    return user;
-  }
-
-  /**
    * Sign a transaction using the smart wallet
    * This creates an authorization entry for Soroban contract calls
    * 
