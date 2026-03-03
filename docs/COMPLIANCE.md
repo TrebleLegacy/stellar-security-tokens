@@ -6,11 +6,12 @@ Digital assets are regulated. This document explains how we ensure safety and le
 
 Every user (Investor or Issuer) must be verified before they can touch the blockchain.
 
-### 1. Onboarding
-- User signs up with email.
-- **KYC Check**: They submit ID documents (Passport, Driver's License).
-- **Status**: Account starts as `pending`.
-- **Approval**: An Admin reviews the documents and marks the account `approved`.
+### 1. Onboarding (Current State)
+- User registers with **name, email, and CPF** (self-declared).
+- A Soroban smart wallet is deployed on-chain automatically.
+- **No document upload or identity verification is implemented yet.**
+
+> **Future**: Full KYC with document upload, OCR verification, and admin review is planned. See [POST_MIGRATION_REMINDERS.md](POST_MIGRATION_REMINDERS.md) § Company Features.
 
 ### 2. Whitelisting (Access Control)
 Even with a wallet, a user cannot buy a Security Token unless they are "Authorized".

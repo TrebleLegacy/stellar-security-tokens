@@ -9,13 +9,12 @@ Unlike traditional banks that take days to process dividends, our platform autom
 ### 1. Revenue Collection
 The Issuer (Company) deposits the interest/dividend payment in USDC into the **Treasury Account**.
 
-### 2. The Snapshot
-On the scheduled payment date (e.g., 1st of the Month), the system takes a "Snapshot".
-- It looks at the value of the token supply.
+### 2. Proportional Calculation
+On the scheduled payment date, the system queries **on-chain token balances** for all holders.
 - It calculates how much each investor owns *at that exact moment*.
 - Example:
-  - Alice owns 10% of tokens -> Gets 10% of the payment.
-  - Bob owns 5% of tokens -> Gets 5% of the payment.
+  - Alice owns 10% of tokens → Gets 10% of the payment.
+  - Bob owns 5% of tokens → Gets 5% of the payment.
 
 ### 3. Fee Deduction
 Before distribution, the **Dividend Fee** (if configured) is deducted from the total pot.

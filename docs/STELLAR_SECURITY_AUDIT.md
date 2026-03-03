@@ -232,7 +232,7 @@ Currently:
 - Total minted (from Horizon)
 - Total in distribution account
 - Total circulating (in investor hands)
-- Total clawed back/burned
+- Total clawed back
 
 ---
 
@@ -243,7 +243,7 @@ Before going to mainnet, ensure:
 - [ ] **Enable multisig** on all platform accounts (issuer, distributor, treasury)
 - [ ] **Add Ledger signers** to treasury (2-of-3 recommended)
 - [ ] **Lock issuer account** after initial token minting (masterWeight: 0)
-- [ ] **Remove secret keys** from production .env (multisig mode only)
+- [ ] **Remove secret keys** from production .env (except `OPERATIONS_SECRET_KEY` for gas station)
 - [ ] **Audit npm dependencies** (`npm audit --production`)
 - [ ] **Review Stellar toml** for proper home domain setup
 - [ ] **Test clawback flow** on testnet fully
@@ -270,7 +270,7 @@ Before going to mainnet, ensure:
 
 ## References
 
-- [Stellar: Control Asset Access](../docs/Stellar%20Docs.../tokens/control-asset-access.md)
-- [Stellar: How to Issue an Asset](../docs/Stellar%20Docs.../tokens/how-to-issue-an-asset.md)
+- [Stellar: Control Asset Access](https://developers.stellar.org/docs/tokens/control-asset-access)
+- [Stellar: How to Issue an Asset](https://developers.stellar.org/docs/tokens/how-to-issue-an-asset)
 - [Platform: Multisig Reference](./STELLAR_MULTISIG_REFERENCE.md)
 - [Platform: Mainnet Checklist](./MAINNET_CHECKLIST.md)

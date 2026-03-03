@@ -6,7 +6,7 @@ How capital moves from Investors to Companies.
 
 ### 1. Discovery
 The Investor browses the **Marketplace**. They see available "Offers" (e.g., "Solar Farm Project - 12% APY").
-- They can read documents, check the maturity date, and see the risk rating.
+- They can read documents, check the maturity date, and view key financial details.
 
 ### 2. Purchase Request
 The Investor decides to invest (e.g., 1,000 USDC).

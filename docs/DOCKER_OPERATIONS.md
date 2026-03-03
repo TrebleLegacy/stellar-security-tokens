@@ -19,7 +19,7 @@
 
 ### Start Development Environment
 ```bash
-cd /Users/pedrosaragossy/Workspace/Tokenizadora/stellar-security-tokens
+# From the project root
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ```
 

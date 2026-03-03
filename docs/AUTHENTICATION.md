@@ -37,7 +37,7 @@ We use the `passkey-kit` (Stellar) and standard WebAuthn API.
 
 ## Security Notes
 
-- **JWT Expiry**: Access tokens are 15-minute lived; refresh tokens are 7-day.
+- **JWT Expiry**: Access tokens are **24-hour** lived (see `generateToken()` default in `auth.js`); refresh tokens are 7-day.
 - **Refresh Token Rotation**: Each refresh generates a new token and revokes the old one (stored in `RefreshToken` table).
 - **Token Blocklist**: Redis-backed blocklist invalidates tokens on logout (`POST /api/auth/logout`).
 - **No Password Hashes for Investors/Companies**: Only passkey public keys are stored.

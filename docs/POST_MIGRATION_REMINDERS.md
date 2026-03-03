@@ -69,7 +69,7 @@ This document tracks items that need to be addressed **after** the initial Mainn
 
 ## 5. Security Hardening
 - [ ] **CORS Configuration**: Set `FRONTEND_URL` to production domain (e.g., `https://app.radox.net`). Restrict origins in `backend/src/app.js`.
-- [ ] **Refresh Tokens**: Implement 15-min access + 7-day refresh tokens (currently single 24h JWT).
+- [ ] **Short-Lived Access Tokens**: Reduce access token expiry from 24h to 15 minutes. Refresh tokens (7-day, httpOnly cookie, rotation) are already implemented.
 - [ ] **Security Audit Logging**: Dedicated audit log for logins, failed auth, admin actions. Consider winston/pino with separate transport.
 - [ ] **Cold Issuer Wallet** (Phased):
     - Phase 1 (MVP): Admin Passkeys as 2nd signer.

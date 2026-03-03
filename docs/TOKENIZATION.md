@@ -27,8 +27,8 @@ When an Investor buys into an Offer:
 2.  The platform transfers the equivalent amount of tokens from the Distributor to the Investors' Wallet.
 
 ### 4. Lifecycle Management
-- **Freezing**: If a user is flagged (e.g., legal order), their tokens can be frozen.
-- **Burning**: If the asset is sold or matures, tokens might be "burned" (destroyed) in exchange for the final payout.
+- **Freezing**: If a user is flagged (e.g., legal order), their tokens can be frozen (reversible).
+- **Clawback**: Tokens can be forcibly reclaimed from a holder by the issuer (e.g., fraud, court order). Requires `AUTH_CLAWBACK_ENABLED` flag.
 
 ## Why Stellar?
 We use the Stellar network because it is fast, cheap (fractions of a cent per transaction), and built specifically for asset issuance.
