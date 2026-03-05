@@ -179,7 +179,8 @@ services:
         VITE_SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
         VITE_STELLAR_NETWORK_PASSPHRASE: "${VITE_STELLAR_NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}"
         VITE_FACTORY_CONTRACT_ID: ${FACTORY_CONTRACT_ID}
-    # No external ports — Caddy handles all external traffic
+    # Override base compose port 80 — only Caddy exposes ports externally
+    ports: !override []
     depends_on:
       backend:
         condition: service_healthy
