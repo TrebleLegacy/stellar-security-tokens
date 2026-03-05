@@ -34,8 +34,17 @@ Create a production `.env` file with the following changes:
 > **NOTE:** The platform uses `KEY_MANAGEMENT_MODE=multisig` — only public keys + the Operations hot wallet key are needed. Issuer/Treasury/Distributor sign via Freighter/Ledger.
 
 - [ ] **Generate new mainnet keypairs** for Issuer, Distributor, Treasury, Operations. Fund each with XLM.
-- [ ] **`OPERATIONS_SECRET_KEY`**: Migrate to Google Secret Manager (only secret key in `.env`).
 - [ ] **All `*_PUBLIC_KEY` vars**: Update in `.env.production` with mainnet public keys.
+
+### Operations Hot Wallet Security (CRITICAL)
+> `OPERATIONS_SECRET_KEY` is the **only** secret key on the server. It sponsors gasless transactions (wallet creation, trustlines). Protect it:
+
+- [ ] **Fresh keypair** — generate a new mainnet Operations key. Never reuse testnet keys.
+- [ ] **Minimal balance** — keep only ~50 XLM (enough for ~1000 sponsored txns). Refill as needed.
+- [ ] **Secrets Manager** — migrate from `.env.production` to a secrets manager (DigitalOcean Vault, HashiCorp Vault, or Google Secret Manager). The backend reads the key at startup via API call.
+- [ ] **File permissions** — if staying in `.env.production`, ensure `chmod 600` on the file (root-only).
+- [ ] **Account monitoring** — set up alerts on [stellar.expert](https://stellar.expert) for unexpected transactions on the Operations account.
+- [ ] **Key rotation plan** — document how to rotate the Operations key if compromised (generate new keypair, update `.env.production`, restart backend).
 
 ### Smart Contracts (Passkey Wallet)
 - [ ] **`FACTORY_CONTRACT_ID`**: Deploy Factory to Mainnet and update this ID.
