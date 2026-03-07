@@ -243,7 +243,7 @@ export const HELP_CONTENT = {
         },
         assetField: {
             title: "Asset Selection",
-            content: `Choose XLM (native), USDC (stablecoin), or a specific security token for the transfer. Double-check the asset before submitting — sending the wrong one can't be automatically reversed.`,
+            content: `Choose XLM (native), USDC (stablecoin), or a specific token for the transfer. Double-check the asset before submitting — sending the wrong one can't be automatically reversed.`,
         },
     },
 
