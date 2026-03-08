@@ -102,6 +102,40 @@ export class Offer {
   }
 
   /**
+   * Busca oferta por Soroban contract ID
+   * @param {string} contractId - Contract address (C...)
+   * @returns {Promise<Object|null>} Oferta encontrada ou null
+   */
+  static async findByContractId(contractId) {
+    return await prisma.offer.findFirst({
+      where: { sorobanContractId: contractId },
+      include: {
+        company: true,
+        requester: true,
+        tokens: true
+      }
+    });
+  }
+
+  /**
+   * Associa um Soroban contract ID a uma oferta
+   * @param {number} id - ID da oferta
+   * @param {string} contractId - Contract address (C...)
+   * @returns {Promise<Object|null>} Oferta atualizada
+   */
+  static async setSorobanContractId(id, contractId) {
+    try {
+      return await prisma.offer.update({
+        where: { id },
+        data: { sorobanContractId: contractId },
+      });
+    } catch (error) {
+      if (error.code === 'P2025') return null;
+      throw error;
+    }
+  }
+
+  /**
    * Busca ofertas de uma empresa
    * @param {number} companyId - ID da empresa
    * @param {number} [limit=100] - Limite de resultados
