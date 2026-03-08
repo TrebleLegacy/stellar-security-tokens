@@ -63,6 +63,7 @@ enum PaymentDueStatus {
 
 enum InvestmentStatus {
   pending_payment
+  trade_submitted     // Soroban trade() TX sent, awaiting confirmation
   payment_received
   pending_distribution
   distributed
@@ -377,6 +378,9 @@ model Offer {
   isTokenLocked       Boolean   @default(true) @map("is_token_locked")
   tokenUnlockedAt     DateTime? @map("token_unlocked_at") @db.Timestamp
 
+  // Soroban token_sale contract (set after offer approval + contract deploy)
+  sorobanContractId   String?   @map("soroban_contract_id") @db.VarChar(56)
+
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamp
   updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamp
 
@@ -398,6 +402,7 @@ model Offer {
   @@index([paymentType])
   @@index([paymentDueStatus])
   @@index([nextPaymentDue])
+  @@index([sorobanContractId])
   @@map("offers")
 }
 

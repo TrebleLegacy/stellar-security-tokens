@@ -5,6 +5,7 @@ import { StellarService } from '../services/stellar.service.js';
 import { PaymentService } from '../services/payment.service.js';
 import { getTreasuryPublicKey } from '../config/stellar.js';
 import { PasskeyWalletService } from '../services/passkeyWallet.service.js';
+import { SorobanSaleService } from '../services/sorobanSale.service.js';
 import { addDistributionJob, isQueueAvailable } from '../services/distributionQueue.service.js';
 import { ConfigService } from '../services/config.service.js';
 import prisma from '../config/prisma.js';
@@ -211,7 +212,7 @@ export const purchaseInvestment = async (req, res, next) => {
     // Update investment with the generated memo
     await Investment.updateStatus(investment.id, { memo: memo });
 
-    // --- SMART WALLET FLOW: Build SAC transfer for passkey signing ---
+    // --- SMART WALLET FLOW: Build transaction for passkey signing ---
     if (investorWallet.startsWith('C') && offerId) {
       try {
         // Resolve company wallet from offer
@@ -222,26 +223,41 @@ export const purchaseInvestment = async (req, res, next) => {
           throw new Error('Company wallet not found for this offer');
         }
 
-        // Route to treasury muxed address (per-company fund segregation)
-        // Funds pool in treasury G-address; muxed ID (company.id) is recorded on-chain
-        // Company claims funds later via admin-approved settlement
-        const { getTreasuryPublicKey } = await import('../config/stellar.js');
-        const { MuxedAccount, Account: StellarAccount } = await import('@stellar/stellar-sdk');
-        const treasuryPubKey = getTreasuryPublicKey();
-        const companyId = offer?.company?.id || 0;
-        const muxedAcct = new MuxedAccount(
-          new StellarAccount(treasuryPubKey, '0'),
-          companyId.toString()
-        );
-        const treasuryMuxed = muxedAcct.accountId(); // M... address
+        let txData;
 
-        log.info(`[Investment] Routing ${totalDeduction} USDC to treasury muxed address (company #${companyId}): ${treasuryMuxed}`);
+        // ─── SOROBAN CONTRACT PATH: atomic trade() ───
+        // When offer has a sorobanContractId, use the contract's trade() function.
+        // This atomically: transfers USDC buyer→treasury AND sell_token contract→buyer.
+        // No separate distribution step needed.
+        if (offer.sorobanContractId) {
+          log.info(`[Investment] Using Soroban contract ${offer.sorobanContractId} for trade (${totalDeduction} USDC)`);
+          txData = await SorobanSaleService.buildTradeXdr(
+            offer.sorobanContractId,
+            investorWallet,
+            totalDeduction
+          );
+          // Mark as contract-based so submitInvestmentTx knows to skip distribution
+          txData._isContractTrade = true;
+        } else {
+          // ─── LEGACY SAC TRANSFER PATH ───
+          // Route to treasury muxed address (per-company fund segregation)
+          const { getTreasuryPublicKey } = await import('../config/stellar.js');
+          const { MuxedAccount, Account: StellarAccount } = await import('@stellar/stellar-sdk');
+          const treasuryPubKey = getTreasuryPublicKey();
+          const companyId = offer?.company?.id || 0;
+          const muxedAcct = new MuxedAccount(
+            new StellarAccount(treasuryPubKey, '0'),
+            companyId.toString()
+          );
+          const treasuryMuxed = muxedAcct.accountId(); // M... address
 
-        const txData = await PasskeyWalletService.buildInvestmentTx(
-          investorWallet,
-          treasuryMuxed,
-          totalDeduction
-        );
+          log.info(`[Investment] Legacy SAC transfer: ${totalDeduction} USDC → treasury muxed (company #${companyId}): ${treasuryMuxed}`);
+          txData = await PasskeyWalletService.buildInvestmentTx(
+            investorWallet,
+            treasuryMuxed,
+            totalDeduction
+          );
+        }
 
         return res.status(200).json({
           success: true,
@@ -256,6 +272,7 @@ export const purchaseInvestment = async (req, res, next) => {
               tokenAmount: tokenAmount,
               assetCode: assetCode,
               memo: memo,
+              isContractTrade: !!offer.sorobanContractId,
             },
             // Smart wallet transaction for passkey signing
             transaction: {
@@ -263,6 +280,7 @@ export const purchaseInvestment = async (req, res, next) => {
               networkPassphrase: txData.networkPassphrase,
               walletId: txData.walletId,
               companyWallet: companyWallet,
+              contractId: txData.contractId || null,
             },
           },
         });
@@ -273,6 +291,17 @@ export const purchaseInvestment = async (req, res, next) => {
           status: 'failed',
           error_message: `Transaction build failed: ${txError.message}`,
         });
+
+        // If it's a SaleError, return the mapped HTTP status
+        const contractErr = SorobanSaleService.parseContractError?.(txError);
+        if (contractErr) {
+          return res.status(contractErr.httpStatus).json({
+            success: false,
+            error: contractErr.message,
+            code: contractErr.code,
+          });
+        }
+
         return res.status(500).json({
           success: false,
           error: `Failed to prepare investment transaction: ${txError.message}`,
@@ -687,7 +716,7 @@ export const submitInvestmentTx = async (req, res, next) => {
     if (!investment) {
       return res.status(404).json({ success: false, error: 'Investment not found' });
     }
-    if (investment.status !== 'pending_payment') {
+    if (investment.status !== 'pending_payment' && investment.status !== 'trade_submitted') {
       return res.status(400).json({
         success: false,
         error: `Investment is not pending payment (status: ${investment.status})`,
@@ -785,6 +814,16 @@ export const submitInvestmentTx = async (req, res, next) => {
         log.error('[Investment] Meta decode error:', metaErr.message);
       }
 
+      // Try to parse SaleError from contract diagnostic events
+      const saleError = SorobanSaleService.parseContractError(txResult);
+      if (saleError) {
+        log.error(`[Investment] SaleError detected: ${saleError.code} (${saleError.name}) — ${saleError.message}`);
+        throw Object.assign(
+          new Error(`Contract error: ${saleError.message}`),
+          { saleError }
+        );
+      }
+
       throw new Error(`Transaction FAILED on-chain. Hash: ${sendResult.hash}. Check logs for diagnostic events.`);
     }
 
@@ -799,27 +838,48 @@ export const submitInvestmentTx = async (req, res, next) => {
 
     log.info(`[Investment] Smart wallet payment submitted for investment #${investmentId}: ${result.hash}`);
 
-    // Funds are now in the treasury muxed address (per-company segregation).
-    // Company claims funds via admin-approved settlement (Phase 2).
+    // Determine if this was a Soroban contract trade or a legacy SAC transfer.
+    // For contract trades, distribution is ATOMIC — the contract already sent tokens to buyer.
+    // For legacy transfers, we still need to trigger separate token distribution.
+    // Note: Investment.findById() doesn't include offer relation, so query separately.
+    let isContractTrade = false;
+    if (investment.offerId) {
+      const { Offer } = await import('../models/Offer.js');
+      const offer = await Offer.findById(investment.offerId);
+      isContractTrade = !!offer?.sorobanContractId;
+    }
 
-    // Trigger token distribution
-    if (isQueueAvailable()) {
-      await addDistributionJob({
-        investmentId: parseInt(investmentId),
-        investorPublicKey: investment.investorId?.toString(),
-        assetCode: investment.assetCode,
-        amount: investment.tokenAmount?.toString(),
-        memo: investment.memo,
+    if (isContractTrade) {
+      // Contract trade: tokens already in buyer's wallet. Update to 'distributed' directly.
+      log.info(`[Investment] Contract trade complete — tokens distributed atomically. Skipping distributeTokens.`);
+      await Investment.updateStatus(parseInt(investmentId), {
+        status: 'distributed',
+        distribution_tx_hash: result.hash, // Same TX did both payment + distribution
       });
+    } else {
+      // Legacy SAC transfer: funds are in treasury, tokens need separate distribution.
+      log.info(`[Investment] Legacy flow — triggering token distribution...`);
+      if (isQueueAvailable()) {
+        await addDistributionJob({
+          investmentId: parseInt(investmentId),
+          investorPublicKey: investment.investorId?.toString(),
+          assetCode: investment.assetCode,
+          amount: investment.tokenAmount?.toString(),
+          memo: investment.memo,
+        });
+      }
     }
 
     return res.json({
       success: true,
-      message: 'Investment payment submitted successfully',
+      message: isContractTrade
+        ? 'Investment completed — tokens received'
+        : 'Investment payment submitted successfully',
       data: {
         investmentId: parseInt(investmentId),
         transactionHash: result.hash,
-        status: 'payment_received',
+        status: isContractTrade ? 'distributed' : 'payment_received',
+        isContractTrade,
       },
     });
   } catch (error) {
