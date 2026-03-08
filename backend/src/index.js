@@ -234,4 +234,17 @@ app.listen(PORT, async () => {
   } catch (error) {
     console.error('Failed to start Soroban TTL Maintenance:', error.message);
   }
+
+  // --- SOROBAN EVENT INDEXER ---
+  if (process.env.ENABLE_SOROBAN_SALE === 'true') {
+    try {
+      const { SorobanEventIndexer } = await import('./services/sorobanEventIndexer.js');
+      SorobanEventIndexer.start();
+      console.log('Soroban event indexer enabled - monitoring contract events every 30s');
+    } catch (error) {
+      console.error('Failed to start Soroban event indexer:', error.message);
+    }
+  } else {
+    console.log('Soroban event indexer disabled (ENABLE_SOROBAN_SALE != true)');
+  }
 });
