@@ -73,15 +73,6 @@
                 },
                 {
                   "u32": 1
-                },
-                {
-                  "u32": 0
-                },
-                {
-                  "i128": "0"
-                },
-                {
-                  "i128": "0"
                 }
               ]
             }
@@ -170,6 +161,28 @@
               "args": [
                 {
                   "bool": true
+                }
+              ]
+            }
+          },
+          "sub_invocations": []
+        }
+      ]
+    ],
+    [
+      [
+        "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+        {
+          "function": {
+            "contract_fn": {
+              "contract_address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMDR4",
+              "function_name": "updt_price",
+              "args": [
+                {
+                  "u32": 5
+                },
+                {
+                  "u32": 2
                 }
               ]
             }
@@ -341,6 +354,26 @@
               "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
               "key": {
                 "ledger_key_nonce": {
+                  "nonce": "6277191135259896685"
+                }
+              },
+              "durability": "temporary",
+              "val": "void"
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 6311999
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM",
+              "key": {
+                "ledger_key_nonce": {
                   "nonce": "8370022561469687789"
                 }
               },
@@ -410,7 +443,7 @@
                               "symbol": "buy_price"
                             },
                             "val": {
-                              "u32": 1
+                              "u32": 2
                             }
                           },
                           {
@@ -423,14 +456,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "deadline_ledger"
-                            },
-                            "val": {
-                              "u32": 0
-                            }
-                          },
-                          {
-                            "key": {
                               "symbol": "is_active"
                             },
                             "val": {
@@ -439,26 +464,10 @@
                           },
                           {
                             "key": {
-                              "symbol": "max_buy_per_buyer"
-                            },
-                            "val": {
-                              "i128": "0"
-                            }
-                          },
-                          {
-                            "key": {
-                              "symbol": "min_buy_amount"
-                            },
-                            "val": {
-                              "i128": "0"
-                            }
-                          },
-                          {
-                            "key": {
                               "symbol": "sell_price"
                             },
                             "val": {
-                              "u32": 1
+                              "u32": 5
                             }
                           },
                           {
