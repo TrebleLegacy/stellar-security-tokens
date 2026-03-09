@@ -137,7 +137,7 @@ export const purchaseInvestment = async (req, res, next) => {
 
       // --- MATURITY CUTOFF: Block investments too close to maturity ---
       if (offer.maturityDate) {
-        const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 90);
+        const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 7);
         const now = new Date();
         const maturity = new Date(offer.maturityDate);
         const daysUntilMaturity = Math.ceil((maturity - now) / (1000 * 60 * 60 * 24));

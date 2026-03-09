@@ -584,7 +584,7 @@ export class OfferController {
       const soldLookup = Object.fromEntries(tokensSoldMap.map(e => [e.id, e.sold]));
 
       // Fetch cutoff from config
-      const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 90);
+      const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 7);
 
       // Formatar ofertas com documentos IPFS + supply data
       const formattedOffers = offers.map(offer => {
@@ -639,7 +639,7 @@ export class OfferController {
 
       // Compute tokens_sold for this offer
       offer._tokensSold = await Investment.getTokensSoldByOffer(offer.id);
-      const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 90);
+      const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 7);
 
       res.json({
         success: true,
