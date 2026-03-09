@@ -969,6 +969,30 @@ export class OfferController {
       });
     }
   }
+
+  /**
+   * Retry Soroban init for a failed sale offer (platform_admin)
+   * POST /api/admin/offers/:id/retry-soroban
+   */
+  static async retrySorobanInit(req, res) {
+    try {
+      const { id } = req.params;
+      const updatedOffer = await OfferService.retrySorobanInit(parseInt(id));
+
+      res.json({
+        success: true,
+        data: OfferController.formatOfferForResponse(updatedOffer),
+        message: 'Soroban deployment retried — check approval hub for signing',
+      });
+    } catch (error) {
+      log.error('Error retrying Soroban init:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to retry Soroban init',
+        details: error.message,
+      });
+    }
+  }
   /**
    * Ativa oferta pelo próprio owner (company_user)
    * POST /api/companies/offers/:id/activate

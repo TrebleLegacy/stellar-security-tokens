@@ -17,6 +17,9 @@ import {
     Contract,
     Address,
     TransactionBuilder,
+    Operation,
+    StrKey,
+    hash,
     xdr,
     rpc,
     nativeToScVal,
@@ -25,7 +28,6 @@ import {
 } from '@stellar/stellar-sdk';
 import {
     getNetworkPassphrase,
-    getOperationsKeypair,
     getSorobanRpcUrl,
     buildTransactionWithAccount,
 } from '../config/stellar.js';
@@ -57,67 +59,104 @@ export class SorobanSaleService {
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Deploy the token_sale WASM and initialize a sale via create().
+     * Build an unsigned deploy TX for the token_sale contract.
+     * The issuerPublicKey is both the deployer and the TX source account.
      *
-     * @param {Object} params - Sale parameters
-     * @param {string} params.wasmHash - Deployed WASM hash (hex)
-     * @param {string} params.admin - Admin address (G... multisig recommended)
-     * @param {string} params.seller - Seller address (G... operational key)
-     * @param {string} params.sellToken - SAC contract ID of the sell token (C...)
-     * @param {string} params.buyToken - SAC contract ID of the buy token / USDC (C...)
-     * @param {string} params.treasury - Treasury address for USDC collection
-     * @param {number} params.sellPrice - Sell price numerator
-     * @param {number} params.buyPrice - Buy price denominator
-     * @param {number} [params.deadlineLedger=0] - Ledger deadline (0 = no deadline)
-     * @param {bigint} [params.minBuyAmount=0n] - Min buy_token per trade in stroops
-     * @param {bigint} [params.maxBuyPerBuyer=0n] - Max cumulative per buyer in stroops
-     * @returns {Promise<Object>} { contractId, createTxHash }
+     * @param {string} issuerPublicKey - Issuer public key (G...) — deployer + TX source
+     * @param {string} wasmHash - WASM hash (hex, 64 chars)
+     * @param {Buffer} salt - 32-byte salt for deterministic contract ID
+     * @returns {Promise<Object>} { xdr, contractId, networkPassphrase }
      */
-    static async createSale({
-        wasmHash,
-        admin,
-        seller,
-        sellToken,
-        buyToken,
-        treasury,
-        sellPrice,
-        buyPrice,
-        deadlineLedger = 0,
-        minBuyAmount = 0n,
-        maxBuyPerBuyer = 0n,
-    }) {
-        const networkPassphrase = getNetworkPassphrase();
-        const opsKeypair = getOperationsKeypair();
-        const rpcServer = new rpc.Server(getSorobanRpcUrl());
+    static async buildDeployXdr(issuerPublicKey, wasmHash, salt) {
+        const deployOp = Operation.createCustomContract({
+            wasmHash: Buffer.from(wasmHash, 'hex'),
+            address: Address.fromString(issuerPublicKey),
+            salt,
+        });
 
-        // 1. Deploy contract instance from WASM hash
-        log.info(`[createSale] Deploying contract from WASM ${wasmHash}...`);
+        let tx = new TransactionBuilder(
+            await StellarService.getAccountRPC(issuerPublicKey),
+            { fee: BASE_FEE, networkPassphrase: getNetworkPassphrase() }
+        )
+            .addOperation(deployOp)
+            .setTimeout(300)
+            .build();
 
-        const deployOp = xdr.Operation.fromXDR(
-            // Use the low-level XDR to deploy a contract with a WASM hash
-            // The SDK doesn't have a high-level helper for this yet
-            Contract.deploy(wasmHash).toXDR('base64'),
-            'base64'
+        tx = await StellarService.prepareSorobanTransaction(tx);
+
+        // Precompute contractId for DB persistence before on-chain confirmation
+        const contractId = this.precomputeContractId(issuerPublicKey, salt);
+
+        log.info(`[buildDeployXdr] Built deploy XDR. Precomputed contractId=${contractId}`);
+        return {
+            xdr: tx.toXDR('base64'),
+            contractId,
+            networkPassphrase: getNetworkPassphrase(),
+        };
+    }
+
+    /**
+     * Deterministically compute a contract ID from deployer + salt + network.
+     * Uses the same algorithm as the Stellar network: sha256(networkId || deployer || salt).
+     *
+     * @param {string} issuerPublicKey - Deployer address (G...)
+     * @param {Buffer} salt - 32-byte salt
+     * @returns {string} Contract ID (C...)
+     */
+    static precomputeContractId(issuerPublicKey, salt) {
+        const networkId = hash(Buffer.from(getNetworkPassphrase()));
+
+        const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
+            new xdr.HashIdPreimageContractId({
+                networkId,
+                contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+                    new xdr.ContractIdPreimageFromAddress({
+                        address: xdr.ScAddress.scAddressTypeAccount(
+                            xdr.PublicKey.publicKeyTypeEd25519(
+                                StrKey.decodeEd25519PublicKey(issuerPublicKey)
+                            )
+                        ),
+                        salt,
+                    })
+                ),
+            })
         );
 
-        // For production, we'll use the Stellar CLI to deploy:
-        // stellar contract deploy --wasm-hash <HASH> --source <ADMIN>
-        // Then call create() on the deployed contract.
-        // Below is the create() call for an already-deployed contract.
+        const contractHash = hash(preimage.toXDR());
+        return StrKey.encodeContract(contractHash);
+    }
 
-        log.warn('[createSale] Contract deployment should be done via CLI. Use createSaleOnContract() after deployment.');
-        throw new Error('Use CLI to deploy, then call createSaleOnContract(contractId, params)');
+    /**
+     * Check if a contract exists on-chain via getLedgerEntries.
+     * Used for crash-safe resumption of the deploy pipeline.
+     *
+     * @param {string} contractId - Contract address (C...)
+     * @returns {Promise<boolean>} True if the contract instance exists on-chain
+     */
+    static async contractExistsOnChain(contractId) {
+        try {
+            const rpcServer = new rpc.Server(getSorobanRpcUrl());
+            const contract = new Contract(contractId);
+            const instanceKey = contract.getFootprint();
+            const result = await rpcServer.getLedgerEntries(instanceKey);
+            return result.entries && result.entries.length > 0;
+        } catch (err) {
+            log.warn(`[contractExistsOnChain] Check failed for ${contractId}: ${err.message}`);
+            return false;
+        }
     }
 
     /**
      * Initialize a sale on an already-deployed contract via create().
      * This is a Soroban invocation that needs admin auth.
+     * Uses issuerPublicKey as source account — Freighter signs the envelope.
      *
      * @param {string} contractId - Deployed contract address (C...)
-     * @param {Object} params - Same as createSale minus wasmHash
-     * @returns {Promise<string>} Unsigned XDR for admin to sign
+     * @param {string} issuerPublicKey - Issuer public key (G...) — TX source
+     * @param {Object} params - Sale parameters
+     * @returns {Promise<Object>} { xdr, networkPassphrase, contractId }
      */
-    static async buildCreateSaleXdr(contractId, {
+    static async buildCreateSaleXdr(contractId, issuerPublicKey, {
         admin,
         seller,
         sellToken,
@@ -129,7 +168,6 @@ export class SorobanSaleService {
         minBuyAmount = 0n,
         maxBuyPerBuyer = 0n,
     }) {
-        const opsKeypair = getOperationsKeypair();
         const contract = new Contract(contractId);
 
         const createOp = contract.call(
@@ -147,7 +185,7 @@ export class SorobanSaleService {
         );
 
         let tx = new TransactionBuilder(
-            await StellarService.getAccountRPC(opsKeypair.publicKey()),
+            await StellarService.getAccountRPC(issuerPublicKey),
             { fee: BASE_FEE, networkPassphrase: getNetworkPassphrase() }
         )
             .addOperation(createOp)
@@ -194,7 +232,8 @@ export class SorobanSaleService {
             throw new Error('Amount must be a positive number');
         }
 
-        const opsKeypair = getOperationsKeypair();
+        const { keyManager: km } = await import('./KeyManager.js');
+        const opsPublicKey = km.getOperationsPublicKey();
         const networkPassphrase = getNetworkPassphrase();
         const amountStroops = BigInt(Math.floor(parsedAmount * 10_000_000));
 
@@ -206,7 +245,7 @@ export class SorobanSaleService {
         );
 
         let tx = new TransactionBuilder(
-            await StellarService.getAccountRPC(opsKeypair.publicKey()),
+            await StellarService.getAccountRPC(opsPublicKey),
             { fee: BASE_FEE, networkPassphrase }
         )
             .addOperation(tradeOp)
@@ -332,13 +371,14 @@ export class SorobanSaleService {
      */
     static async #simulateReadOnly(contractId, method, args = []) {
         const rpcServer = new rpc.Server(getSorobanRpcUrl());
-        const opsKeypair = getOperationsKeypair();
+        const { keyManager: km } = await import('./KeyManager.js');
+        const opsPublicKey = km.getOperationsPublicKey();
         const contract = new Contract(contractId);
 
         const callOp = contract.call(method, ...args);
 
         const tx = new TransactionBuilder(
-            await rpcServer.getAccount(opsKeypair.publicKey()),
+            await rpcServer.getAccount(opsPublicKey),
             { fee: BASE_FEE, networkPassphrase: getNetworkPassphrase() }
         )
             .addOperation(callOp)
@@ -429,16 +469,19 @@ export class SorobanSaleService {
 
     /**
      * Generic admin/seller operation builder.
+     * Uses issuerPublicKey as TX source — contract requires admin.require_auth()
+     * or seller.require_auth(), both set to issuerPub at create() time.
      * @private
      */
     static async #buildAdminOpXdr(contractId, method, args = []) {
-        const opsKeypair = getOperationsKeypair();
+        const { keyManager } = await import('./KeyManager.js');
+        const issuerPublicKey = keyManager.getIssuerPublicKey();
         const contract = new Contract(contractId);
 
         const op = contract.call(method, ...args);
 
         let tx = new TransactionBuilder(
-            await StellarService.getAccountRPC(opsKeypair.publicKey()),
+            await StellarService.getAccountRPC(issuerPublicKey),
             { fee: BASE_FEE, networkPassphrase: getNetworkPassphrase() }
         )
             .addOperation(op)
@@ -447,12 +490,102 @@ export class SorobanSaleService {
 
         tx = await StellarService.prepareSorobanTransaction(tx);
 
-        log.info(`[buildAdminOpXdr] Built ${method}() XDR for contract ${contractId}`);
+        log.info(`[buildAdminOpXdr] Built ${method}() XDR for contract ${contractId} (source: ${issuerPublicKey.slice(0, 8)}…)`);
         return {
             xdr: tx.toXDR('base64'),
             networkPassphrase: getNetworkPassphrase(),
             contractId,
             method,
+        };
+    }
+
+    /**
+     * Build upgrade() XDR — replaces contract WASM. Admin only (high-privilege).
+     * @param {string} contractId - Sale contract ID (C...)
+     * @param {string} newWasmHash - New WASM hash (64-char hex)
+     */
+    static async buildUpgradeXdr(contractId, newWasmHash) {
+        const hashBytes = Buffer.from(newWasmHash, 'hex');
+        return this.#buildAdminOpXdr(contractId, 'upgrade', [
+            nativeToScVal(hashBytes, { type: 'bytes' }),
+        ]);
+    }
+
+    /**
+     * Build SAC set_authorized() XDR — authorize/deauthorize an address on a SAC.
+     * Required for contracts (C...) with AUTH_REQUIRED sell tokens before deposit.
+     *
+     * @param {string} sacContractId - Stellar Asset Contract ID for the sell token
+     * @param {string} targetAddress - Address to authorize (C... contract or G... account)
+     * @param {boolean} authorize - true = authorize, false = deauthorize
+     */
+    static async buildSacAuthorizeXdr(sacContractId, targetAddress, authorize) {
+        const { keyManager: km } = await import('./KeyManager.js');
+        const issuerPublicKey = km.getIssuerPublicKey();
+
+        const sacContract = new Contract(sacContractId);
+        const op = sacContract.call(
+            'set_authorized',
+            new Address(targetAddress).toScVal(),
+            nativeToScVal(authorize, { type: 'bool' }),
+        );
+
+        let tx = new TransactionBuilder(
+            await StellarService.getAccountRPC(issuerPublicKey),
+            { fee: BASE_FEE, networkPassphrase: getNetworkPassphrase() }
+        )
+            .addOperation(op)
+            .setTimeout(300)
+            .build();
+
+        tx = await StellarService.prepareSorobanTransaction(tx);
+
+        log.info(`[buildSacAuthorizeXdr] Built set_authorized(${authorize}) for ${targetAddress.slice(0, 8)}… on SAC ${sacContractId.slice(0, 8)}…`);
+        return {
+            xdr: tx.toXDR('base64'),
+            networkPassphrase: getNetworkPassphrase(),
+            sacContractId,
+            method: 'set_authorized',
+        };
+    }
+
+    /**
+     * Build SAC transfer() XDR — transfer tokens via SAC (Soroban invocation).
+     * Used for depositing sell tokens from issuer to sale contract.
+     *
+     * @param {string} sacContractId - Stellar Asset Contract ID
+     * @param {string} from - Source address (G... or C...)
+     * @param {string} to - Destination address (G... or C...)
+     * @param {bigint|number} amount - Amount in stroops (i128)
+     */
+    static async buildSacTransferXdr(sacContractId, from, to, amount) {
+        const { keyManager: km } = await import('./KeyManager.js');
+        const issuerPublicKey = km.getIssuerPublicKey();
+
+        const sacContract = new Contract(sacContractId);
+        const op = sacContract.call(
+            'transfer',
+            new Address(from).toScVal(),
+            new Address(to).toScVal(),
+            nativeToScVal(BigInt(amount), { type: 'i128' }),
+        );
+
+        let tx = new TransactionBuilder(
+            await StellarService.getAccountRPC(issuerPublicKey),
+            { fee: BASE_FEE, networkPassphrase: getNetworkPassphrase() }
+        )
+            .addOperation(op)
+            .setTimeout(300)
+            .build();
+
+        tx = await StellarService.prepareSorobanTransaction(tx);
+
+        log.info(`[buildSacTransferXdr] Built transfer(${from.slice(0, 8)}… → ${to.slice(0, 8)}…, ${amount}) on SAC ${sacContractId.slice(0, 8)}…`);
+        return {
+            xdr: tx.toXDR('base64'),
+            networkPassphrase: getNetworkPassphrase(),
+            sacContractId,
+            method: 'transfer',
         };
     }
 

@@ -279,6 +279,19 @@ class KeyManager {
                 'trustline_auth': [this.getIssuerPublicKey()],
                 'account_setup': [this.getOperationsPublicKey()],
                 'channel_op': this.channels.map(c => c.publicKey()),
+                'sale_deploy': [this.getIssuerPublicKey()],
+                'sale_create': [this.getIssuerPublicKey()],
+                'contract_pause': [this.getIssuerPublicKey()],
+                'contract_resume': [this.getIssuerPublicKey()],
+                'contract_deposit_auth': [this.getIssuerPublicKey()],
+                'contract_deposit_transfer': [this.getIssuerPublicKey()],
+                'contract_price': [this.getIssuerPublicKey()],
+                'contract_withdraw': [this.getIssuerPublicKey()],
+                'contract_freeze': [this.getIssuerPublicKey()],
+                'contract_drain': [this.getIssuerPublicKey()],
+                'contract_propose_admin': [this.getIssuerPublicKey()],
+                'contract_accept_admin': [this.getIssuerPublicKey()],
+                'contract_upgrade': [this.getIssuerPublicKey()],
             };
             return signerMap[operationType] || [this.getOperationsPublicKey()];
         }
@@ -301,6 +314,19 @@ class KeyManager {
             'account_setup': [this.getOperationsPublicKey()],
             'sac_deploy': [this.getIssuerPublicKey()],
             'unlock_token': [this.getIssuerPublicKey()],
+            'sale_deploy': [this.getIssuerPublicKey()],
+            'sale_create': [this.getIssuerPublicKey()],
+            'contract_pause': [this.getIssuerPublicKey()],
+            'contract_resume': [this.getIssuerPublicKey()],
+            'contract_deposit_auth': [this.getIssuerPublicKey()],
+            'contract_deposit_transfer': [this.getIssuerPublicKey()],
+            'contract_price': [this.getIssuerPublicKey()],
+            'contract_withdraw': [this.getIssuerPublicKey()],
+            'contract_freeze': [this.getIssuerPublicKey()],
+            'contract_drain': [this.getIssuerPublicKey()],
+            'contract_propose_admin': [this.getIssuerPublicKey()],
+            'contract_accept_admin': [this.getIssuerPublicKey()],
+            'contract_upgrade': [this.getIssuerPublicKey()],
         };
 
         return defaultMap[operationType] || [this.getOperationsPublicKey()];
@@ -364,6 +390,19 @@ class KeyManager {
             'disable_clawback': 2,      // 2-of-3 consensus (Institutional Requirement)
             'sac_deploy': 1,            // Single issuer
             'unlock_token': 1,          // Single issuer
+            'sale_deploy': 1,           // Single issuer (Soroban sale contract deploy)
+            'sale_create': 1,           // Single issuer (Soroban sale contract init)
+            'contract_pause': 1,        // Day-to-day seller op
+            'contract_resume': 1,       // Day-to-day seller op
+            'contract_deposit_auth': 1, // Authorize contract trustline
+            'contract_deposit_transfer': 1, // Transfer tokens to contract
+            'contract_price': 1,        // Day-to-day seller op
+            'contract_withdraw': 1,     // Admin withdraws tokens
+            'contract_freeze': 1,       // Admin freezes buyer
+            'contract_drain': 2,        // DESTRUCTIVE — 2 signers required
+            'contract_propose_admin': 1, // Admin proposes transfer
+            'contract_accept_admin': 1, // New admin accepts
+            'contract_upgrade': 2,      // DESTRUCTIVE — 2 signers required
         };
 
         return defaultThresholds[operationType] || 1;

@@ -411,6 +411,29 @@ router.post('/admin/offers/:id/activate', requirePlatformAdmin, OfferController.
 
 /**
  * @swagger
+ * /api/admin/offers/{id}/retry-soroban:
+ *   post:
+ *     summary: "[Admin] Retry failed Soroban deploy"
+ *     description: Retries the Soroban contract deployment for a sale offer that previously failed
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Retry queued
+ *       400:
+ *         description: Only failed deployments can be retried
+ */
+router.post('/admin/offers/:id/retry-soroban', requirePlatformAdmin, OfferController.retrySorobanInit);
+
+/**
+ * @swagger
  * /api/admin/offers/{id}/verify:
  *   post:
  *     summary: "[Admin] Verificar emissão e habilitar launch"

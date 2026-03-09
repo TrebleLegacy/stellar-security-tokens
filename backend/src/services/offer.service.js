@@ -300,9 +300,12 @@ export class OfferService {
   }
 
   /**
-   * Ativa uma oferta após token emitido
+   * Ativa uma oferta: inicia o pipeline de Soroban deploy → create → activate.
+   * Constrói o TX de deploy sem assinar e envia para o approval hub (Freighter).
+   * A oferta só vira 'active' após processEffects('sale_create') completar.
+   *
    * @param {number} offerId - ID da oferta
-   * @returns {Promise<Object>} Oferta atualizada
+   * @returns {Promise<Object>} Oferta com status de init atualizado
    */
   static async activateOffer(offerId) {
     const offer = await Offer.findById(offerId);
@@ -320,7 +323,109 @@ export class OfferService {
       throw new Error('Offer must be approved before activation');
     }
 
+    // Sale-type offers need Soroban contract deployment
+    if (offer.offerType === 'sale') {
+      return await this.#initSorobanDeploy(offer, token);
+    }
+
+    // Collateral offers activate directly (no Soroban contract needed)
     return await Offer.updateStatus(offerId, 'active');
+  }
+
+  /**
+   * Retry Soroban init for a failed sale offer
+   * @param {number} offerId - ID da oferta
+   * @returns {Promise<Object>} Oferta com init reiniciado
+   */
+  static async retrySorobanInit(offerId) {
+    const offer = await Offer.findById(offerId);
+    if (!offer) {
+      throw new Error('Offer not found');
+    }
+    if (offer.sorobanInitStatus !== 'failed') {
+      throw new Error('Only failed Soroban deployments can be retried');
+    }
+
+    const token = await Token.findByAssetCode(offer.assetCode);
+    if (!token) {
+      throw new Error('Token not found');
+    }
+
+    return await this.#initSorobanDeploy(offer, token);
+  }
+
+  /**
+   * Internal: Build + queue the Soroban deploy TX
+   * @private
+   */
+  static async #initSorobanDeploy(offer, token) {
+    const { createHash } = await import('crypto');
+    const { keyManager } = await import('../services/KeyManager.js');
+    const { getSaleWasmHash } = await import('../config/stellar.js');
+    const { SorobanSaleService } = await import('../services/sorobanSale.service.js');
+    const { TransactionManager } = await import('../services/transactionManager.service.js');
+
+    const issuerPublicKey = keyManager.getIssuerPublicKey();
+    const wasmHash = getSaleWasmHash();
+
+    // Deterministic salt: sha256("radox:sale:{offerId}")
+    const salt = createHash('sha256')
+      .update(`radox:sale:${offer.id}`)
+      .digest();
+
+    // Check for crash recovery: contract may already exist on-chain
+    const precomputedId = SorobanSaleService.precomputeContractId(issuerPublicKey, salt);
+    const alreadyDeployed = await SorobanSaleService.contractExistsOnChain(precomputedId);
+
+    if (alreadyDeployed) {
+      log.info(`[activateOffer] Contract ${precomputedId} already deployed, skipping to create step`);
+      // Update DB and chain directly to the create step
+      await prisma.offer.update({
+        where: { id: offer.id },
+        data: {
+          sorobanContractId: precomputedId,
+          sorobanInitStatus: 'deployed',
+          sorobanInitError: null,
+        },
+      });
+      // TODO: In a future iteration, auto-chain the create TX here.
+      // For now, processEffects('sale_deploy') handles the chaining.
+    }
+
+    // Build unsigned deploy TX
+    const { xdr, contractId } = await SorobanSaleService.buildDeployXdr(
+      issuerPublicKey,
+      wasmHash,
+      salt,
+    );
+
+    // Save precomputed contractId + status BEFORE queuing TX
+    await prisma.offer.update({
+      where: { id: offer.id },
+      data: {
+        sorobanContractId: contractId,
+        sorobanInitStatus: 'deploying',
+        sorobanInitError: null,
+      },
+    });
+
+    // Queue for Freighter signing via TransactionManager
+    await TransactionManager.submit({
+      xdr,
+      operationType: 'sale_deploy',
+      signingRole: 'ISSUER',
+      metadata: {
+        offerId: offer.id,
+        contractId,
+        assetCode: offer.assetCode,
+        tokenId: token.id,
+      },
+      description: `Deploy sale contract for ${offer.assetCode}`,
+    });
+
+    log.info(`[activateOffer] Soroban deploy TX queued for offer ${offer.id}, contractId=${contractId}`);
+
+    return await Offer.findById(offer.id);
   }
 
 

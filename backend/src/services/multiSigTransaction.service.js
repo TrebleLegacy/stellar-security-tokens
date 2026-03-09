@@ -667,6 +667,173 @@ export class MultiSigTransactionService {
                     log.debug(`Clawback disabled on-chain for ${metadata.investorPublicKey} / ${metadata.assetCode}`);
                     break;
 
+                case 'sale_deploy': {
+                    // Step 1 complete: contract deployed on-chain.
+                    // Update DB and chain the create() TX.
+                    const deployOfferId = parseInt(metadata.offerId);
+                    await prisma.offer.update({
+                        where: { id: deployOfferId },
+                        data: {
+                            sorobanContractId: metadata.contractId,
+                            sorobanInitStatus: 'deployed',
+                            sorobanInitError: null,
+                        },
+                    });
+                    log.info(`[sale_deploy] Contract deployed: ${metadata.contractId} for offer #${deployOfferId}`);
+
+                    // Chain: build the create() TX
+                    try {
+                        const { SorobanSaleService } = await import('./sorobanSale.service.js');
+                        const { TransactionManager } = await import('./transactionManager.service.js');
+                        const { keyManager: km } = await import('./KeyManager.js');
+                        const { getUsdcAsset } = await import('../config/stellar.js');
+
+                        const offer = await prisma.offer.findUnique({
+                            where: { id: deployOfferId },
+                            include: { tokens: true },
+                        });
+
+                        const issuerPub = km.getIssuerPublicKey();
+                        const treasuryPub = km.getTreasuryPublicKey();
+                        const rules = typeof offer.offerRules === 'string'
+                            ? JSON.parse(offer.offerRules)
+                            : offer.offerRules || {};
+
+                        const sellToken = offer.tokens?.[0]?.sacContractId;
+                        const usdcAsset = getUsdcAsset();
+                        const buyToken = usdcAsset.contractId(km.getIssuerPublicKey().substring(0, 1) === 'G' ? undefined : undefined);
+
+                        // Build the create() XDR
+                        const createResult = await SorobanSaleService.buildCreateSaleXdr(
+                            metadata.contractId,
+                            issuerPub,
+                            {
+                                admin: issuerPub,
+                                seller: issuerPub,
+                                sellToken: sellToken,
+                                buyToken: buyToken,
+                                treasury: treasuryPub,
+                                sellPrice: parseInt(offer.unitPrice * 10000000) || 1,
+                                buyPrice: 10000000,
+                                deadlineLedger: 0,
+                                minBuyAmount: BigInt(Math.floor((rules.min_investment || 0) * 10000000)),
+                                maxBuyPerBuyer: BigInt(Math.floor((rules.max_investment || 0) * 10000000)),
+                            }
+                        );
+
+                        // Queue for Freighter signing
+                        await TransactionManager.submit({
+                            xdr: createResult.xdr,
+                            operationType: 'sale_create',
+                            signingRole: 'ISSUER',
+                            metadata: {
+                                offerId: deployOfferId,
+                                contractId: metadata.contractId,
+                                assetCode: metadata.assetCode,
+                            },
+                            description: `Initialize sale contract for ${metadata.assetCode}`,
+                        });
+
+                        log.info(`[sale_deploy] Chained sale_create TX for offer #${deployOfferId}`);
+                    } catch (chainError) {
+                        log.error(`[sale_deploy] Failed to chain create TX: ${chainError.message}`);
+                        await prisma.offer.update({
+                            where: { id: deployOfferId },
+                            data: {
+                                sorobanInitStatus: 'failed',
+                                sorobanInitError: `Chain create failed: ${chainError.message}`,
+                            },
+                        });
+                    }
+                    break;
+                }
+
+                case 'sale_create': {
+                    // Step 2 complete: create() executed on-chain.
+                    // Verify contract state, extend TTL, activate offer.
+                    const createOfferId = parseInt(metadata.offerId);
+                    try {
+                        const { SorobanSaleService } = await import('./sorobanSale.service.js');
+
+                        // Verify: contract is alive and initialized
+                        const version = await SorobanSaleService.getVersion(metadata.contractId);
+                        log.info(`[sale_create] Contract ${metadata.contractId} verified, version=${version}`);
+
+                        // Best-effort TTL extension (uses ops account for fees only)
+                        try {
+                            const { StellarService } = await import('./stellar.service.js');
+                            await StellarService.extendContractTTL(metadata.contractId);
+                            log.info(`[sale_create] TTL extended for ${metadata.contractId}`);
+                        } catch (ttlErr) {
+                            log.warn(`[sale_create] TTL extension failed (non-fatal): ${ttlErr.message}`);
+                        }
+
+                        // Update DB: mark as fully created
+                        await prisma.offer.update({
+                            where: { id: createOfferId },
+                            data: {
+                                sorobanInitStatus: 'created',
+                                sorobanInitError: null,
+                            },
+                        });
+
+                        // Activate the offer
+                        const { Offer } = await import('../models/Offer.js');
+                        await Offer.updateStatus(createOfferId, 'active');
+
+                        log.info(`[sale_create] Offer #${createOfferId} activated with contract ${metadata.contractId}`);
+                    } catch (verifyError) {
+                        log.error(`[sale_create] Verification failed: ${verifyError.message}`);
+                        await prisma.offer.update({
+                            where: { id: createOfferId },
+                            data: {
+                                sorobanInitStatus: 'failed',
+                                sorobanInitError: `Verification failed: ${verifyError.message}`,
+                            },
+                        });
+                    }
+                    break;
+                }
+
+                case 'contract_deposit_auth': {
+                    // Step 1 complete: SAC set_authorized(contractAddr, true) succeeded.
+                    // Chain Step 2: SAC transfer(issuer → contract, amount).
+                    try {
+                        const { SorobanSaleService } = await import('./sorobanSale.service.js');
+                        const { TransactionManager } = await import('./transactionManager.service.js');
+                        const { keyManager: km } = await import('./KeyManager.js');
+
+                        const issuerPub = km.getIssuerPublicKey();
+                        const depositAmount = BigInt(metadata.amount);
+
+                        const transferResult = await SorobanSaleService.buildSacTransferXdr(
+                            metadata.sacContractId,
+                            issuerPub,
+                            metadata.contractId,
+                            depositAmount,
+                        );
+
+                        await TransactionManager.submit({
+                            xdr: transferResult.xdr,
+                            operationType: 'contract_deposit_transfer',
+                            signingRole: 'ISSUER',
+                            metadata: {
+                                offerId: metadata.offerId,
+                                contractId: metadata.contractId,
+                                sacContractId: metadata.sacContractId,
+                                amount: metadata.amount,
+                                assetCode: metadata.assetCode,
+                            },
+                            description: `Deposit ${metadata.assetCode} to sale contract (step 2/2: transfer)`,
+                        });
+
+                        log.info(`[contract_deposit_auth] Chained transfer TX for offer #${metadata.offerId}`);
+                    } catch (chainError) {
+                        log.error(`[contract_deposit_auth] Failed to chain transfer TX: ${chainError.message}`);
+                    }
+                    break;
+                }
+
                 default:
                     log.debug(`No post-execution hooks for ${operationType}`);
             }
@@ -723,6 +890,21 @@ export class MultiSigTransactionService {
                             error_message: reason,
                         });
                         log.info(`Investment #${metadata.investmentId} (SAC chain) → failed (TX #${tx.id})`);
+                    }
+                    break;
+
+                case 'sale_deploy':
+                case 'sale_create':
+                    // Set sorobanInitStatus to 'failed' so admin can retry
+                    if (metadata?.offerId) {
+                        await prisma.offer.update({
+                            where: { id: parseInt(metadata.offerId) },
+                            data: {
+                                sorobanInitStatus: 'failed',
+                                sorobanInitError: reason,
+                            },
+                        });
+                        log.info(`Offer #${metadata.offerId} Soroban init → failed (TX #${tx.id})`);
                     }
                     break;
 
