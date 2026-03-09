@@ -8,7 +8,6 @@ import prisma from '../config/prisma.js';
 import { SorobanSaleService } from '../services/sorobanSale.service.js';
 import { StellarService } from '../services/stellar.service.js';
 import { TransactionManager } from '../services/transactionManager.service.js';
-import { OfferService } from '../services/offer.service.js';
 import logger from '../utils/logger.js';
 
 const log = logger.scope('ContractCtrl');
@@ -246,16 +245,6 @@ export class ContractController {
             const offer = await resolveContract(req.params.offerId);
             const result = await StellarService.extendContractTTL(offer.sorobanContractId);
             res.json(result);
-        } catch (err) {
-            next(err);
-        }
-    }
-
-    /** POST /api/admin/contracts/:offerId/retry */
-    static async retry(req, res, next) {
-        try {
-            const result = await OfferService.retrySorobanInit(parseInt(req.params.offerId));
-            res.status(202).json(result);
         } catch (err) {
             next(err);
         }
