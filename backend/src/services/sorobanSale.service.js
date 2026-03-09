@@ -298,7 +298,7 @@ export class SorobanSaleService {
 
                 log.info(`[boostResources] instructions ${simInstructions}→${boostedInstructions}, readBytes ${simReadBytes}→${boostedReadBytes}, writeBytes ${simWriteBytes}→${boostedWriteBytes}`);
 
-                const boostedFee = Math.max(Math.ceil(parseInt(tx.fee) * 10), 10_000_000).toString();
+                const boostedFee = Math.max(Math.ceil(parseInt(tx.fee) * 10), 1_000_000).toString();
                 tx = TransactionBuilder.cloneFrom(tx, {
                     fee: boostedFee,
                     sorobanData,
