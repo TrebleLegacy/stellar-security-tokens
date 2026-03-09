@@ -323,13 +323,8 @@ export class OfferService {
       throw new Error('Offer must be approved before activation');
     }
 
-    // Sale-type offers need Soroban contract deployment
-    if (offer.offerType === 'sale') {
-      return await this.#initSorobanDeploy(offer, token);
-    }
-
-    // Collateral offers activate directly (no Soroban contract needed)
-    return await Offer.updateStatus(offerId, 'active');
+    // All offer types need a Soroban sale contract for the crowdfunding flow
+    return await this.#initSorobanDeploy(offer, token);
   }
 
   /**
@@ -342,8 +337,8 @@ export class OfferService {
     if (!offer) {
       throw new Error('Offer not found');
     }
-    if (offer.sorobanInitStatus !== 'failed') {
-      throw new Error('Only failed Soroban deployments can be retried');
+    if (offer.sorobanInitStatus && !['failed', null].includes(offer.sorobanInitStatus)) {
+      throw new Error('Soroban deployment is already in progress or completed');
     }
 
     const token = await Token.findByAssetCode(offer.assetCode);
