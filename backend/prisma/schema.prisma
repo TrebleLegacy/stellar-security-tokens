@@ -580,6 +580,21 @@ enum MultiSigOperationType {
   sac_deploy
   dividend_distribution
   disable_clawback
+  // Soroban sale contract lifecycle
+  sale_deploy
+  sale_create
+  // Contract management ops
+  contract_pause
+  contract_resume
+  contract_deposit_auth
+  contract_deposit_transfer
+  contract_price
+  contract_withdraw
+  contract_freeze
+  contract_drain
+  contract_propose_admin
+  contract_accept_admin
+  contract_upgrade
   other
 }
 
