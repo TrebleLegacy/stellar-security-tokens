@@ -124,15 +124,6 @@ router.post('/:offerId/ttl', ContractController.extendTtl);
 
 /**
  * @swagger
- * /api/admin/contracts/{offerId}/retry:
- *   post:
- *     summary: Retry failed Soroban deploy/create
- *     tags: [Contracts]
- */
-router.post('/:offerId/retry', ContractController.retry);
-
-/**
- * @swagger
  * /api/admin/contracts/{offerId}/withdraw:
  *   post:
  *     summary: Withdraw tokens from the contract (sent to admin/issuer account)
