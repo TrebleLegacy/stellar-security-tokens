@@ -153,7 +153,7 @@ export function SelectOfferType() {
                         <div className="space-y-2">
                             <h4 className="text-sm font-medium text-white">How It Works</h4>
                             <ol className="space-y-1 text-xs text-muted-foreground list-decimal list-inside">
-                                <li>You define the total token supply and price per token</li>
+                                <li>You define the target raise amount (each token = $1.00 USD)</li>
                                 <li>Investors purchase tokens representing ownership</li>
                                 <li>You distribute dividends when profits are available</li>
                                 <li>Investors can trade tokens on secondary markets</li>

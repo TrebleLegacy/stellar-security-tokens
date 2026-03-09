@@ -221,8 +221,8 @@ export function CreateOffer() {
             case 1:
                 return formData.offer_name && formData.asset_code && formData.description;
             case 2: {
-                // Base: supply + price required
-                if (!formData.total_supply || !formData.unit_price) return false;
+                // Target raise required
+                if (!formData.total_supply) return false;
                 // Collateral needs interest rate
                 if (formData.offer_type === 'collateral' && !formData.annual_interest_rate) return false;
                 // Bullet payments need a future maturity date
@@ -371,61 +371,40 @@ export function CreateOffer() {
                             <CardDescription>Set the financial parameters of your offer</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white">Token Supply (Qty) *</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-white">Target Raise (USD) *</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                                     <Input
                                         type="number"
-                                        placeholder="1000000"
+                                        placeholder="100000"
                                         min="0"
                                         value={formData.total_supply}
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === '' || parseFloat(val) >= 0) {
-                                                updateFormData({ total_supply: val });
+                                                updateFormData({ total_supply: val, unit_price: '1.00' });
                                             }
                                         }}
-                                        className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                        className="pl-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
                                     />
-                                    <p className="text-xs text-muted-foreground">
-                                        Number of tokens to issue
-                                    </p>
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white">Price per Token (USD) *</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                                        <Input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            placeholder="1.00"
-                                            value={formData.unit_price}
-                                            onChange={(e) => {
-                                                const val = e.target.value;
-                                                if (val === '' || parseFloat(val) >= 0) {
-                                                    updateFormData({ unit_price: val });
-                                                }
-                                            }}
-                                            className="pl-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Initial offering price
-                                    </p>
-                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    Each token = $1.00 USD — supply is set automatically
+                                </p>
                             </div>
 
-                            <div className="p-4 rounded-lg bg-white/5 border border-white/10 animate-fade-in">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-sm text-muted-foreground">Total Target Raise</span>
-                                    <span className="text-xl font-bold text-emerald-400">
-                                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
-                                            (parseFloat(formData.total_supply || '0') * parseFloat(formData.unit_price || '0'))
-                                        )}
-                                    </span>
+                            {formData.total_supply && parseFloat(formData.total_supply) > 0 && (
+                                <div className="p-4 rounded-lg bg-white/5 border border-white/10 animate-fade-in">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm text-muted-foreground">Tokens to issue</span>
+                                        <span className="text-lg font-bold text-emerald-400">
+                                            {new Intl.NumberFormat('en-US').format(parseFloat(formData.total_supply))} tokens
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">@ $1.00 per token</p>
                                 </div>
-                            </div>
+                            )}
 
                             {formData.offer_type === 'collateral' && (
                                 <div className="space-y-2">
@@ -748,10 +727,11 @@ export function CreateOffer() {
                             {/* Key Metrics Summary */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
-                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Supply</p>
+                                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Target Raise</p>
                                     <p className="text-xl font-bold text-white mt-1">
                                         {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(parseFloat(formData.total_supply || '0'))}
                                     </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{new Intl.NumberFormat('en-US').format(parseFloat(formData.total_supply || '0'))} tokens @ $1.00</p>
                                 </div>
                                 {formData.offer_type === 'collateral' && (
                                     <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-center">
