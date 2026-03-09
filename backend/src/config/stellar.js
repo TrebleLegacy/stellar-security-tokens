@@ -427,6 +427,19 @@ export const signAndSubmitTransaction = async (transaction, keypair, server = nu
   }
 };
 
+/**
+ * Get the WASM hash for the token_sale Soroban contract
+ * @returns {string} WASM hash (hex)
+ * @throws {Error} If SALE_WASM_HASH is not set
+ */
+export const getSaleWasmHash = () => {
+  const hash = process.env.SALE_WASM_HASH;
+  if (!hash) {
+    throw new Error('[StellarConfig] SALE_WASM_HASH environment variable is required for Soroban sale contract deployment');
+  }
+  return hash;
+};
+
 export default {
   stellarServer,
   createFreshServer,
@@ -444,5 +457,5 @@ export default {
   signAndSubmitTransaction,
   getUsdcIssuer,
   getUsdcAsset,
+  getSaleWasmHash,
 };
-

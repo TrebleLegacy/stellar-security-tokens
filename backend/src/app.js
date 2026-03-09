@@ -221,6 +221,10 @@ app.use('/api/notifications', apiLimiter, notificationRoutes);
 // Admin multisig transaction routes (strict limiting for security)
 app.use('/api/admin/transactions', strictLimiter, adminTransactionRoutes);
 
+// Admin contract management routes
+import contractRoutes from './routes/contractRoutes.js';
+app.use('/api/admin/contracts', strictLimiter, contractRoutes);
+
 
 app.use(notFoundHandler);
 

@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet, AlertTriangle, Building2, FileText, Siren, Coins, Info, CheckCircle2, ClipboardCheck, Loader2 } from 'lucide-react';
+import { LayoutDashboard, Users, LogOut, DollarSign, Shield, Wallet, AlertTriangle, Building2, FileText, Siren, Coins, Info, CheckCircle2, ClipboardCheck, Loader2, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -75,6 +75,16 @@ const PAGE_DESCRIPTIONS: Record<string, { title: string, description: string, ke
             'Monitor fundraising progress in real-time',
             'Pause or resume offerings if necessary',
             'Finalize or cancel completed campaigns'
+        ]
+    },
+    '/admin/contracts': {
+        title: 'Contract Management',
+        description: 'Manage deployed Soroban sale contracts and their on-chain state.',
+        keyFeatures: [
+            'View on-chain balance, active status, and contract version',
+            'Pause/resume sales, update prices, deposit tokens',
+            'Freeze buyers, withdraw funds, extend TTL',
+            'Emergency drain and WASM upgrade with confirmation guards'
         ]
     },
 
@@ -207,6 +217,7 @@ export function AdminLayout() {
         { id: 'companies', label: 'Companies', icon: Building2, path: '/admin/companies' },
         { id: 'tokens', label: 'Tokens', icon: Coins, path: '/admin/tokens' },
         { id: 'offers', label: 'Offers', icon: FileText, path: '/admin/offers' },
+        { id: 'contracts', label: 'Contracts', icon: Box, path: '/admin/contracts' },
 
         { id: 'wallets', label: 'Wallets', icon: Wallet, path: '/admin/wallets' },
 

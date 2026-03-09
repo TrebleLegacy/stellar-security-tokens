@@ -380,6 +380,8 @@ model Offer {
 
   // Soroban token_sale contract (set after offer approval + contract deploy)
   sorobanContractId   String?   @map("soroban_contract_id") @db.VarChar(56)
+  sorobanInitStatus   String?   @map("soroban_init_status") @db.VarChar(20)
+  sorobanInitError    String?   @map("soroban_init_error") @db.Text
 
   createdAt           DateTime    @default(now()) @map("created_at") @db.Timestamp
   updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamp

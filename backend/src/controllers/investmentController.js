@@ -276,7 +276,7 @@ export const purchaseInvestment = async (req, res, next) => {
       }
 
       if (!offer.sorobanContractId) {
-        throw new Error(`Offer #${offerId} does not have a Soroban sale contract. Run initSorobanSale.js first.`);
+        throw new Error(`Offer #${offerId} does not have a Soroban sale contract. Activate the offer first to trigger auto-deployment.`);
       }
 
       log.info(`[Investment] Using Soroban contract ${offer.sorobanContractId} for trade (${totalDeduction} USDC)`);
