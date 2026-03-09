@@ -773,7 +773,7 @@ export class MultiSigTransactionService {
                             log.warn(`[sale_create] TTL extension failed (non-fatal): ${ttlErr.message}`);
                         }
 
-                        // Update DB: mark as fully created
+                        // Update DB: mark as fully created (but NOT active yet — contract is still inactive)
                         await prisma.offer.update({
                             where: { id: createOfferId },
                             data: {
@@ -782,11 +782,23 @@ export class MultiSigTransactionService {
                             },
                         });
 
-                        // Activate the offer
-                        const { Offer } = await import('../models/Offer.js');
-                        await Offer.updateStatus(createOfferId, 'active');
+                        // Chain: activate the contract on-chain via set_active(true)
+                        const { TransactionManager } = await import('./transactionManager.service.js');
+                        const activateResult = await SorobanSaleService.buildSetActiveXdr(metadata.contractId, true);
+                        await TransactionManager.submit({
+                            xdr: activateResult.xdr,
+                            operationType: 'contract_resume',
+                            signingRole: 'ISSUER',
+                            metadata: {
+                                offerId: createOfferId,
+                                contractId: metadata.contractId,
+                                assetCode: metadata.assetCode,
+                                autoActivateOffer: true,
+                            },
+                            description: `Activate sale contract for ${metadata.assetCode}`,
+                        });
 
-                        log.info(`[sale_create] Offer #${createOfferId} activated with contract ${metadata.contractId}`);
+                        log.info(`[sale_create] Chained contract_resume TX for offer #${createOfferId}`);
                     } catch (verifyError) {
                         log.error(`[sale_create] Verification failed: ${verifyError.message}`);
                         await prisma.offer.update({
@@ -796,6 +808,18 @@ export class MultiSigTransactionService {
                                 sorobanInitError: `Verification failed: ${verifyError.message}`,
                             },
                         });
+                    }
+                    break;
+                }
+
+                case 'contract_resume': {
+                    // set_active(true) succeeded on-chain.
+                    // If this was chained from sale_create, activate the offer in the DB.
+                    if (metadata?.autoActivateOffer && metadata?.offerId) {
+                        const resumeOfferId = parseInt(metadata.offerId);
+                        const { Offer } = await import('../models/Offer.js');
+                        await Offer.updateStatus(resumeOfferId, 'active');
+                        log.info(`[contract_resume] Offer #${resumeOfferId} activated (contract ${metadata.contractId} is now live)`);
                     }
                     break;
                 }
