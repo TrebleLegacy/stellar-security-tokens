@@ -1,10 +1,8 @@
 import app from './app.js';
 import dotenv from 'dotenv';
 import path from 'path';
-import { startPaymentScheduler } from './services/paymentScheduler.js';
 import { PaymentReminderService } from './services/paymentReminder.service.js';
-
-import { initDistributionQueue } from './services/distributionQueue.service.js';
+import { getPaymentMonitor } from './services/paymentMonitor.service.js';
 import { MaintenanceService } from './services/maintenance.service.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
@@ -75,23 +73,6 @@ app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Health check: http://localhost:${PORT}/health`);
-
-  // Iniciar agendamento automático de pagamentos
-  const enableAutoPayments = process.env.ENABLE_AUTO_PAYMENTS !== 'false';
-  if (enableAutoPayments) {
-    try {
-
-      startPaymentScheduler();
-      console.log('Automatic payment scheduler enabled (offer-based)');
-      console.log('Payments will be processed automatically for all active offers');
-    } catch (error) {
-      console.error('Failed to start payment scheduler:', error.message);
-      console.warn('Automatic payments will not be scheduled. You can process payments manually via POST /api/payments/process');
-    }
-  } else {
-    console.log('Automatic payment scheduler is disabled (ENABLE_AUTO_PAYMENTS=false)');
-    console.log('You can process payments manually via POST /api/payments/process');
-  }
 
   // --- AUTO-VERIFY ISSUER ACCOUNT FLAGS ---
   // This ensures the issuer account has correct flags (auth_required, auth_revocable, auth_clawback_enabled)
@@ -168,22 +149,19 @@ app.listen(PORT, async () => {
     console.error('Failed to start MultiSig expiry checker:', error.message);
   }
 
-  // Inicializar fila de distribuição de tokens (com retry automático)
-  const enableDistributionQueue = process.env.ENABLE_DISTRIBUTION_QUEUE !== 'false';
-  if (enableDistributionQueue) {
+  // Start deposit relay monitor (watches treasury for CEX → C-wallet deposits)
+  const enablePaymentMonitoring = process.env.ENABLE_PAYMENT_MONITORING !== 'false';
+  if (enablePaymentMonitoring) {
     try {
-      const queue = initDistributionQueue();
-      if (queue) {
-        console.log('Distribution queue enabled - token distributions will be processed with automatic retry');
-      } else {
-        console.warn('Distribution queue disabled - Redis not available. Distributions will be processed synchronously.');
-      }
+      const paymentMonitor = getPaymentMonitor();
+      await paymentMonitor.start();
+      console.log('Payment monitoring enabled - deposit relay will forward CEX deposits to smart wallets');
     } catch (error) {
-      console.error('Failed to initialize distribution queue:', error.message);
-      console.warn('Distribution queue disabled. Distributions will be processed synchronously.');
+      console.error('Failed to start payment monitoring:', error.message);
+      console.warn('Payment monitoring disabled. CEX deposits will not be auto-forwarded.');
     }
   } else {
-    console.log('Distribution queue is disabled (ENABLE_DISTRIBUTION_QUEUE=false)');
+    console.log('Payment monitoring is disabled (ENABLE_PAYMENT_MONITORING=false)');
   }
 
   // --- DAILY DATABASE BACKUP (3:00 AM UTC) ---
@@ -254,6 +232,13 @@ const gracefulShutdown = async (signal) => {
   console.log(`\n${signal} received — shutting down gracefully...`);
 
   try {
+    // Stop deposit relay monitor
+    const paymentMonitor = getPaymentMonitor();
+    if (paymentMonitor.isActive()) {
+      paymentMonitor.stop();
+      console.log('Payment monitor stopped.');
+    }
+
     if (process.env.ENABLE_SOROBAN_SALE === 'true') {
       const { SorobanEventIndexer } = await import('./services/sorobanEventIndexer.js');
       const { SorobanReconciler } = await import('./services/sorobanReconciler.js');

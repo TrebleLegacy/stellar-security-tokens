@@ -1,0 +1,350 @@
+import { stellarServer, createFreshServer } from '../config/stellar.js';
+import { DepositRelayService } from './depositRelay.service.js';
+import logger from '../utils/logger.js';
+
+// Scoped logger for this service
+const log = logger.scope('PaymentMonitor');
+
+const RECONNECT_DELAY = parseInt(process.env.PAYMENT_MONITOR_RECONNECT_DELAY || '5000', 10);
+
+/**
+ * Serviço para monitorar pagamentos USDC em tempo real usando Horizon streaming
+ */
+export class PaymentMonitor {
+  constructor() {
+    this.treasuryPublicKey = null;
+    this.stream = null;
+    this.isRunning = false;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 10;
+    this.lastCursor = 'now'; // Initialize cursor tracking
+    this.connectionStabilityTimer = null;
+    this.isReconnecting = false; // Guard against multiple simultaneous reconnects
+  }
+
+  /**
+   * Inicia o monitoramento de pagamentos USDC
+   * @param {string} [treasuryPublicKey] - Chave pública da conta treasury (opcional, usa env se não fornecido)
+   */
+  async start(treasuryPublicKey = null) {
+    try {
+      if (this.isRunning) {
+        log.debug('Already running');
+        return;
+      }
+
+      // Use getPublicKey — works in both env and multisig modes
+      const { keyManager } = await import('./KeyManager.js');
+      this.treasuryPublicKey = treasuryPublicKey || keyManager.getPublicKey('TREASURY');
+
+      log.info(`Starting monitoring for treasury: ${this.treasuryPublicKey}`);
+
+      this.isRunning = true;
+      this.reconnectAttempts = 0;
+
+      await this.startStream();
+    } catch (error) {
+      log.error('Failed to start:', error);
+      this.isRunning = false;
+      throw error;
+    }
+  }
+
+  /**
+   * Inicia o stream de pagamentos
+   * @private
+   */
+  async startStream() {
+    try {
+      // Ensure any existing stream is closed before starting a new one
+      if (this.stream) {
+        try {
+          this.stream();
+        } catch (e) {
+          // ignore error on close
+        }
+        this.stream = null;
+      }
+
+      log.debug(`Starting stream with cursor: ${this.lastCursor}`);
+
+      this.isReconnecting = false; // Clear guard now that we're starting fresh
+
+      this.stream = stellarServer
+        .payments()
+        .forAccount(this.treasuryPublicKey)
+        .cursor(this.lastCursor)
+        .stream({
+          onmessage: async (payment) => {
+            try {
+              // Update cursor tracking
+              if (payment.paging_token) {
+                this.lastCursor = payment.paging_token;
+              }
+              // Received a message => connection works.
+              this.reconnectAttempts = 0;
+              await this.handlePayment(payment);
+            } catch (error) {
+              log.error('Error handling payment:', error);
+            }
+          },
+          onerror: (error) => {
+            log.error('Stream error:', error);
+            this.handleStreamError(error);
+          },
+        });
+
+      log.info('Stream started successfully');
+
+      // Do NOT reset reconnectAttempts immediately.
+      // Reset it only if the connection stays alive for a while (e.g., 60s)
+      if (this.connectionStabilityTimer) clearTimeout(this.connectionStabilityTimer);
+      this.connectionStabilityTimer = setTimeout(() => {
+        if (this.isRunning) {
+          log.debug('Connection stable for 60s. Resetting reconnection attempts.');
+          this.reconnectAttempts = 0;
+        }
+      }, 60000);
+
+    } catch (error) {
+      log.error('Failed to start stream:', error);
+      this.handleStreamError(error);
+    }
+  }
+
+  /**
+   * Trata erros do stream e reconecta
+   * Aplica backoff mais longo para erros de rate limit (429)
+   * @private
+   */
+  async handleStreamError(error) {
+    // Always close the current stream on error to stop EventSource auto-retries
+    if (this.connectionStabilityTimer) {
+      clearTimeout(this.connectionStabilityTimer);
+      this.connectionStabilityTimer = null;
+    }
+
+    if (this.stream) {
+      try {
+        this.stream();
+      } catch (e) {
+        log.error('Error closing stream during error handling:', e);
+      }
+      this.stream = null;
+    }
+
+    if (!this.isRunning) {
+      return; // Do not reconnect if manually stopped
+    }
+
+    // Guard against multiple simultaneous reconnect attempts from EventSource firing onerror multiple times
+    if (this.isReconnecting) {
+      log.debug('Reconnection already in progress, ignoring duplicate error.');
+      return;
+    }
+    this.isReconnecting = true;
+
+    this.reconnectAttempts++;
+
+    // Detectar erro 429 (rate limit) do Horizon
+    const isRateLimitError = this.isRateLimitError(error);
+
+    // Detectar erro 404 (account not found) - comum em testnet quando treasury não existe
+    const isAccountNotFound = this.isAccountNotFoundError(error);
+
+    if (isAccountNotFound) {
+      log.warn(`Treasury account not found on Stellar network (404). The account may not be funded yet.`);
+      log.warn(`Payment monitoring disabled until treasury account exists. Will retry in 5 minutes.`);
+      this.isRunning = false;
+      // Schedule a retry in 5 minutes to check if account was created
+      setTimeout(() => {
+        log.info('Retrying to start after account not found...');
+        this.isRunning = true;
+        this.reconnectAttempts = 0;
+        this.startStream();
+      }, 5 * 60 * 1000);
+      return;
+    }
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      log.error(`Max reconnection attempts (${this.maxReconnectAttempts}) reached. Stopping.`);
+      this.isRunning = false;
+      const { AlertService } = await import('./alert.service.js');
+      await AlertService.paymentMonitorFailed(`Max reconnection attempts reached: ${error.message}`);
+      return;
+    }
+
+    // Use longer backoff for rate limit errors (30s base vs 5s default)
+    const baseDelay = isRateLimitError ? 30000 : RECONNECT_DELAY;
+    const delay = baseDelay * Math.pow(2, Math.min(this.reconnectAttempts - 1, 4)); // Max 4 doublings
+
+    if (isRateLimitError) {
+      log.warn(`Rate limited by Horizon (429). Backing off for ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+    } else {
+      log.info(`Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+    }
+
+    setTimeout(() => {
+      if (this.isRunning) {
+        this.startStream();
+      }
+    }, delay);
+  }
+
+  /**
+   * Check if error is a rate limit (429) error from Horizon
+   * @param {Error} error - Error object
+   * @returns {boolean} True if rate limit error
+   * @private
+   */
+  isRateLimitError(error) {
+    if (!error) return false;
+
+    // Check status code directly
+    if (error.status === 429 || error.response?.status === 429) {
+      return true;
+    }
+
+    // Check error message
+    const message = error.message || error.toString() || '';
+    if (message.includes('429') || message.toLowerCase().includes('too many requests')) {
+      return true;
+    }
+
+    // Check for Horizon-specific error format
+    if (error.type === 'error' && error.status === 429) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if error is an account not found (404) error from Horizon
+   * This typically happens when the treasury account hasn't been funded on testnet
+   * @param {Error} error - Error object
+   * @returns {boolean} True if account not found error
+   * @private
+   */
+  isAccountNotFoundError(error) {
+    if (!error) return false;
+
+    // Check status code directly
+    if (error.status === 404 || error.response?.status === 404) {
+      return true;
+    }
+
+    // Check error message
+    const message = error.message || error.toString() || '';
+    if (message.includes('404') || message.toLowerCase().includes('not found')) {
+      return true;
+    }
+
+    // Check for Horizon-specific error format
+    if (error.type === 'error' && error.status === 404) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Processa um pagamento recebido
+   * @param {Object} payment - Objeto de pagamento do Horizon
+   * @private
+   */
+  async handlePayment(payment) {
+    // Only process payment operations
+    if (payment.type !== 'payment') {
+      return;
+    }
+
+    // Verify payment is to treasury
+    if (payment.to !== this.treasuryPublicKey) {
+      return;
+    }
+
+    // Determine asset info for logging
+    const isNative = payment.asset_type === 'native';
+    const assetCode = isNative ? 'XLM' : payment.asset_code;
+
+    // IMPORTANT: Payment operations don't have memo directly - it's on the transaction
+    // We need to fetch the transaction to get the memo
+    let memo = null;
+    try {
+      // CRITICAL: Use fresh server to avoid URL corruption from previous operations
+      const freshServer = createFreshServer();
+      const tx = await freshServer.transactions().transaction(payment.transaction_hash).call();
+      if (tx.memo_type === 'text' && tx.memo) {
+        memo = tx.memo;
+      }
+    } catch (err) {
+      log.warn(`Could not fetch transaction ${payment.transaction_hash} for memo: ${err.message}`);
+    }
+
+    // Route deposit relay payments (memo starts with DEP)
+    if (memo && memo.startsWith(DepositRelayService.MEMO_PREFIX)) {
+      log.info(`Deposit relay payment detected: ${payment.amount} ${assetCode} from ${payment.from}, memo: ${memo}`);
+      await DepositRelayService.handleIncomingPayment(
+        memo,
+        payment.amount,
+        payment.transaction_hash,
+        assetCode
+      );
+      return;
+    }
+
+    // Non-deposit payments to treasury are logged but not processed
+    // (Investment purchases now use Soroban atomic swaps, not USDC payments to treasury)
+    if (memo) {
+      log.debug(`Ignoring non-relay payment to treasury: ${payment.amount} ${assetCode}, memo: ${memo}`);
+    }
+  }
+
+  /**
+   * Para o monitoramento de pagamentos
+   */
+  stop() {
+    log.info('Stopping...');
+    this.isRunning = false;
+
+    if (this.connectionStabilityTimer) {
+      clearTimeout(this.connectionStabilityTimer);
+      this.connectionStabilityTimer = null;
+    }
+
+    if (this.stream) {
+      try {
+        this.stream();
+      } catch (error) {
+        log.error('Error stopping stream:', error);
+      }
+      this.stream = null;
+    }
+
+    log.info('Stopped');
+  }
+
+  /**
+   * Verifica se o monitoramento está ativo
+   * @returns {boolean} True se está rodando
+   */
+  isActive() {
+    return this.isRunning;
+  }
+}
+
+// Singleton instance
+let paymentMonitorInstance = null;
+
+/**
+ * Obtém instância singleton do PaymentMonitor
+ * @returns {PaymentMonitor} Instância do monitor
+ */
+export function getPaymentMonitor() {
+  if (!paymentMonitorInstance) {
+    paymentMonitorInstance = new PaymentMonitor();
+  }
+  return paymentMonitorInstance;
+}
+
