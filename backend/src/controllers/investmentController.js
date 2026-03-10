@@ -282,8 +282,8 @@ export const purchaseInvestment = async (req, res, next) => {
         investorWallet,
         totalDeduction
       );
-      // Mark as contract-based so submitInvestmentTx knows to skip distribution
-      txData._isContractTrade = true;
+
+
 
       return res.status(200).json({
         success: true,
