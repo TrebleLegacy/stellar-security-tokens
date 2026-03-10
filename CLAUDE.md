@@ -30,6 +30,9 @@
 
 Operational runbooks, mainnet checklist → `docs/Operations/`
 
+### Bible Maintenance
+When you create new files, add new features, or significantly change existing code, update the relevant Bible artifact to reflect the change. Follow the patterns in `docs/Project_Bible/CONTRIBUTING.md` — every claim must be traceable to a specific file and line.
+
 ## Code Patterns (enforce these)
 - **Backend**: ES modules, async/await, thin controllers → fat services → Prisma
 - **Frontend**: Functional components + hooks, typed props/state, `types/index.ts` interfaces
