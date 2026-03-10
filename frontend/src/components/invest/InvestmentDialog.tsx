@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -11,10 +11,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TransactionLink } from "@/components/ui/TransactionLink";
 import { useInvestment } from '@/hooks/useInvestment';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
 import { useInvestmentFees } from '@/hooks/useInvestmentFees';
-import { AlertTriangle, Settings, Wallet, ExternalLink, CheckCircle2, Loader2, Shield } from 'lucide-react';
+import { AlertTriangle, Settings, Wallet, ExternalLink, CheckCircle2, Loader2, Shield, Copy, Check, Rocket } from 'lucide-react';
 import { authStorage } from '@/utils/authStorage';
 import { passkeyClient } from '@/lib/passkey';
 
@@ -33,35 +34,191 @@ interface InvestmentDialogProps {
     trigger?: React.ReactNode;
 }
 
+type DialogStep = 'form' | 'signing' | 'submitting' | 'confirming' | 'success' | 'error';
+
+const MAX_SILENT_RETRIES = 2;
+
+interface PurchaseDetails {
+    usdcAmount: number;
+    feeAmount: number;
+    totalDeduction: number;
+    tokensReceived: number;
+    assetCode: string;
+    offerName: string;
+}
+
 const QUICK_AMOUNTS = [100, 500, 1000, 5000];
 
+// Detect timeout-style errors for user-friendly messaging
+function isTimeoutError(msg: string): boolean {
+    return /timeout|timed out|ETIMEDOUT|exceeded/i.test(msg);
+}
+
+// ─── STEPPER STEPS ───
+const PROGRESS_STEPS = [
+    { key: 'authorized', label: 'Authorized' },
+    { key: 'processing', label: 'Processing' },
+    { key: 'confirmed', label: 'Confirmed' },
+] as const;
+
+function getActiveStepIndex(step: DialogStep): number {
+    switch (step) {
+        case 'signing': return 0;
+        case 'submitting': return 1;
+        case 'confirming':
+        case 'success': return 2;
+        default: return -1;
+    }
+}
+
+// ─── FLYING ROCKET COMPONENT (replaces Loader2 spinners) ───
+function FlyingRocket({ className = '' }: { className?: string }) {
+    return (
+        <div className={`relative inline-flex items-center justify-center ${className}`}>
+            {/* Speed lines */}
+            <div className="absolute inset-0 flex items-center justify-center" style={{ animation: 'speed-lines 1s ease-in-out infinite' }}>
+                <div className="absolute w-4 h-[1.5px] bg-gradient-to-r from-transparent to-[hsl(160_60%_45%/0.4)] -translate-x-5 -translate-y-1 rounded-full" />
+                <div className="absolute w-6 h-[1.5px] bg-gradient-to-r from-transparent to-[hsl(160_60%_45%/0.3)] -translate-x-6 translate-y-1 rounded-full" style={{ animationDelay: '0.3s' }} />
+                <div className="absolute w-3 h-[1.5px] bg-gradient-to-r from-transparent to-[hsl(160_60%_45%/0.5)] -translate-x-4 translate-y-3 rounded-full" style={{ animationDelay: '0.6s' }} />
+            </div>
+            <Rocket className="w-6 h-6 text-[hsl(160_60%_45%)] rotate-[135deg]" style={{ animation: 'rocket-fly 1.5s ease-in-out infinite' }} />
+        </div>
+    );
+}
+
+// ─── SHUTTLE ANIMATION COMPONENT ───
+function ShuttleProgress({ activeIndex }: { activeIndex: number }) {
+    const progressPercent = activeIndex <= 0 ? 0 : activeIndex === 1 ? 50 : 100;
+
+    return (
+        <div className="relative w-full px-6 mt-8 mb-2">
+            {/* Track */}
+            <div className="relative h-1 bg-white/10 rounded-full overflow-visible">
+                {/* Filled bar */}
+                <div
+                    className="absolute inset-y-0 left-0 rounded-full transition-all duration-[1200ms] ease-out"
+                    style={{
+                        width: `${progressPercent}%`,
+                        background: 'linear-gradient(90deg, hsl(160 60% 40%), hsl(160 60% 50%))',
+                    }}
+                />
+
+                {/* Shuttle icon */}
+                <div
+                    className="absolute top-1/2 -translate-y-1/2 transition-all duration-[1200ms] ease-out"
+                    style={{ left: `${progressPercent}%` }}
+                >
+                    <div className="relative -translate-x-1/2 flex items-center justify-center">
+                        <div className="w-7 h-7 rounded-full bg-slate-900 border-2 border-[hsl(160_60%_45%)] flex items-center justify-center shadow-[0_0_12px_hsl(160_60%_45%/0.4)]">
+                            <Rocket
+                                className="w-3.5 h-3.5 text-[hsl(160_60%_45%)] rotate-[135deg]"
+                                style={{
+                                    animation: activeIndex === 1
+                                        ? 'shuttle-bounce 1.5s ease-in-out infinite'
+                                        : activeIndex === 2
+                                            ? 'none'
+                                            : 'shuttle-pulse 2s ease-in-out infinite',
+                                }}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Step labels */}
+            <div className="flex justify-between mt-3">
+                {PROGRESS_STEPS.map((s, i) => {
+                    const isActive = i <= activeIndex;
+                    const isCurrent = i === activeIndex;
+                    return (
+                        <div key={s.key} className="flex flex-col items-center gap-1">
+                            <div
+                                className={`w-2 h-2 rounded-full transition-all duration-500 ${isActive
+                                    ? 'bg-[hsl(160_60%_45%)] shadow-[0_0_6px_hsl(160_60%_45%/0.5)]'
+                                    : 'bg-white/15'
+                                    }`}
+                            />
+                            <span
+                                className={`text-[10px] uppercase tracking-wider font-medium transition-colors duration-500 ${isActive
+                                    ? isCurrent
+                                        ? 'text-[hsl(160_60%_50%)]'
+                                        : 'text-slate-300'
+                                    : 'text-slate-600'
+                                    }`}
+                            >
+                                {s.label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// ─── COPYABLE HASH ───
+function CopyableHash({ hash }: { hash: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const short = hash.length > 16
+        ? `${hash.slice(0, 8)}…${hash.slice(-8)}`
+        : hash;
+
+    const handleCopy = async () => {
+        await navigator.clipboard.writeText(hash);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <button
+            onClick={handleCopy}
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-white/[0.04] hover:bg-white/[0.08] transition-colors group"
+            title="Copy full transaction hash"
+        >
+            <code className="text-xs text-blue-400">{short}</code>
+            {copied ? (
+                <Check className="w-3 h-3 text-emerald-400" />
+            ) : (
+                <Copy className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-colors" />
+            )}
+        </button>
+    );
+}
+
+// ─── MAIN COMPONENT ───
 export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const [amount, setAmount] = useState('');
     const [open, setOpen] = useState(false);
-    const [step, setStep] = useState<'form' | 'signing' | 'success'>('form');
+    const [step, setStep] = useState<DialogStep>('form');
     const [txResult, setTxResult] = useState<{ investmentId: number; transactionHash: string } | null>(null);
     const [signingError, setSigningError] = useState<string | null>(null);
-    const [isContractTrade, setIsContractTrade] = useState(false);
+    const [submissionError, setSubmissionError] = useState<string | null>(null);
+    const [purchaseDetails, setPurchaseDetails] = useState<PurchaseDetails | null>(null);
+    const [pendingRetry, setPendingRetry] = useState<{ signedXdr: string; investmentId: number } | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
+    const [isExtendedWait, setIsExtendedWait] = useState(false);
     const { purchase, submitSignedTx, loading, error } = useInvestment();
     const { usdcBalance, loading: balanceLoading, refresh: refreshBalance } = useWalletBalance();
     const { blockchainFee } = useInvestmentFees();
+    const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-    // KYC gate — check before showing the investment form
+    // KYC gate
     const user = authStorage.getUser<{ kycStatus?: string }>('investor') || {};
     const kycApproved = user.kycStatus === 'approved';
 
-    // Offer rules — min/max investment amounts
+    // Offer rules
     const rules = offer.offer_rules || {};
     const minInvestment = rules.min_investment ? Number(rules.min_investment) : undefined;
     const maxInvestment = rules.max_investment ? Number(rules.max_investment) : undefined;
 
-    // HIG Entering Data: dynamic validation
+    // Validation
     const parsedAmount = parseFloat(amount);
     const isValidAmount = !isNaN(parsedAmount) && parsedAmount > 0;
     const isBelowMin = minInvestment !== undefined && isValidAmount && parsedAmount < minInvestment;
     const isAboveMax = maxInvestment !== undefined && isValidAmount && parsedAmount > maxInvestment;
 
-    // Remaining supply guard rail
+    // Supply guard
     const unitPrice = offer.unit_price || 1;
     const totalSupply = offer.total_supply ?? 0;
     const tokensSold = offer.tokens_sold ?? 0;
@@ -70,7 +227,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const isFullySubscribed = totalSupply > 0 && remainingTokens <= 0;
     const isAboveRemaining = totalSupply > 0 && isValidAmount && parsedAmount > remainingUsdc;
 
-    // Maturity cutoff guard rail
+    // Maturity cutoff
     const cutoffDate = offer.investment_cutoff_date ? new Date(offer.investment_cutoff_date) : null;
     const isPastCutoff = cutoffDate ? new Date() >= cutoffDate : false;
     const daysUntilCutoff = cutoffDate ? Math.ceil((cutoffDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
@@ -84,6 +241,9 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
 
     const canSubmit = isValidAmount && !isBelowMin && !isAboveMax && !isAboveRemaining && !isFullySubscribed && !isPastCutoff && !loading && !hasInsufficientFunds;
 
+    // Cleanup timers on unmount
+    useEffect(() => () => { if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current); }, []);
+
     const handleInvest = async () => {
         try {
             const usdcAmount = parseFloat(amount);
@@ -92,20 +252,79 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
             const result = await purchase(offer.id, usdcAmount, offer.asset_code);
 
             if (result && result.transaction) {
-                // Smart wallet flow — sign with passkey and submit
+                // ─── STEP 1: SIGNING ───
                 setStep('signing');
                 setSigningError(null);
-                setIsContractTrade(!!result.investment?.isContractTrade);
+
+                // Capture purchase details for the receipt
+                const details: PurchaseDetails = {
+                    usdcAmount,
+                    feeAmount: blockchainFee,
+                    totalDeduction: usdcAmount + blockchainFee,
+                    tokensReceived: result.investment?.tokenAmount ?? (usdcAmount / unitPrice),
+                    assetCode: offer.asset_code,
+                    offerName: offer.offer_name,
+                };
+                setPurchaseDetails(details);
+
                 try {
-                    const signedXdr = await passkeyClient.signTransaction(result.transaction.xdr, result.transaction.walletId);
-                    const submitResult = await submitSignedTx(signedXdr, result.investment.id);
+                    const signedXdr = await passkeyClient.signTransaction(
+                        result.transaction.xdr,
+                        result.transaction.walletId
+                    );
+
+                    // ─── STEP 2: SUBMITTING ───
+                    setStep('submitting');
+                    setRetryCount(0);
+                    setIsExtendedWait(false);
+                    // Save retry info in case submission fails
+                    const retryInfo = { signedXdr, investmentId: result.investment.id };
+                    setPendingRetry(retryInfo);
+
+                    // Submit with silent auto-retry on timeout
+                    const attemptSubmit = async (attempt: number): Promise<any> => {
+                        try {
+                            return await submitSignedTx(retryInfo.signedXdr, retryInfo.investmentId);
+                        } catch (submitErr: any) {
+                            const errMsg = submitErr.message || '';
+                            if (isTimeoutError(errMsg) && attempt < MAX_SILENT_RETRIES) {
+                                console.warn(`[Investment] Attempt ${attempt + 1} timed out, retrying silently...`);
+                                setRetryCount(attempt + 1);
+                                setIsExtendedWait(true);
+                                return attemptSubmit(attempt + 1);
+                            }
+                            throw submitErr;
+                        }
+                    };
+
+                    const submitResult = await attemptSubmit(0);
+
+                    // ─── STEP 3: CONFIRMING (brief pause for UX) ───
+                    setStep('confirming');
                     setTxResult(submitResult);
-                    setStep('success');
+                    setPendingRetry(null);
+                    setIsExtendedWait(false);
                     refreshBalance();
+
+                    // Let the user see "Confirmed" step for a moment
+                    confirmTimerRef.current = setTimeout(() => {
+                        setStep('success');
+                    }, 1400);
+
                 } catch (signErr: any) {
-                    console.error('Passkey signing failed:', signErr);
-                    setSigningError(signErr.message || 'Failed to sign transaction');
-                    setStep('form');
+                    // Distinguish: passkey cancel vs. submission failure
+                    if (step === 'submitting' || isExtendedWait) {
+                        // All retries exhausted — show error recovery
+                        console.error('Transaction submission failed after retries:', signErr);
+                        setSubmissionError(signErr.message || 'Transaction submission failed');
+                        setStep('error');
+                    } else {
+                        // Passkey signing was cancelled/failed — go back to form
+                        console.error('Passkey signing failed:', signErr);
+                        setSigningError(signErr.message || 'Failed to sign transaction');
+                        setPendingRetry(null);
+                        setStep('form');
+                    }
                 }
             } else {
                 setOpen(false);
@@ -116,32 +335,139 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     };
 
     const handleClose = () => {
+        if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
         setOpen(false);
         setAmount('');
         setStep('form');
         setTxResult(null);
         setSigningError(null);
-        setIsContractTrade(false);
+        setSubmissionError(null);
+        setPurchaseDetails(null);
+        setPendingRetry(null);
+        setRetryCount(0);
+        setIsExtendedWait(false);
     };
 
+    // Is the dialog in a "processing" state (non-dismissable)?
+    const isProcessing = step === 'signing' || step === 'submitting' || step === 'confirming';
+
+    // Retry handler for failed submissions
+    const handleRetry = async () => {
+        if (!pendingRetry) {
+            // No saved XDR — user needs to start over
+            setStep('form');
+            setSubmissionError(null);
+            return;
+        }
+        try {
+            setStep('submitting');
+            setSubmissionError(null);
+            const submitResult = await submitSignedTx(pendingRetry.signedXdr, pendingRetry.investmentId);
+            setStep('confirming');
+            setTxResult(submitResult);
+            setPendingRetry(null);
+            refreshBalance();
+            confirmTimerRef.current = setTimeout(() => {
+                setStep('success');
+            }, 1400);
+        } catch (retryErr: any) {
+            console.error('Retry failed:', retryErr);
+            setSubmissionError(retryErr.message || 'Transaction submission failed');
+            setStep('error');
+        }
+    };
+
+    // Stepper active index
+    const activeStepIndex = getActiveStepIndex(step);
+
+    // Context message for each processing step
+    const processingMessage = (() => {
+        switch (step) {
+            case 'signing':
+                return {
+                    title: 'Authorize with biometric',
+                    subtitle: 'Use Face ID or fingerprint to confirm this transaction.',
+                };
+            case 'submitting':
+                return isExtendedWait
+                    ? {
+                        title: 'Taking a little longer than usual',
+                        subtitle: `We're still processing — hang tight, we're almost there. (attempt ${retryCount + 1})`,
+                    }
+                    : {
+                        title: 'Processing your investment',
+                        subtitle: 'Your transaction is being securely submitted to the blockchain.',
+                    };
+            case 'confirming':
+                return {
+                    title: 'Almost there!',
+                    subtitle: 'Transaction confirmed. Preparing your receipt.',
+                };
+            default:
+                return { title: '', subtitle: '' };
+        }
+    })();
+
     return (
-        <Dialog open={open} onOpenChange={(val) => val ? setOpen(true) : handleClose()}>
+        <Dialog open={open} onOpenChange={(val) => val ? setOpen(true) : (isProcessing ? undefined : handleClose())}>
             <DialogTrigger asChild>
                 {trigger || <Button>Invest Now</Button>}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] bg-slate-900 border-slate-800 text-white">
+            <DialogContent
+                className="sm:max-w-[500px] bg-slate-900 border-slate-800 text-white"
+                onPointerDownOutside={(e) => isProcessing && e.preventDefault()}
+                onEscapeKeyDown={(e) => isProcessing && e.preventDefault()}
+            >
+                {/* ─── SHUTTLE ANIMATION KEYFRAMES (injected once) ─── */}
+                <style>{`
+                    @keyframes shuttle-bounce {
+                        0%, 100% { transform: translateY(0) rotate(135deg); }
+                        50% { transform: translateY(-3px) rotate(135deg); }
+                    }
+                    @keyframes shuttle-pulse {
+                        0%, 100% { opacity: 0.7; }
+                        50% { opacity: 1; }
+                    }
+                    @keyframes rocket-fly {
+                        0%, 100% { transform: translateX(0) rotate(135deg); }
+                        25% { transform: translateX(3px) translateY(-2px) rotate(135deg); }
+                        75% { transform: translateX(-2px) translateY(1px) rotate(135deg); }
+                    }
+                    @keyframes speed-lines {
+                        0%, 100% { opacity: 0.3; transform: translateX(0); }
+                        50% { opacity: 0.8; transform: translateX(-4px); }
+                    }
+                    @keyframes receipt-reveal {
+                        from { opacity: 0; transform: translateY(12px) scale(0.97); }
+                        to { opacity: 1; transform: translateY(0) scale(1); }
+                    }
+                    @keyframes check-pop {
+                        0% { transform: scale(0); opacity: 0; }
+                        50% { transform: scale(1.2); }
+                        100% { transform: scale(1); opacity: 1; }
+                    }
+                `}</style>
+
                 <DialogHeader>
-                    <DialogTitle>Invest in {offer.offer_name}</DialogTitle>
+                    <DialogTitle>
+                        {step === 'success'
+                            ? 'Investment Complete'
+                            : step === 'error'
+                                ? 'Transaction Interrupted'
+                                : `Invest in ${offer.offer_name}`}
+                    </DialogTitle>
                     <DialogDescription className="text-slate-400">
                         {step === 'success'
-                            ? "Your investment has been confirmed."
-                            : step === 'signing'
-                                ? "Sign the transaction with your passkey."
-                                : "Enter the amount of USDC you wish to invest."}
+                            ? "Your tokens have been delivered to your wallet."
+                            : step === 'error'
+                                ? "Don't worry — your funds are safe."
+                                : isProcessing
+                                    ? processingMessage.subtitle
+                                    : "Enter the amount of USDC you wish to invest."}
                     </DialogDescription>
                 </DialogHeader>
 
-                {/* KYC Gate — HIG Modality: prevent lost work by gating early */}
+                {/* ─── KYC GATE ─── */}
                 {!kycApproved ? (
                     <div className="py-6">
                         <div className="p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-xl text-center space-y-3">
@@ -165,63 +491,207 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                             </Button>
                         </div>
                     </div>
-                ) : step === 'signing' ? (
-                    // SIGNING STATE — passkey prompt
-                    <div className="py-12 text-center space-y-4">
-                        <Loader2 className="h-10 w-10 text-blue-400 mx-auto animate-spin" />
-                        <div className="space-y-1">
-                            <p className="font-semibold text-white">Confirm with your Passkey</p>
-                            <p className="text-sm text-slate-400">
-                                Use your biometric (Face ID, fingerprint) to authorize this transaction.
-                            </p>
+
+                ) : isProcessing ? (
+                    /* ─── PROCESSING STATES (signing / submitting / confirming) ─── */
+                    <div className="py-6 space-y-2">
+                        {/* Central icon + message */}
+                        <div className="text-center space-y-2">
+                            {step === 'signing' ? (
+                                <div className="mx-auto w-10 h-10 flex items-center justify-center">
+                                    <FlyingRocket />
+                                </div>
+                            ) : step === 'confirming' ? (
+                                <CheckCircle2
+                                    className="h-10 w-10 text-emerald-400 mx-auto"
+                                    style={{ animation: 'check-pop 0.4s ease-out forwards' }}
+                                />
+                            ) : (
+                                <div className="mx-auto w-10 h-10 flex items-center justify-center">
+                                    <FlyingRocket />
+                                </div>
+                            )}
+                            <div className="space-y-0.5">
+                                <p className="font-semibold text-white">{processingMessage.title}</p>
+                                {purchaseDetails && step !== 'signing' && (
+                                    <p className="text-xs text-slate-500">
+                                        {purchaseDetails.tokensReceived.toFixed(2)} {purchaseDetails.assetCode} · ${purchaseDetails.totalDeduction.toFixed(2)} USDC
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Stepper with shuttle */}
+                        <ShuttleProgress activeIndex={activeStepIndex} />
+
+                        {/* Trust badge */}
+                        <div className="flex items-center justify-center gap-1.5 pt-2">
+                            <Shield className="h-3 w-3 text-emerald-400/60" />
+                            <span className="text-[10px] text-slate-500">
+                                Secured by blockchain · Do not close this window
+                            </span>
                         </div>
                     </div>
+
                 ) : step === 'success' ? (
-                    // SUCCESS STATE — investment confirmed
-                    <div className="py-8 text-center space-y-4">
-                        <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto" />
-                        <div className="space-y-1">
-                            <p className="font-semibold text-lg text-white">Investment Confirmed!</p>
-                            <p className="text-sm text-slate-400">
-                                {isContractTrade
-                                    ? 'Atomic swap complete — your tokens have been delivered instantly.'
-                                    : 'Your USDC has been transferred. Token distribution will follow shortly.'
-                                }
-                            </p>
+                    /* ─── SUCCESS RECEIPT ─── */
+                    <div
+                        className="py-4 space-y-4"
+                        style={{ animation: 'receipt-reveal 0.5s ease-out forwards' }}
+                    >
+                        {/* Hero */}
+                        <div className="text-center space-y-1">
+                            <CheckCircle2 className="h-11 w-11 text-emerald-400 mx-auto mb-2" />
+                            {purchaseDetails && (
+                                <p className="text-2xl font-bold text-white">
+                                    {purchaseDetails.tokensReceived.toFixed(2)}{' '}
+                                    <span className="text-[hsl(43_45%_55%)]">{purchaseDetails.assetCode}</span>
+                                </p>
+                            )}
+                            <p className="text-sm text-slate-400">Tokens delivered to your wallet</p>
                         </div>
-                        {txResult && (
-                            <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 text-left space-y-2">
-                                <div>
-                                    <Label className="text-xs text-slate-500 uppercase">Transaction Hash</Label>
-                                    <code className="text-xs text-blue-400 break-all block mt-1">
-                                        {txResult.transactionHash}
-                                    </code>
+
+                        {/* Receipt card */}
+                        {purchaseDetails && (
+                            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/8 space-y-2">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Offer</span>
+                                    <span className="text-slate-300 font-medium">{purchaseDetails.offerName}</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800">
-                                    <Shield className="h-3 w-3 text-emerald-400" />
-                                    <span className="text-[10px] text-slate-400">
-                                        {isContractTrade
-                                            ? 'Soroban Atomic Swap — funds and tokens exchanged in a single transaction'
-                                            : 'SAC Transfer — tokens will be distributed after confirmation'
-                                        }
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Investment amount</span>
+                                    <span className="text-white">${purchaseDetails.usdcAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Blockchain fee</span>
+                                    <span className="text-slate-400">+${purchaseDetails.feeAmount.toFixed(2)}</span>
+                                </div>
+                                <div className="border-t border-white/8 pt-2 flex justify-between text-xs font-semibold">
+                                    <span className="text-white">Total charged</span>
+                                    <span className="text-white">${purchaseDetails.totalDeduction.toFixed(2)} USDC</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Transaction hash + explorer */}
+                        {txResult && (
+                            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/8 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-[10px] text-slate-500 uppercase tracking-wider">Transaction</Label>
+                                    <CopyableHash hash={txResult.transactionHash} />
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1.5">
+                                        <Shield className="h-3 w-3 text-emerald-400" />
+                                        <span className="text-[10px] text-slate-500">
+                                            Verified on the Stellar blockchain
+                                        </span>
+                                    </div>
+                                    <TransactionLink
+                                        hash={txResult.transactionHash}
+                                        label="Explorer"
+                                        variant="link"
+                                        className="text-[10px] h-auto p-0 text-blue-400/70 hover:text-blue-400"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Actions */}
+                        <DialogFooter className="flex-col gap-2 sm:flex-col">
+                            <Button
+                                onClick={() => { handleClose(); window.location.href = '/portfolio'; }}
+                                className="w-full bg-[hsl(160_60%_40%)] hover:bg-[hsl(160_60%_35%)] text-white"
+                            >
+                                View Portfolio
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                onClick={handleClose}
+                                className="w-full text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                            >
+                                Close
+                            </Button>
+                        </DialogFooter>
+                    </div>
+                ) : step === 'error' ? (
+                    /* ─── ERROR RECOVERY ─── */
+                    <div className="py-6 space-y-4">
+                        <div className="text-center space-y-3">
+                            <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto">
+                                <AlertTriangle className="h-7 w-7 text-amber-400" />
+                            </div>
+                            <div className="space-y-1">
+                                <p className="font-semibold text-white">
+                                    {submissionError && isTimeoutError(submissionError)
+                                        ? 'The network is busy'
+                                        : 'Something went wrong'
+                                    }
+                                </p>
+                                <p className="text-sm text-slate-400 max-w-xs mx-auto">
+                                    {submissionError && isTimeoutError(submissionError)
+                                        ? 'Your transaction took longer than expected. This happens occasionally and your funds have not been charged.'
+                                        : 'We couldn\'t complete your transaction. No funds were deducted from your wallet.'
+                                    }
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Reassurance card */}
+                        <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
+                            <div className="flex items-start gap-2">
+                                <Shield className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                                <div className="text-xs text-slate-400">
+                                    <p className="font-medium text-emerald-400 mb-0.5">Your funds are safe</p>
+                                    <p>The investment was not finalized. You can try again or come back later — nothing has been charged.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Purchase context */}
+                        {purchaseDetails && (
+                            <div className="p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                                <div className="flex justify-between text-xs">
+                                    <span className="text-slate-500">Attempted</span>
+                                    <span className="text-white">
+                                        {purchaseDetails.tokensReceived.toFixed(2)} {purchaseDetails.assetCode} · ${purchaseDetails.totalDeduction.toFixed(2)} USDC
                                     </span>
                                 </div>
                             </div>
                         )}
-                        <p className="text-xs text-slate-500">
-                            You can track your investment status on your Portfolio page.
-                        </p>
-                        <DialogFooter>
+
+                        <DialogFooter className="flex-col gap-2 sm:flex-col">
                             <Button
-                                onClick={() => { handleClose(); window.location.href = '/portfolio'; }}
-                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                                onClick={handleRetry}
+                                disabled={loading}
+                                className="w-full bg-[hsl(43_45%_55%)] hover:bg-[hsl(43_45%_50%)] text-slate-900 font-medium"
                             >
-                                View Portfolio
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Retrying...
+                                    </>
+                                ) : 'Try Again'}
+                            </Button>
+                            {txResult && (
+                                <TransactionLink
+                                    hash={txResult.transactionHash}
+                                    label="View on Stellar Explorer"
+                                    variant="ghost"
+                                    className="w-full text-blue-400/70 hover:text-blue-400"
+                                />
+                            )}
+                            <Button
+                                variant="ghost"
+                                onClick={handleClose}
+                                className="w-full text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                            >
+                                Close
                             </Button>
                         </DialogFooter>
                     </div>
                 ) : (
-                    // INVESTMENT FORM
+                    /* ─── INVESTMENT FORM ─── */
                     <div className="grid gap-4 py-4">
                         {/* WALLET BALANCE STRIP */}
                         <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-white/[0.04] border border-white/10">
@@ -263,7 +733,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 onChange={(e) => setAmount(e.target.value)}
                             />
 
-                            {/* HIG Entering Data: quick-pick amounts */}
+                            {/* Quick-pick amounts */}
                             <div className="flex gap-2">
                                 {QUICK_AMOUNTS.map(qa => (
                                     <button
@@ -279,7 +749,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 ))}
                             </div>
 
-                            {/* FEE BREAKDOWN */}
+                            {/* Fee breakdown */}
                             {isValidAmount && !isBelowMin && !isAboveMax && (
                                 <div className="mt-1 space-y-1.5 p-3 rounded-lg bg-white/[0.03] border border-white/8">
                                     <div className="flex justify-between text-xs">

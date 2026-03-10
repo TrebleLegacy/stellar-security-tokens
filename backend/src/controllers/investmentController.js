@@ -610,7 +610,6 @@ export const submitInvestmentTx = async (req, res, next) => {
     // Soroban atomic swaps bypass the traditional distribution pipeline but the
     // portfolio page (Investor.getPortfolio) depends on token_distributions rows.
     try {
-      const { default: prisma } = await import('../config/database.js');
       await prisma.tokenDistribution.create({
         data: {
           investorId: investment.investorId,
