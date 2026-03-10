@@ -115,6 +115,32 @@ frontend/
 
 ---
 
+## Project Bible (Deep Context)
+
+> **Location**: `docs/Project_Bible/`
+> **Start here**: [`00_index.md`](docs/Project_Bible/00_index.md)
+
+The Project Bible is a comprehensive, code-verified reference of the entire codebase — generated from a full deep read of ~180 files (~35,000+ lines). **Before researching any question about how the system works, check the Bible first.**
+
+| Question | Read This |
+|----------|-----------|
+| "How does X call Y?" | `01_call_graph.md` |
+| "Is feature X implemented?" | `02_feature_matrix.md` |
+| "How does data flow through X?" | `03_data_flow.md` |
+| "Is this code still used?" | `04_dead_code.md` |
+| "What does this env var do?" | `05_config_env_map.md` |
+| "Is this secure?" | `06_security_audit.md` |
+| "What happens when X fails?" | `07_error_recovery.md` |
+| "What emails does the platform send?" | `08_email_inventory.md` |
+| "How does [backend layer] work?" | `services_layer.md`, `controllers_layer.md`, `routes_layer.md` |
+| "How does [frontend layer] work?" | `frontend_layer.md` |
+| "How does the smart contract work?" | `smart_contract_layer.md` |
+| "How is it deployed?" | `deploy_layer.md` |
+
+**Operational docs** (runbooks, checklists) are in `docs/Operations/`.
+
+---
+
 ## Stellar Documentation Reference
 
 > ⚠️ **SKIP DURING CODEBASE SCANNING**: The folder `Stellar Docs (...)` is **NOT part of the codebase** - it's the complete official Stellar developer documentation for reference only. Do not index or analyze when understanding the project structure.
