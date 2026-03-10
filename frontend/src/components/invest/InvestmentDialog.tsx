@@ -195,7 +195,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const [signingError, setSigningError] = useState<string | null>(null);
     const [submissionError, setSubmissionError] = useState<string | null>(null);
     const [purchaseDetails, setPurchaseDetails] = useState<PurchaseDetails | null>(null);
-    const [pendingRetry, setPendingRetry] = useState<{ signedXdr: string; investmentId: number } | null>(null);
+    const [pendingRetry, setPendingRetry] = useState<{ signedXdr: string; investmentContext: any } | null>(null);
     const [retryCount, setRetryCount] = useState(0);
     const [isExtendedWait, setIsExtendedWait] = useState(false);
     const { purchase, submitSignedTx, loading, error } = useInvestment();
@@ -261,7 +261,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                     usdcAmount,
                     feeAmount: blockchainFee,
                     totalDeduction: usdcAmount + blockchainFee,
-                    tokensReceived: result.investment?.tokenAmount ?? (usdcAmount / unitPrice),
+                    tokensReceived: result.investmentContext?.tokenAmount ?? (usdcAmount / unitPrice),
                     assetCode: offer.asset_code,
                     offerName: offer.offer_name,
                 };
@@ -278,13 +278,13 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                     setRetryCount(0);
                     setIsExtendedWait(false);
                     // Save retry info in case submission fails
-                    const retryInfo = { signedXdr, investmentId: result.investment.id };
+                    const retryInfo = { signedXdr, investmentContext: result.investmentContext };
                     setPendingRetry(retryInfo);
 
                     // Submit with silent auto-retry on timeout
                     const attemptSubmit = async (attempt: number): Promise<any> => {
                         try {
-                            return await submitSignedTx(retryInfo.signedXdr, retryInfo.investmentId);
+                            return await submitSignedTx(retryInfo.signedXdr, retryInfo.investmentContext);
                         } catch (submitErr: any) {
                             const errMsg = submitErr.message || '';
                             if (isTimeoutError(errMsg) && attempt < MAX_SILENT_RETRIES) {
@@ -362,7 +362,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
         try {
             setStep('submitting');
             setSubmissionError(null);
-            const submitResult = await submitSignedTx(pendingRetry.signedXdr, pendingRetry.investmentId);
+            const submitResult = await submitSignedTx(pendingRetry.signedXdr, pendingRetry.investmentContext);
             setStep('confirming');
             setTxResult(submitResult);
             setPendingRetry(null);

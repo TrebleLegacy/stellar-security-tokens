@@ -71,10 +71,9 @@ function getMaturityAccent(date: string | null): string {
 }
 
 
-/* ─── Pending Investment Card (kept compact) ─── */
-function PendingInvestmentCard({ investment, isProcessing }: { investment: PendingInvestment; isProcessing?: boolean }) {
-    const navigate = useNavigate();
-    const statusConfig = isProcessing ? {
+/* ─── Processing Investment Card (only shows actively processing investments) ─── */
+function PendingInvestmentCard({ investment }: { investment: PendingInvestment }) {
+    const statusConfig = {
         label: investment.status === 'trade_submitted' ? 'Submitting Trade' : 'Processing',
         sublabel: investment.status === 'trade_submitted'
             ? 'Soroban atomic swap in progress…'
@@ -83,13 +82,6 @@ function PendingInvestmentCard({ investment, isProcessing }: { investment: Pendi
         textClass: 'text-blue-400',
         icon: RefreshCw,
         iconClass: 'animate-spin',
-    } : {
-        label: 'Awaiting Signature',
-        sublabel: 'Your transaction was prepared but not signed yet.',
-        bgClass: 'bg-amber-500/10 border-amber-500/30',
-        textClass: 'text-amber-400',
-        icon: Hourglass,
-        iconClass: '',
     };
 
     const StatusIcon = statusConfig.icon;
@@ -116,49 +108,30 @@ function PendingInvestmentCard({ investment, isProcessing }: { investment: Pendi
             {/* Amount row */}
             <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                    <p className="text-muted-foreground">Amount to Pay</p>
+                    <p className="text-muted-foreground">Amount</p>
                     <p className="font-semibold text-lg">{formatCurrency(investment.usdcAmount)}</p>
                 </div>
                 <div>
-                    <p className="text-muted-foreground">Tokens to Receive</p>
+                    <p className="text-muted-foreground">Tokens</p>
                     <p className="font-semibold text-lg">{investment.tokenAmount.toLocaleString()} {investment.assetCode}</p>
                 </div>
             </div>
 
-            {/* Pending: action button + message */}
-            {!isProcessing && (
-                <div className="pt-3 border-t border-white/10 space-y-3">
-                    <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
-                    {investment.offerId && (
-                        <Button
-                            size="sm"
-                            className="w-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 font-medium gap-2"
-                            onClick={() => navigate(`/market/${investment.offerId}`)}
-                        >
-                            <ArrowRight className="h-3.5 w-3.5" />
-                            Complete Investment
-                        </Button>
-                    )}
-                </div>
-            )}
-
-            {/* Processing message */}
-            {isProcessing && (
-                <div className="pt-2 border-t border-white/10 space-y-2">
-                    <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
-                    {investment.usdcPaymentHash && (
-                        <a
-                            href={`${STELLAR_EXPLORER}/tx/${investment.usdcPaymentHash}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                        >
-                            <ExternalLink className="h-3 w-3" />
-                            View payment on Stellar Expert
-                        </a>
-                    )}
-                </div>
-            )}
+            {/* Processing message + explorer link */}
+            <div className="pt-2 border-t border-white/10 space-y-2">
+                <p className={`text-xs ${statusConfig.textClass}`}>{statusConfig.sublabel}</p>
+                {investment.usdcPaymentHash && (
+                    <a
+                        href={`${STELLAR_EXPLORER}/tx/${investment.usdcPaymentHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                    >
+                        <ExternalLink className="h-3 w-3" />
+                        View on Stellar Expert
+                    </a>
+                )}
+            </div>
 
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
@@ -532,14 +505,11 @@ export function Portfolio() {
                                 </Button>
                             </div>
                             {processingInvestments.map(inv => (
-                                <PendingInvestmentCard key={inv.id} investment={inv} isProcessing />
-                            ))}
-                            {pendingInvestments.map(inv => (
                                 <PendingInvestmentCard key={inv.id} investment={inv} />
                             ))}
                             {pendingLoading && pendingCount === 0 && (
                                 <div className="flex items-center justify-center py-4">
-                                    <Loader2 className="h-5 w-5 animate-spin text-amber-400" />
+                                    <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
                                 </div>
                             )}
                         </div>
