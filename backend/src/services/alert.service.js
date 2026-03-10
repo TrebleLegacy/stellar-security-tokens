@@ -95,24 +95,6 @@ export class AlertService {
   }
 
   /**
-   * Alerta de falha na distribuição de tokens
-   * @param {number} investmentId - ID do investimento
-   * @param {string} errorMessage - Mensagem de erro
-   * @param {number} attempts - Número de tentativas
-   */
-  static async distributionFailed(investmentId, errorMessage, attempts) {
-    return this.critical(
-      `Token distribution failed for investment ${investmentId} after ${attempts} attempts`,
-      {
-        investmentId,
-        errorMessage,
-        attempts,
-        type: 'distribution_failed',
-      }
-    );
-  }
-
-  /**
    * Alerta de falha no monitoramento de pagamentos
    * @param {string} errorMessage - Mensagem de erro
    */
@@ -122,21 +104,6 @@ export class AlertService {
       {
         type: 'payment_monitor_failed',
         errorMessage,
-      }
-    );
-  }
-
-  /**
-   * Alerta de falha na fila de distribuição
-   * @param {string} errorMessage - Mensagem de erro
-   */
-  static async distributionQueueFailed(errorMessage) {
-    const message = errorMessage || 'Unknown error';
-    return this.error(
-      `Distribution queue failed: ${message}`,
-      {
-        type: 'distribution_queue_failed',
-        errorMessage: message,
       }
     );
   }
