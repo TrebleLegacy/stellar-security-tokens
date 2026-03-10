@@ -34,13 +34,20 @@ export function useInvestment() {
         }
     };
 
-    const submitSignedTx = async (signedXdr: string, investmentId: number) => {
+    const submitSignedTx = async (signedXdr: string, investmentContext: {
+        investorId: number;
+        offerId: number;
+        usdcAmount: number;
+        totalDeduction: number;
+        tokenAmount: number;
+        assetCode: string;
+    }) => {
         setLoading(true);
         setError(null);
         try {
             const response = await api.post('/investments/submit-tx', {
                 signedXdr,
-                investmentId,
+                investmentContext,
             });
 
             if (!response.success) {

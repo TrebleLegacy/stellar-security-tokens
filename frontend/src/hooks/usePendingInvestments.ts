@@ -48,16 +48,16 @@ export function usePendingInvestments(options: UsePendingInvestmentsOptions = {}
             if (!silent) setLoading(true);
             setError(null);
 
-            // Fetch pending, trade_submitted, and processing investments
+            // Fetch only actively processing investments (no more pending_payment)
             const response = await investmentsApi.getMyInvestments(user.id, {
-                status: 'pending_payment,trade_submitted,payment_received,pending_distribution',
+                status: 'trade_submitted,payment_received,pending_distribution',
             });
 
             if (!isMountedRef.current) return;
 
             if (response.success && response.data) {
                 const investments = response.data.investments;
-                setPendingInvestments(investments.filter(i => i.status === 'pending_payment'));
+                setPendingInvestments([]);  // No more pending_payment records
                 setProcessingInvestments(investments.filter(i => ['trade_submitted', 'payment_received', 'pending_distribution'].includes(i.status)));
                 setLastUpdated(new Date());
             }

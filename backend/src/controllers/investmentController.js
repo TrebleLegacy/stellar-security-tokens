@@ -48,6 +48,10 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
+    if (!offerId) {
+      return res.status(400).json({ success: false, error: 'Offer ID is required.' });
+    }
+
     const investor = await Investor.findById(parseInt(investorId, 10));
     if (!investor) {
       return res.status(404).json({
@@ -65,27 +69,18 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
+    if (!investorWallet.startsWith('C')) {
+      return res.status(400).json({
+        success: false,
+        error: 'A smart wallet (passkey) is required to invest. Please register a passkey in Settings.',
+      });
+    }
+
     if (investor.kycStatus !== 'approved') {
       return res.status(403).json({
         success: false,
         error: 'Investor KYC status must be approved to purchase tokens',
       });
-    }
-
-    // --- PHASE 2.1: AUTONOMOUS JIT ONBOARDING ---
-    // Ensure investor has the trustline for the asset they are buying.
-    // Skip for Soroban contracts (C...) — they use SAC, no classic trustlines.
-    if (!investorWallet.startsWith('C')) {
-      StellarService.setupSponsoredTrustline(investorWallet, assetCode)
-        .then(() => log.info(`[JIT Onboarding] Successfully ensured trustline for ${investor.id} / ${assetCode}`))
-        .catch(err => log.warn(`[JIT Onboarding] Non-critical failure during early trustline setup for ${investor.id}:`, err.message));
-    }
-
-    // Cancel any stale pending investments for same investor/offer
-    const existingPending = await Investment.findPendingByInvestorAndOffer(parseInt(investorId, 10), offerId);
-    if (existingPending) {
-      log.info(`[Investment] Cancelling stale pending investment #${existingPending.id} for investor ${investorId}`);
-      await Investment.updateStatus(existingPending.id, { status: 'cancelled' });
     }
 
     const token = await Token.findByAssetCode(assetCode);
@@ -96,68 +91,69 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
+    // ─── SOROBAN-ONLY PATH ───
+    if (process.env.ENABLE_SOROBAN_SALE !== 'true') {
+      return res.status(503).json({
+        success: false,
+        error: 'Investment service is temporarily unavailable. Please try again later.',
+      });
+    }
+
     // --- SUPPLY CHECK: Prevent over-subscription ---
-    if (offerId) {
-      const offer = await (await import('../models/Offer.js')).Offer.findById(parseInt(offerId));
-      if (!offer) {
-        return res.status(404).json({
-          success: false,
-          error: 'Offer not found',
-        });
-      }
+    const offer = await (await import('../models/Offer.js')).Offer.findById(parseInt(offerId));
+    if (!offer) {
+      return res.status(404).json({ success: false, error: 'Offer not found' });
+    }
 
-      // Reject if offer is not active
-      if (offer.status !== 'active') {
+    if (offer.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        error: `Offer is not accepting investments (status: ${offer.status})`,
+      });
+    }
+
+    const totalSupply = parseFloat(offer.totalSupply);
+    const unitPrice = parseFloat(offer.unitPrice) || 1;
+    const tokensSold = await Investment.getTokensSoldByOffer(parseInt(offerId));
+    const remainingTokens = totalSupply - tokensSold;
+    const requestedTokens = parseFloat(usdcAmount) / unitPrice;
+
+    if (requestedTokens > remainingTokens) {
+      const remainingUsdc = remainingTokens * unitPrice;
+      return res.status(400).json({
+        success: false,
+        error: remainingTokens <= 0
+          ? 'This offer is fully subscribed. No tokens remaining.'
+          : `Requested amount exceeds remaining supply. Maximum investment: $${remainingUsdc.toFixed(2)} USDC (${remainingTokens.toFixed(0)} tokens remaining).`,
+        remaining_supply: remainingTokens,
+        remaining_usdc: remainingUsdc,
+      });
+    }
+
+    // --- MATURITY CUTOFF: Block investments too close to maturity ---
+    if (offer.maturityDate) {
+      const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 7);
+      const now = new Date();
+      const maturity = new Date(offer.maturityDate);
+      const daysUntilMaturity = Math.ceil((maturity - now) / (1000 * 60 * 60 * 24));
+
+      if (daysUntilMaturity < cutoffDays) {
         return res.status(400).json({
           success: false,
-          error: `Offer is not accepting investments (status: ${offer.status})`,
+          error: daysUntilMaturity <= 0
+            ? 'This offer has reached maturity and is no longer accepting investments.'
+            : `This offer closes for new investments ${cutoffDays} days before maturity. Only ${daysUntilMaturity} days remain.`,
+          days_until_maturity: daysUntilMaturity,
+          cutoff_days: cutoffDays,
         });
-      }
-
-      const totalSupply = parseFloat(offer.totalSupply);
-      const unitPrice = parseFloat(offer.unitPrice) || 1;
-      const tokensSold = await Investment.getTokensSoldByOffer(parseInt(offerId));
-      const remainingTokens = totalSupply - tokensSold;
-      const requestedTokens = parseFloat(usdcAmount) / unitPrice;
-
-      if (requestedTokens > remainingTokens) {
-        const remainingUsdc = remainingTokens * unitPrice;
-        return res.status(400).json({
-          success: false,
-          error: remainingTokens <= 0
-            ? 'This offer is fully subscribed. No tokens remaining.'
-            : `Requested amount exceeds remaining supply. Maximum investment: $${remainingUsdc.toFixed(2)} USDC (${remainingTokens.toFixed(0)} tokens remaining).`,
-          remaining_supply: remainingTokens,
-          remaining_usdc: remainingUsdc,
-        });
-      }
-
-      // --- MATURITY CUTOFF: Block investments too close to maturity ---
-      if (offer.maturityDate) {
-        const cutoffDays = await ConfigService.getFloat('MATURITY_CUTOFF_DAYS', 7);
-        const now = new Date();
-        const maturity = new Date(offer.maturityDate);
-        const daysUntilMaturity = Math.ceil((maturity - now) / (1000 * 60 * 60 * 24));
-
-        if (daysUntilMaturity < cutoffDays) {
-          return res.status(400).json({
-            success: false,
-            error: daysUntilMaturity <= 0
-              ? 'This offer has reached maturity and is no longer accepting investments.'
-              : `This offer closes for new investments ${cutoffDays} days before maturity. Only ${daysUntilMaturity} days remain.`,
-            days_until_maturity: daysUntilMaturity,
-            cutoff_days: cutoffDays,
-          });
-        }
       }
     }
 
     // Fee Logic
     const grossAmount = parseFloat(usdcAmount);
     const feePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
-    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0); // Blockchain Fee (Investor pays ON TOP)
+    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0);
 
-    // Validation: Investment amount must be positive
     if (grossAmount <= 0) {
       return res.status(400).json({
         success: false,
@@ -165,11 +161,8 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     }
 
-    // Investor pays Blockchain Fee ON TOP — full amount goes to tokens
     const tokenAmount = grossAmount;
-    const totalDeduction = grossAmount + fixedFee; // Total deducted from wallet
-
-    // Company pays Investment Fee (calculated on gross amount, charged later/accounted for)
+    const totalDeduction = grossAmount + fixedFee;
     const investmentFeeAmount = grossAmount * (feePercent / 100);
 
     // Log Fees
@@ -188,84 +181,13 @@ export const purchaseInvestment = async (req, res, next) => {
         amount: investmentFeeAmount,
         assetCode: 'USDC',
         category: 'INVESTMENT_FEE',
-        sourceId: offerId || null, // Issue 8 Fix: Use offerId (Company pays this fee)
+        sourceId: offerId || null,
         description: `Investment Fee: ${feePercent}% (${investmentFeeAmount} USDC) - Charge to Company`,
       });
     }
 
-    // ─── RACE CONDITION GUARD ───
-    // Prevent duplicate pending investments for the same investor/offer.
-    // Without this, concurrent requests can over-subscribe an offer.
-    if (offerId) {
-      const existingPending = await prisma.investment.findFirst({
-        where: {
-          investorId: investorId,
-          offerId: parseInt(offerId),
-          status: { in: ['pending_payment', 'trade_submitted'] },
-        },
-      });
-      if (existingPending) {
-        log.warn(`[Investment] Duplicate pending investment blocked: investor #${investorId}, offer #${offerId} (existing: #${existingPending.id})`);
-        return res.status(409).json({
-          success: false,
-          error: 'You already have a pending investment for this offer. Please complete or cancel it first.',
-          existingInvestmentId: existingPending.id,
-        });
-      }
-    }
-
-    // Criar registro de investimento
-    const investment = await Investment.create({
-      investor_id: investorId,
-      offer_id: offerId || null,
-      asset_code: assetCode,
-      usdc_amount: totalDeduction,
-      token_amount: tokenAmount,
-      memo: null,
-    });
-
-    // Generate Memo using the new ID
-    const memo = generateInvestmentMemo(investment.id, investorId, assetCode);
-
-    // Update investment with the generated memo
-    await Investment.updateStatus(investment.id, { memo: memo });
-
-    // ─── SOROBAN-ONLY PATH ───
-    // All investments go through Soroban contract atomic swap.
-    // Kill switch: returns 503 when ENABLE_SOROBAN_SALE is false.
-    if (process.env.ENABLE_SOROBAN_SALE !== 'true') {
-      await Investment.updateStatus(investment.id, {
-        status: 'failed',
-        error_message: 'Soroban sale is currently disabled (maintenance)',
-      });
-      return res.status(503).json({
-        success: false,
-        error: 'Investment service is temporarily unavailable. Please try again later.',
-      });
-    }
-
-    if (!investorWallet.startsWith('C')) {
-      await Investment.updateStatus(investment.id, {
-        status: 'failed',
-        error_message: 'Legacy G-address wallets are no longer supported',
-      });
-      return res.status(400).json({
-        success: false,
-        error: 'A smart wallet (passkey) is required to invest. Please register a passkey in Settings.',
-      });
-    }
-
-    if (!offerId) {
-      await Investment.updateStatus(investment.id, {
-        status: 'failed',
-        error_message: 'Offer ID is required for all investments',
-      });
-      return res.status(400).json({ success: false, error: 'Offer ID is required.' });
-    }
-
+    // ─── BUILD SOROBAN XDR (no DB record yet) ───
     try {
-      // Resolve company wallet from offer
-      const offer = await (await import('../models/Offer.js')).Offer.findById(parseInt(offerId));
       const companyWallet = offer?.company?.stellarContractId || offer?.company?.stellarPublicKey;
 
       if (!companyWallet) {
@@ -276,29 +198,27 @@ export const purchaseInvestment = async (req, res, next) => {
         throw new Error(`Offer #${offerId} does not have a Soroban sale contract. Activate the offer first to trigger auto-deployment.`);
       }
 
-      log.info(`[Investment] Using Soroban contract ${offer.sorobanContractId} for trade (${totalDeduction} USDC)`);
+      log.info(`[Investment] Building XDR via Soroban contract ${offer.sorobanContractId} for trade (${totalDeduction} USDC)`);
       const txData = await SorobanSaleService.buildTradeXdr(
         offer.sorobanContractId,
         investorWallet,
         totalDeduction
       );
 
-
-
+      // Return XDR + context (NO DB record created)
       return res.status(200).json({
         success: true,
-        message: 'Investment created. Sign with your passkey to complete.',
+        message: 'Transaction prepared. Sign with your passkey to complete.',
         data: {
-          investment: {
-            id: investment.id,
-            status: investment.status,
+          // Context needed by submitInvestmentTx after signing
+          investmentContext: {
+            investorId: parseInt(investorId, 10),
+            offerId: parseInt(offerId),
             usdcAmount: grossAmount,
             feeAmount: fixedFee,
             totalDeduction: totalDeduction,
             tokenAmount: tokenAmount,
             assetCode: assetCode,
-            memo: memo,
-            isContractTrade: true,
           },
           // Smart wallet transaction for passkey signing
           transaction: {
@@ -312,13 +232,7 @@ export const purchaseInvestment = async (req, res, next) => {
       });
     } catch (txError) {
       log.error('[Investment] Failed to build smart wallet transfer:', txError);
-      // Cancel the investment if we can't build the transaction
-      await Investment.updateStatus(investment.id, {
-        status: 'failed',
-        error_message: `Transaction build failed: ${txError.message}`,
-      });
 
-      // If it's a SaleError, return the mapped HTTP status
       const contractErr = SorobanSaleService.parseContractError?.(txError);
       if (contractErr) {
         return res.status(contractErr.httpStatus).json({
@@ -406,48 +320,31 @@ export const getFeeSchedule = async (req, res, next) => {
  * POST /api/investments/submit-tx
  * 
  * Called after the investor signs the XDR with their Passkey.
- * Submits via fee-bumped sponsorship and updates the investment record.
+ * Submits via fee-bumped sponsorship, then creates the Investment +
+ * tokenDistribution records AFTER on-chain confirmation.
+ * No DB record exists until the transaction is confirmed by Horizon.
  */
 export const submitInvestmentTx = async (req, res, next) => {
   try {
-    const { signedXdr, investmentId } = req.body;
+    const { signedXdr, investmentContext } = req.body;
 
-    if (!signedXdr || !investmentId) {
+    if (!signedXdr || !investmentContext) {
       return res.status(400).json({
         success: false,
-        error: 'signedXdr and investmentId are required',
+        error: 'signedXdr and investmentContext are required',
       });
     }
 
-    // Verify investment exists and is pending
-    const investment = await Investment.findById(parseInt(investmentId));
-    if (!investment) {
-      return res.status(404).json({ success: false, error: 'Investment not found' });
-    }
-    if (investment.status !== 'pending_payment' && investment.status !== 'trade_submitted') {
-      // Idempotency: if already has a payment hash, return it (retry scenario)
-      if (investment.usdcPaymentHash && (investment.status === 'payment_received' || investment.status === 'distributed')) {
-        log.info(`[Investment] Idempotent return — investment #${investmentId} already processed with hash ${investment.usdcPaymentHash}`);
-        return res.json({
-          success: true,
-          message: 'Investment already processed',
-          data: {
-            investmentId: parseInt(investmentId),
-            transactionHash: investment.usdcPaymentHash,
-            status: investment.status,
-            idempotent: true,
-          },
-        });
-      }
+    const { investorId, offerId, usdcAmount, totalDeduction, tokenAmount, assetCode } = investmentContext;
+    if (!investorId || !offerId || !assetCode || !totalDeduction) {
       return res.status(400).json({
         success: false,
-        error: `Investment is not pending payment (status: ${investment.status})`,
+        error: 'investmentContext must include investorId, offerId, assetCode, and totalDeduction',
       });
     }
 
     // ─── RATE LIMIT: prevent fee bump drain via spam ───
-    // Max 3 submit attempts per investor per minute
-    const investorKey = `submit_tx:${investment.investorId}`;
+    const investorKey = `submit_tx:${investorId}`;
     if (!submitInvestmentTx._rateLimiter) submitInvestmentTx._rateLimiter = new Map();
     const limiter = submitInvestmentTx._rateLimiter;
     const now = Date.now();
@@ -456,7 +353,7 @@ export const submitInvestmentTx = async (req, res, next) => {
     const attempts = limiter.get(investorKey) || [];
     const recent = attempts.filter(t => now - t < windowMs);
     if (recent.length >= maxAttempts) {
-      log.warn(`[Investment] Rate limit hit for investor ${investment.investorId}`);
+      log.warn(`[Investment] Rate limit hit for investor ${investorId}`);
       return res.status(429).json({
         success: false,
         error: 'Too many submission attempts. Please wait 1 minute.',
@@ -466,14 +363,6 @@ export const submitInvestmentTx = async (req, res, next) => {
     limiter.set(investorKey, recent);
 
     // ─── RE-SIMULATE WITH SIGNED AUTH ENTRIES ───
-    // The initial simulation (in buildTradeXdr) mocked auth, so __check_auth
-    // costs (passkey secp256r1 verification) weren't included in the resource estimate.
-    // Now that the frontend's passkey-kit sign() has signed the auth entries,
-    // we re-simulate to get accurate resource estimates.
-    //
-    // IMPORTANT: We only extract sorobanData (resources) via cloneFrom().
-    // The operation's signed auth entries are preserved — cloneFrom only touches
-    // the TX envelope's ext field (sorobanData + fee), not the operations.
     const { TransactionBuilder, xdr, rpc: rpcMod } = await import('@stellar/stellar-sdk');
     const { getNetworkPassphrase, getOperationsKeypair, getSorobanRpcUrl } = await import('../config/stellar.js');
 
@@ -489,8 +378,6 @@ export const submitInvestmentTx = async (req, res, next) => {
       if (simResult.error) {
         log.error(`[Investment] Re-simulation error: ${simResult.error}`);
       } else if (simResult.transactionData) {
-        // Extract ONLY the resource allocation from re-simulation.
-        // cloneFrom preserves operations (including passkey-signed auth entries).
         const newSorobanData = simResult.transactionData.build();
         const newFee = Math.ceil(parseInt(simResult.minResourceFee) * 1.15).toString();
 
@@ -509,46 +396,66 @@ export const submitInvestmentTx = async (req, res, next) => {
     // Add the source account signature
     tx.sign(opsKeypair);
 
-
-    log.info(`[Investment] Submitting passkey-signed TX for investment #${investmentId}...`);
-    const metricsStart = Date.now(); // ← Metrics timer
-
-    // ─── SET STATUS TO trade_submitted BEFORE SENDING ───
-    // This ensures reconciler can find and fix orphans if we crash after send.
-    await Investment.updateStatus(parseInt(investmentId), {
-      status: 'trade_submitted',
-    });
+    log.info(`[Investment] Submitting passkey-signed TX for investor #${investorId}, offer #${offerId}...`);
+    const metricsStart = Date.now();
 
     // ─── CAPTURE INNER TX HASH before fee bumping ───
-    // Fee bump wraps the TX → Horizon returns the OUTER hash.
-    // But Soroban RPC getTransaction() needs the INNER hash.
     const innerTxHash = tx.hash().toString('hex');
     log.info(`[Investment] Inner TX hash: ${innerTxHash}`);
 
     // ─── FEE BUMP SPONSORSHIP ───
-    // Wrap the signed TX in a fee bump so the investor doesn't need XLM (gasless UX).
     let feeBumpHash;
     try {
       const sponsorResult = await PasskeyWalletService.submitWithSponsorship(tx);
       feeBumpHash = sponsorResult.hash;
       log.info(`[Investment] Fee-bumped TX submitted: ${feeBumpHash} (inner: ${innerTxHash})`);
     } catch (sponsorErr) {
-      // ─── RECOVERY: revert to pending_payment so investor can retry ───
+      // No DB record to revert — just throw
       log.error(`[Investment] Fee bump sponsorship failed: ${sponsorErr.message}`);
-      await Investment.updateStatus(parseInt(investmentId), {
-        status: 'pending_payment',
-        error_message: `Fee bump failed: ${sponsorErr.message}`,
-      });
       throw new Error(`Fee-bump sponsorship failed: ${sponsorErr.message}`);
     }
 
-    // Horizon confirmed the fee-bumped TX — the trade is settled.
-    // Record the inner TX hash and proceed immediately.
-    const result = { hash: innerTxHash, ledger: null };
+    // ─── HORIZON CONFIRMED — create DB records NOW ───
     log.info(`[Investment] Transaction confirmed by Horizon: ${innerTxHash}`);
 
+    // Create the Investment record directly as 'distributed'
+    const investment = await Investment.create({
+      investor_id: investorId,
+      offer_id: offerId,
+      asset_code: assetCode,
+      usdc_amount: totalDeduction,
+      token_amount: tokenAmount,
+      memo: null,
+    });
+
+    await Investment.updateStatus(investment.id, {
+      status: 'distributed',
+      usdc_payment_hash: innerTxHash,
+      distribution_tx_hash: innerTxHash,
+    });
+
+    log.info(`[Investment] Created investment #${investment.id} as distributed (atomic swap).`);
+
+    // Create token_distributions record for portfolio
+    try {
+      await prisma.tokenDistribution.create({
+        data: {
+          investorId: investorId,
+          assetCode: assetCode,
+          amount: tokenAmount,
+          transactionHash: innerTxHash,
+          usdcPaymentHash: innerTxHash,
+          offerId: offerId,
+          memo: null,
+          approvalStatus: 'approved',
+        },
+      });
+      log.info(`[Investment] Created token_distributions record for atomic trade #${investment.id}`);
+    } catch (distErr) {
+      log.error(`[Investment] Failed to create distribution record: ${distErr.message}`);
+    }
+
     // ─── BACKGROUND: Soroban RPC diagnostic polling (fire-and-forget) ───
-    // This runs async for audit logging only — the user response is NOT blocked.
     (async () => {
       try {
         const { rpc: rpcLib } = await import('@stellar/stellar-sdk');
@@ -566,8 +473,7 @@ export const submitInvestmentTx = async (req, res, next) => {
         }
 
         if (txResult?.status === 'FAILED') {
-          log.error(`[Investment] [BG] TX ${innerTxHash} FAILED on Soroban RPC (Horizon had accepted it)`);
-          log.error(`[Investment] [BG] Result XDR: ${txResult.resultXdr?.toXDR?.('base64') || 'N/A'}`);
+          log.error(`[Investment] [BG] TX ${innerTxHash} FAILED on Soroban RPC`);
         } else if (txResult?.status === 'SUCCESS') {
           log.info(`[Investment] [BG] Soroban RPC confirmed SUCCESS for ${innerTxHash} (ledger ${txResult.ledger})`);
         } else {
@@ -578,79 +484,26 @@ export const submitInvestmentTx = async (req, res, next) => {
       }
     })();
 
-
     // ─── RECORD METRICS ───
     try {
       const { SorobanMetrics } = await import('../services/sorobanMetrics.service.js');
-      const offerForMetrics = investment.offerId
-        ? await (await import('../models/Offer.js')).Offer.findById(parseInt(investment.offerId))
-        : null;
       const durationMs = Date.now() - metricsStart;
-      SorobanMetrics.recordTrade({ durationMs, success: true, investmentId: parseInt(investmentId) });
+      SorobanMetrics.recordTrade({ durationMs, success: true, investmentId: investment.id });
     } catch (metricsErr) {
       log.warn(`[Investment] Metrics recording failed: ${metricsErr.message}`);
-    }
-
-    // Update investment status
-    await Investment.updateStatus(parseInt(investmentId), {
-      status: 'payment_received',
-      usdc_payment_hash: result.hash,
-    });
-
-    log.info(`[Investment] Smart wallet payment submitted for investment #${investmentId}: ${result.hash}`);
-
-    // Soroban atomic trade: tokens already in buyer's wallet. Update to 'distributed' directly.
-    log.info(`[Investment] Contract trade complete — tokens distributed atomically.`);
-    await Investment.updateStatus(parseInt(investmentId), {
-      status: 'distributed',
-      distribution_tx_hash: result.hash, // Same TX did both payment + distribution
-    });
-
-    // Create token_distributions record so the portfolio query shows this investment.
-    // Soroban atomic swaps bypass the traditional distribution pipeline but the
-    // portfolio page (Investor.getPortfolio) depends on token_distributions rows.
-    try {
-      await prisma.tokenDistribution.create({
-        data: {
-          investorId: investment.investorId,
-          assetCode: investment.assetCode,
-          amount: investment.tokenAmount,
-          transactionHash: result.hash,
-          usdcPaymentHash: result.hash,
-          offerId: investment.offerId,
-          memo: investment.memo || null,
-          approvalStatus: 'approved',
-        },
-      });
-      log.info(`[Investment] Created token_distributions record for atomic trade #${investmentId}`);
-    } catch (distErr) {
-      // Non-fatal — tokens are on-chain regardless
-      log.error(`[Investment] Failed to create distribution record: ${distErr.message}`);
     }
 
     return res.json({
       success: true,
       message: 'Investment completed — tokens received',
       data: {
-        investmentId: parseInt(investmentId),
-        transactionHash: result.hash,
+        investmentId: investment.id,
+        transactionHash: innerTxHash,
         status: 'distributed',
       },
     });
   } catch (error) {
     log.error('[Investment] Submit TX failed:', error);
-
-    // If we have an investmentId, mark the investment as failed
-    if (req.body?.investmentId) {
-      try {
-        await Investment.updateStatus(parseInt(req.body.investmentId), {
-          status: 'failed',
-          error_message: `Payment submission failed: ${error.message}`,
-        });
-      } catch (updateErr) {
-        log.error('[Investment] Failed to update investment status:', updateErr);
-      }
-    }
 
     return res.status(500).json({
       success: false,
