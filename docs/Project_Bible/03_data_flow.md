@@ -1,0 +1,155 @@
+# 03 — Data Flow
+
+> How data moves through the system: user → frontend → backend → blockchain/DB
+> Generated: 2026-03-10
+
+---
+
+## Core Data Flow Patterns
+
+### Pattern 1: Soroban Transaction Flow (Investment, Withdrawal, Payment)
+```
+┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐
+│ Frontend │    │ Backend  │    │ Soroban  │    │ Frontend │    │ Backend  │
+│ (React)  │    │ (Node)   │    │ (RPC)    │    │ (React)  │    │ (Node)   │
+└────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘    └────┬─────┘
+     │               │               │               │               │
+     │ POST /purchase │               │               │               │
+     │───────────────>│               │               │               │
+     │               │ simulate TX   │               │               │
+     │               │──────────────>│               │               │
+     │               │ assembled XDR │               │               │
+     │               │<──────────────│               │               │
+     │  { xdr }      │               │               │               │
+     │<───────────────│               │               │               │
+     │               │               │               │               │
+     │ Passkey sign  │               │               │               │
+     │──(WebAuthn)──>│               │               │               │
+     │               │               │               │               │
+     │ POST /submit  │               │               │               │
+     │───────────────>│               │               │               │
+     │               │ sendTransaction│              │               │
+     │               │──────────────>│               │               │
+     │               │ poll result   │               │               │
+     │               │──────────────>│               │               │
+     │               │ SUCCESS       │               │               │
+     │               │<──────────────│               │               │
+     │  { txHash }   │               │               │               │
+     │<───────────────│               │               │               │
+```
+
+### Pattern 2: Multisig Admin Flow
+```
+Admin A                Backend              Stellar           Admin B
+  │                      │                    │                  │
+  │ Create proposal      │                    │                  │
+  │─────────────────────>│                    │                  │
+  │                      │ Store XDR in DB    │                  │
+  │                      │                    │                  │
+  │                      │ GET /pending ──────│──────────────────│
+  │                      │                    │                  │
+  │                      │                    │  GET /xdr        │
+  │                      │<───────────────────│──────────────────│
+  │                      │ rebuild (Soroban)  │                  │
+  │                      │───────────────────>│                  │
+  │                      │  fresh XDR         │                  │
+  │                      │<───────────────────│                  │
+  │                      │                    │    { xdr }       │
+  │                      │────────────────────│─────────────────>│
+  │                      │                    │                  │
+  │                      │                    │ Sign (Freighter) │
+  │                      │<───────────────────│──────────────────│
+  │                      │ POST /submit       │                  │
+  │                      │                    │                  │
+  │                      │ submitTransaction  │                  │
+  │                      │───────────────────>│                  │
+  │                      │                    │                  │
+  │                      │ Execute post-hooks │                  │
+  │                      │ (chain: issue →    │                  │
+  │                      │  SAC → deploy →    │                  │
+  │                      │  activate)         │                  │
+```
+
+### Pattern 3: Deposit Relay (CEX → Smart Wallet)
+```
+Investor              CEX/Exchange         Treasury         Backend          Smart Wallet
+  │                      │                    │               │                 │
+  │ Initiate deposit     │                    │               │                 │
+  │──────────────────────│────────────────────│──────────────>│                 │
+  │ { address, memo }    │                    │               │                 │
+  │<─────────────────────│────────────────────│───────────────│                 │
+  │                      │                    │               │                 │
+  │ Send USDC with memo  │                    │               │                 │
+  │─────────────────────>│                    │               │                 │
+  │                      │ Payment arrives    │               │                 │
+  │                      │───────────────────>│               │                 │
+  │                      │                    │  Stream event │                 │
+  │                      │                    │──────────────>│                 │
+  │                      │                    │               │ SAC transfer    │
+  │                      │                    │               │────────────────>│
+  │                      │                    │               │                 │
+  │                      │                    │               │ Update DB       │
+  │                      │                    │               │ + Notify        │
+```
+
+---
+
+## Data Persistence Map
+
+| Data | Primary Store | Secondary Store | On-Chain |
+|------|--------------|----------------|----------|
+| Investor profile | PostgreSQL `investor` | — | Smart wallet address |
+| Company profile | PostgreSQL `company` | — | Smart wallet address |
+| Offer details | PostgreSQL `offer` | IPFS (legal docs) | Soroban sale contract |
+| Token metadata | PostgreSQL `token` | — | Stellar asset + SAC |
+| Investment records | PostgreSQL `investment` | — | Soroban trade events |
+| Interest payments | PostgreSQL `interestPayment` | — | USDC transfer TX |
+| Fee logs | PostgreSQL `feeLog` | — | ❌ Not on-chain |
+| Passkey credentials | PostgreSQL `passkeyCredential` | — | Smart wallet signers |
+| Notifications | PostgreSQL `notification` | Pusher (real-time) | — |
+| Multisig proposals | PostgreSQL `multiSigTransaction` | — | Stellar TX (when submitted) |
+| Deposits | PostgreSQL `deposit` | — | Stellar payment + SAC transfer |
+| System config | PostgreSQL `systemConfig` | — | — |
+| Sessions/JWT | In-memory + httpOnly cookie | Redis (blocklist) | — |
+| Rate limits | In-memory + Redis | — | — |
+| WebAuthn challenges | ⚠️ In-memory Map | — | — |
+| Legal documents | IPFS (Pinata) | PostgreSQL (hash + URL) | — |
+| Soroban metrics | PostgreSQL `sorobanMetric` | In-memory cache | — |
+
+---
+
+## Token Flow (Lifecycle)
+
+```
+1. ISSUE:     Issuer ──(totalSupply)──> Distributor
+2. SAC:       Deploy Stellar Asset Contract (tokenizes the classic asset)
+3. CONTRACT:  Deploy Soroban sale contract
+4. DEPOSIT:   Distributor ──(totalSupply via SAC)──> Sale Contract
+5. ACTIVATE:  set_active(true)
+6. TRADE:     Buyer ──(USDC)──> Contract ──(tokens)──> Buyer
+                                Contract ──(USDC)──> Treasury
+7. WITHDRAW:  Company requests USDC withdrawal from treasury
+8. PAYMENTS:  Company ──(USDC interest)──> Each Investor (per offer terms)
+```
+
+## USDC Flow
+```
+                    ┌─────────────┐
+                    │  Investor   │
+                    │ Smart Wallet│
+                    └──────┬──────┘
+                           │
+              deposit ↓    │ ↑ withdrawal
+                           │ │
+                    ┌──────▼──────┐         ┌─────────────┐
+       CEX ──USDC──>│  Treasury   │──USDC──>│   Company   │
+                    │  (Hot Wallet)│<──USDC──│ Smart Wallet│
+                    └──────┬──────┘         └─────────────┘
+                           │
+                    invest ↓
+                           │
+                    ┌──────▼──────┐
+                    │ Sale Contract│
+                    │ (holds tokens)│
+                    └─────────────┘
+```
