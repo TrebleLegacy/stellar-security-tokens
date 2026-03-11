@@ -117,9 +117,9 @@ PUT /api/admin/offers/:id/review
 
 POST /api/admin/offers/:id/issue
   → OfferController.issueToken
-    → StellarService.issueToken
-      → Horizon: changeTrust (distributor)
-      → Horizon: payment (issuer → distributor, totalSupply)
+    → StellarService.issueToken (forSaleContract: true)
+      → Horizon: setOptions (home_domain, flags re-assertion — no distributor payment)
+      → Tokens will be minted via SAC during sale activation
     → StellarService.deploySAC (if needed)
       → sorobanServer.simulateTransaction
     → prisma.token.create
@@ -127,13 +127,13 @@ POST /api/admin/offers/:id/issue
 
 POST /api/admin/offers/:id/activate
   → OfferController.activateOffer
-    → SorobanSaleService.deployAndInitialize
-      → deployer.deploy (SALE_WASM_HASH)
-      → contract.create(admin, seller, sell, buy, treasury, prices...)
-      → SorobanSaleService.depositTokens
-        → sellTokenSac.transfer(distributor → contract, supply)
-      → SorobanSaleService.activate
-        → contract.set_active(true)
+    → OfferService.activateOffer
+      → SorobanSaleService.buildDeployXdr (sale_deploy)
+      → processEffects chain:
+        → sale_create: contract.create(admin, seller, sell, buy, …)
+        → contract_deposit_auth: SAC.set_authorized(contractAddr, true)
+        → contract_deposit_transfer: SAC.transfer(issuer → contract, totalSupply) [MINTS]
+        → contract_resume: contract.set_active(true)
     → prisma.offer.update (status: active, sorobanContractId)
 ```
 

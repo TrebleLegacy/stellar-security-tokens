@@ -342,55 +342,14 @@ export class StellarService {
         throw new Error('Amount must be a positive number');
       }
 
-      // CRITICAL: Use fresh server instances for account loading to avoid the
-      // stale URL bug where the SDK mutates the singleton's serverURL after prior ops
-      const freshHorizon = createFreshServer();
-      const issuerAccount = await freshHorizon.loadAccount(issuerPublicKey);
-      const distributorAccount = await freshHorizon.loadAccount(distributorPublicKey);
-
       const asset = createAsset(code, issuerPublicKey);
 
-      // ─── Build ALL classic operations in a single atomic transaction ───
-      // This ensures the entire issuance (trustline + auth + payment) goes
-      // through multisig as one unit instead of crashing mid-flow.
+      // ─── Build classic operations ───
       const classicOperations = [];
 
-      // 1. Trustline: Check if distributor needs one
-      const trustline = distributorAccount.balances.find(
-        (b) => b.asset_code === code && b.asset_issuer === issuerPublicKey
-      );
-
-      if (!trustline) {
-        log.info(`[StellarService] Including trustline creation for distributor (${distributorPublicKey}) for asset ${code}`);
-        classicOperations.push(
-          Operation.changeTrust({
-            asset: asset,
-            source: distributorPublicKey,
-          })
-        );
-      }
-
-      // 2. Authorization: If issuer requires auth, authorize the distributor trustline
-      const needsAuth = issuerAccount.flags.auth_required;
-      const currentTrust = distributorAccount.balances.find(
-        (b) => b.asset_code === code && b.asset_issuer === issuerPublicKey
-      );
-
-      if (needsAuth && (!currentTrust || !currentTrust.is_authorized)) {
-        log.info(`[StellarService] Including trustline authorization for asset ${code}`);
-        classicOperations.push(
-          Operation.setTrustLineFlags({
-            trustor: distributorPublicKey,
-            asset: asset,
-            flags: { authorized: true },
-            source: issuerPublicKey,
-          })
-        );
-      }
-
-      // 3. Home domain if provided
+      // Home domain is always applied if configured (regardless of placement strategy)
       if (options.homeDomain) {
-        classicOperations.unshift(
+        classicOperations.push(
           Operation.setOptions({
             source: issuerPublicKey,
             homeDomain: options.homeDomain,
@@ -398,15 +357,74 @@ export class StellarService {
         );
       }
 
-      // 4. Payment (the actual token issuance)
-      classicOperations.push(
-        Operation.payment({
-          destination: distributorPublicKey,
-          asset: asset,
-          amount: amount.toString(),
-          source: issuerPublicKey,
-        })
-      );
+      if (options.forSaleContract) {
+        // ─── Sale-bound offers: skip distributor entirely ───
+        // Tokens will be minted directly into the sale contract via
+        // SAC transfer(issuer → contract) during the sale_create chain.
+        // No classic payment needed — avoids distributor custody exposure.
+        log.info(`[StellarService] forSaleContract=true for ${code} — no distributor ops. Tokens will be minted into sale contract via SAC.`);
+
+        // Ensure at least 1 op for the TX (flags re-assertion is idempotent)
+        if (classicOperations.length === 0) {
+          classicOperations.push(
+            Operation.setOptions({
+              source: issuerPublicKey,
+              setFlags: AuthRequiredFlag | AuthRevocableFlag | AuthClawbackEnabledFlag,
+            })
+          );
+        }
+      } else {
+        // ─── Legacy path: trustline + auth + payment to distributor ───
+        // Used for private placements, manual distributions, etc.
+
+        // CRITICAL: Use fresh server instances to avoid stale URL bug
+        const freshHorizon = createFreshServer();
+        const issuerAccount = await freshHorizon.loadAccount(issuerPublicKey);
+        const distributorAccount = await freshHorizon.loadAccount(distributorPublicKey);
+
+        // 1. Trustline: Check if distributor needs one
+        const trustline = distributorAccount.balances.find(
+          (b) => b.asset_code === code && b.asset_issuer === issuerPublicKey
+        );
+
+        if (!trustline) {
+          log.info(`[StellarService] Including trustline creation for distributor (${distributorPublicKey}) for asset ${code}`);
+          classicOperations.push(
+            Operation.changeTrust({
+              asset: asset,
+              source: distributorPublicKey,
+            })
+          );
+        }
+
+        // 2. Authorization: If issuer requires auth, authorize the distributor trustline
+        const needsAuth = issuerAccount.flags.auth_required;
+        const currentTrust = distributorAccount.balances.find(
+          (b) => b.asset_code === code && b.asset_issuer === issuerPublicKey
+        );
+
+        if (needsAuth && (!currentTrust || !currentTrust.is_authorized)) {
+          log.info(`[StellarService] Including trustline authorization for asset ${code}`);
+          classicOperations.push(
+            Operation.setTrustLineFlags({
+              trustor: distributorPublicKey,
+              asset: asset,
+              flags: { authorized: true },
+              source: issuerPublicKey,
+            })
+          );
+        }
+
+        // 3. Payment (the actual token issuance to distributor)
+        classicOperations.push(
+          Operation.payment({
+            destination: distributorPublicKey,
+            asset: asset,
+            amount: amount.toString(),
+            source: issuerPublicKey,
+          })
+        );
+      }
 
       // ─── Submit the single atomic transaction ───
       log.info(`[StellarService] Submitting atomic issuance for asset ${code} (${classicOperations.length} ops)`);
@@ -417,16 +435,24 @@ export class StellarService {
         transaction: classicTx,
         signingRole: 'ISSUER',
         operationType: 'token_issue',
-        description: `Issue ${amount} ${code} (trustline + auth + payment)`,
+        description: options.forSaleContract
+          ? `Register asset ${code} (flags only — tokens minted via SAC later)`
+          : `Issue ${amount} ${code} (trustline + auth + payment)`,
         metadata: {
           assetCode: code,
           amount,
           totalSupply: amount,
           description: options.description || null,
-          type: 'classic_issuance',
+          type: options.forSaleContract ? 'sale_registration' : 'classic_issuance',
           issuerPublicKey: issuerPublicKey,
           offerId: options.offerId,
-        }
+          forSaleContract: options.forSaleContract || false,
+        },
+        // When forSaleContract, TX only has issuer ops — no distributor signature needed
+        ...(options.forSaleContract && {
+          requiredSigners: [issuerPublicKey],
+          thresholdRequired: 1,
+        }),
       });
 
       // If multisig is pending, return early — can't proceed to SAC until issuance is confirmed

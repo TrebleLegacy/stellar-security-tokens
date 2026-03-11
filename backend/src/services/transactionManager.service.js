@@ -36,6 +36,8 @@ export class TransactionManager {
         metadata = {},
         description = null,
         initiatorId = null,
+        requiredSigners: overrideSigners = null,
+        thresholdRequired: overrideThreshold = null,
     }) {
         if (!transaction && !rawXdr) {
             throw new Error('[TransactionManager] Either transaction or xdr must be provided');
@@ -58,8 +60,8 @@ export class TransactionManager {
         const xdr = rawXdr || transaction.toXDR();
         log.info(`[TransactionManager] Queueing ${operationType} for MultiSig approval`);
 
-        const requiredSigners = keyManager.getRequiredSigners(operationType);
-        const threshold = keyManager.getSignatureThreshold(operationType);
+        const requiredSigners = overrideSigners || keyManager.getRequiredSigners(operationType);
+        const threshold = overrideThreshold ?? keyManager.getSignatureThreshold(operationType);
         const signerRoles = keyManager.getSignerRoles(operationType);
 
         const pendingTx = await MultiSigTransactionService.create({

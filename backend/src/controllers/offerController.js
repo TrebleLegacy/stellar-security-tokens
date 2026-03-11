@@ -875,7 +875,8 @@ export class OfferController {
         {
           homeDomain,
           offerId: offer.id,
-          description: offer.description
+          description: offer.description,
+          forSaleContract: true,
         }
       );
 
