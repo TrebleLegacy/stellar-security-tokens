@@ -74,7 +74,11 @@ router.post('/purchase', purchaseValidation, authenticateToken, purchaseInvestme
 // Submit signed investment SAC transfer (smart wallet passkey flow)
 router.post('/submit-tx', [
   body('signedXdr').isString().notEmpty().withMessage('Signed XDR is required'),
-  body('investmentId').isInt({ min: 1 }).withMessage('Valid investment ID is required'),
+  body('investmentContext').isObject().withMessage('investmentContext object is required'),
+  body('investmentContext.investorId').isInt({ min: 1 }).withMessage('Valid investor ID is required'),
+  body('investmentContext.offerId').isInt({ min: 1 }).withMessage('Valid offer ID is required'),
+  body('investmentContext.assetCode').isString().notEmpty().withMessage('Asset code is required'),
+  body('investmentContext.totalDeduction').isFloat({ gt: 0 }).withMessage('totalDeduction must be positive'),
   validate,
 ], authenticateToken, submitInvestmentTx);
 
