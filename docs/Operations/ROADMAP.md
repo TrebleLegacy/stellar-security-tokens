@@ -101,6 +101,22 @@
 
 ---
 
+## Backlog — Untested / Unverified
+
+### Contract Management Actions (Admin → Contracts)
+> These buttons exist in the UI but have **never been end-to-end tested** with real contract state.
+
+- [ ] **Pause** — pause a sale contract
+- [ ] **Resume** — unpause a paused sale contract
+- [ ] **Deposit** — deposit sell tokens into contract
+- [ ] **Price** — update token price on active contract
+- [ ] **Extend TTL** — extend Soroban contract time-to-live
+- [ ] **Withdraw** — withdraw unsold tokens from contract
+- [ ] **Freeze** — freeze investor account (compliance)
+- [ ] **Emergency Drain** — drain all funds from contract (emergency)
+
+---
+
 ## Strategic Principle
 
 > The platform is **feature-complete**. The gap isn't features — it's:
