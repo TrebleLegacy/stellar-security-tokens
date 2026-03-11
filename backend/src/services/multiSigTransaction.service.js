@@ -877,23 +877,43 @@ export class MultiSigTransactionService {
                             },
                         });
 
-                        // Chain: activate the contract on-chain via set_active(true)
+                        // Chain: deposit tokens into the contract before activation
+                        // Flow: sale_create → deposit_auth → deposit_transfer → contract_resume
                         const { TransactionManager } = await import('./transactionManager.service.js');
-                        const activateResult = await SorobanSaleService.buildSetActiveXdr(metadata.contractId, true);
+                        const { keyManager: saleKm } = await import('./KeyManager.js');
+
+                        // Fetch offer to get SAC contract ID and totalSupply for deposit
+                        const depositOffer = await prisma.offer.findUnique({
+                            where: { id: createOfferId },
+                            include: { tokens: true },
+                        });
+                        const sellToken = depositOffer.tokens?.[0]?.sacContractId;
+                        if (!sellToken) {
+                            throw new Error(`Token SAC not deployed for offer #${createOfferId}`);
+                        }
+                        const depositAmount = BigInt(Math.floor(depositOffer.totalSupply * 10_000_000));
+
+                        // Step 1/3: Authorize the sale contract on the SAC
+                        const authResult = await SorobanSaleService.buildSacAuthorizeXdr(
+                            sellToken, metadata.contractId, true
+                        );
                         await TransactionManager.submit({
-                            xdr: activateResult.xdr,
-                            operationType: 'contract_resume',
+                            xdr: authResult.xdr,
+                            operationType: 'contract_deposit_auth',
                             signingRole: 'ISSUER',
                             metadata: {
                                 offerId: createOfferId,
                                 contractId: metadata.contractId,
+                                sacContractId: sellToken,
+                                amount: depositAmount.toString(),
                                 assetCode: metadata.assetCode,
                                 autoActivateOffer: true,
+                                from: saleKm.getIssuerPublicKey(),
                             },
-                            description: `Activate sale contract for ${metadata.assetCode}`,
+                            description: `Authorize sale contract for ${metadata.assetCode} deposit (1/3: auth)`,
                         });
 
-                        log.info(`[sale_create] Chained contract_resume TX for offer #${createOfferId}`);
+                        log.info(`[sale_create] Chained deposit_auth TX for offer #${createOfferId}`);
                     } catch (verifyError) {
                         log.error(`[sale_create] Verification failed: ${verifyError.message}`);
                         await prisma.offer.update({
@@ -947,13 +967,46 @@ export class MultiSigTransactionService {
                                 sacContractId: metadata.sacContractId,
                                 amount: metadata.amount,
                                 assetCode: metadata.assetCode,
+                                autoActivateOffer: metadata.autoActivateOffer || false,
                             },
-                            description: `Deposit ${metadata.assetCode} to sale contract (step 2/2: transfer)`,
+                            description: `Deposit ${metadata.assetCode} to sale contract (2/3: transfer)`,
                         });
 
                         log.info(`[contract_deposit_auth] Chained transfer TX for offer #${metadata.offerId}`);
                     } catch (chainError) {
                         log.error(`[contract_deposit_auth] Failed to chain transfer TX: ${chainError.message}`);
+                    }
+                    break;
+                }
+
+                case 'contract_deposit_transfer': {
+                    // Step 2 complete: tokens deposited into sale contract.
+                    // Chain Step 3: activate the contract via set_active(true).
+                    if (metadata?.autoActivateOffer && metadata?.contractId) {
+                        try {
+                            const { SorobanSaleService } = await import('./sorobanSale.service.js');
+                            const { TransactionManager } = await import('./transactionManager.service.js');
+
+                            const activateResult = await SorobanSaleService.buildSetActiveXdr(
+                                metadata.contractId, true
+                            );
+                            await TransactionManager.submit({
+                                xdr: activateResult.xdr,
+                                operationType: 'contract_resume',
+                                signingRole: 'ISSUER',
+                                metadata: {
+                                    offerId: metadata.offerId,
+                                    contractId: metadata.contractId,
+                                    assetCode: metadata.assetCode,
+                                    autoActivateOffer: true,
+                                },
+                                description: `Activate sale contract for ${metadata.assetCode} (3/3: activate)`,
+                            });
+
+                            log.info(`[contract_deposit_transfer] Chained contract_resume for offer #${metadata.offerId}`);
+                        } catch (activateError) {
+                            log.error(`[contract_deposit_transfer] Failed to chain activation: ${activateError.message}`);
+                        }
                     }
                     break;
                 }
