@@ -159,7 +159,7 @@ export function Approvals() {
     const [sponsorAmount, setSponsorAmount] = useState('10');
 
     // Freighter for multisig
-    const { device: freighterDevice, signTransaction: freighterSign, isSigning } = useFreighter();
+    const { device: freighterDevice, signTransaction: freighterSign, isSigning, connect: freighterConnect } = useFreighter();
 
     // System wallets (for showing required signer info)
     const [systemWallets, setSystemWallets] = useState<Array<{ name: string; publicKey: string }>>([]);
@@ -760,6 +760,7 @@ export function Approvals() {
                             freighterConnected={!!freighterDevice}
                             freighterPublicKey={freighterDevice?.publicKey || ''}
                             systemWallets={systemWallets}
+                            onConnectFreighter={freighterConnect}
                             onApproveInvestor={() => handleApproveInvestor(selected)}
                             onRejectInvestor={() => setRejectDialog({ open: true, item: selected })}
                             onSponsorInvestor={() => setSponsorDialog({ open: true, item: selected })}
@@ -774,7 +775,6 @@ export function Approvals() {
                             onSignMultisig={() => handleSignMultisig(selected)}
                             onSubmitMultisig={() => handleSubmitMultisig(selected)}
                             onRejectMultisig={() => handleRejectMultisig(selected)}
-
                         />
                     )}
                 </div>
@@ -1113,6 +1113,7 @@ function DetailPanel({
     onIssueToken,
     onVerifyIssuance,
     onUnlockToken,
+    onConnectFreighter,
     onSignMultisig,
     onSubmitMultisig,
     onRejectMultisig,
@@ -1124,6 +1125,7 @@ function DetailPanel({
     freighterConnected: boolean;
     freighterPublicKey: string;
     systemWallets: Array<{ name: string; publicKey: string }>;
+    onConnectFreighter: () => Promise<any>;
     onApproveInvestor: () => void;
     onRejectInvestor: () => void;
     onSponsorInvestor: () => void;
@@ -1413,7 +1415,9 @@ function DetailPanel({
                                         {freighterPublicKey ? `${freighterPublicKey.slice(0, 4)}…${freighterPublicKey.slice(-4)}` : 'Connected'}
                                     </span>
                                 ) : (
-                                    <span className="text-yellow-400">Not connected — open Freighter extension</span>
+                                    <button onClick={onConnectFreighter} className="text-yellow-400 hover:text-yellow-300 underline cursor-pointer">
+                                        Not connected — click to connect
+                                    </button>
                                 )}
                             </div>
 
@@ -1448,9 +1452,9 @@ function DetailPanel({
                                 </Button>
                             ) : (
                                 <Button
-                                    className={`w-full ${keyMatches ? 'bg-purple-600 hover:bg-purple-500' : 'bg-zinc-700 cursor-not-allowed opacity-60'}`}
-                                    disabled={!keyMatches || actionLoading || isSigning}
-                                    onClick={onSignMultisig}
+                                    className={`w-full ${!freighterConnected ? 'bg-purple-600 hover:bg-purple-500' : keyMatches ? 'bg-purple-600 hover:bg-purple-500' : 'bg-zinc-700 cursor-not-allowed opacity-60'}`}
+                                    disabled={freighterConnected ? (!keyMatches || actionLoading || isSigning) : false}
+                                    onClick={!freighterConnected ? onConnectFreighter : onSignMultisig}
                                 >
                                     {isSigning ? (
                                         <Loader2 className="w-4 h-4 animate-spin mr-2" />
