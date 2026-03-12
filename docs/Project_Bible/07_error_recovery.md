@@ -40,7 +40,7 @@ Smart Contract (SaleError enum) → Soroban RPC (TX failure) → Backend Service
 |---------|--------------|----------|
 | SorobanSaleService | `try/catch` → re-throw with context | Caller handles |
 | StellarService | TX failure → retry with fee bump (limited) | 3 retries then fail |
-| PasskeyWalletService | Launchtube failure → throw | User retries |
+| PasskeyWalletService | Channels failure → fee-bump fallback → throw | User retries |
 | EmailService | `try/catch` → log warning, no throw | Silently degrades |
 | DepositRelayService | Match failure → skip, log | Unmatched deposits queued |
 | CompanyPaymentService | Overdue check → create penalty, no throw | Penalties are informational |
@@ -126,5 +126,5 @@ process.on('uncaughtException', (error) => {
 | **No TX retry queue** | Failed Soroban TXs require user to manually retry | Add background retry with exponential backoff |
 | **No dead letter queue for deposits** | Unmatched deposits are logged but not retried | Add periodic reconciliation |
 | **Soroban simulation can go stale** | XDR built, user delays signing → TX may fail | Add expiration check before submit |
-| **No circuit breaker** | All external calls (Horizon, Soroban RPC, Launchtube) have no circuit breaker | Add circuit breaker pattern |
+| **No circuit breaker** | All external calls (Horizon, Soroban RPC, Channels) have no circuit breaker | Add circuit breaker pattern |
 | **In-memory challenge store** | Server restart loses all pending WebAuthn challenges | Move to Redis with 5-min TTL |

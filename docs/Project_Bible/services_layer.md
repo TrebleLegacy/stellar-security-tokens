@@ -91,24 +91,25 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 2. Smart Wallet (Passkeys)
 
-### passkeyWallet.service.js (1,745L)
-**Role:** Complete smart wallet lifecycle via `passkey-kit`
+### passkeyWallet.service.js (~950L)
+**Role:** Complete smart wallet lifecycle via `smart-account-kit` + OpenZeppelin Stellar Channels
 
 | Method | Purpose |
 |---|---|
-| `deploySmartWallet` | Factory deploy → DB update (stellarContractId) |
-| `buildInvestmentTx` | SAC transfer USDC investor→company with resource boosting (5× CPU for secp256r1) + footprint injection |
-| `submitSignedTx` | Launchtube first → fee-bump fallback → direct send |
+| `deploySmartWallet` | OZ SmartAccountClient.deploy → Channels submission → DB update (stellarContractId) |
+| `buildInvestmentTx` | SAC transfer USDC investor→company (footprint handled by Channels) |
+| `sendTransaction` | Channels submitTransaction → fee-bump fallback |
+| `sendSorobanTransaction` | Channels submitSorobanTransaction (func+auth — auto footprint) |
 | `submitWithdrawalTx` | Validates contract allowlist before sponsoring |
 | `buildWithdrawalTx` / `buildWithdrawalTxForCompany` | Build SAC transfer from smart wallet |
-| `addPasskeySigner` / `removePasskeySigner` | Multi-device passkey management (contract + DB) |
-| `addEd25519Signer` / `removeEd25519Signer` | Ledger recovery signer management |
+| `addPasskeySigner` / `removePasskeySigner` | Multi-device passkey management (OZ add_signer/remove_signer + DB) |
+| `addEd25519Signer` / `removeEd25519Signer` | Ledger recovery signer management (Delegated type) |
 | `listUserPasskeys` / `listEd25519Signers` | List all signers |
 
 **Architecture notes:**
-- 3-tier submission: Launchtube → fee-bump → direct RPC
-- Auth expiration extended to 120 ledgers (~10 min) for passkey signing flow
-- Footprint injection adds signer persistent/temporary keys + contract instance + WASM code
+- 2-tier submission: Channels → fee-bump fallback
+- OZ smart-account contract uses External (passkey) and Delegated (Stellar account) signer types
+- Channels handles footprint discovery + resource calculation for Soroban transactions
 
 ---
 
@@ -341,12 +342,12 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ### Security Notes
 - `submitWithdrawalTx` validates contract allowlist before sponsoring
-- `buildInvestmentTx` injects smart wallet footprint entries for auth verification
+- `buildInvestmentTx` footprint and resource calculation handled by Channels service
 - Multisig signatures cryptographically verified before acceptance
 - Withdrawal XDR validation: single op, invokeHostFunction only, known contracts, transfer function only
 
 ### Architecture Patterns
 - **Balance source routing:** locked tokens → DB, unlocked → on-chain SAC query
-- **3-tier TX submission:** Launchtube → fee-bump → direct RPC
+- **2-tier TX submission:** Channels → fee-bump fallback
 - **Chain operations:** processEffects cascades up to 5 TXs automatically
 - **Crash recovery:** offer.service.js checks sorobanInitStatus on deploy

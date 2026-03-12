@@ -184,11 +184,11 @@ export function Register() {
         setError('');
 
         try {
-            // 1. Create Passkey AND Deploy Smart Wallet (Client-side via passkey-kit + Launchtube)
+            // 1. Create Passkey AND Deploy Smart Wallet (Client-side via smart-account-kit + Channels)
             const { credentialId, contractId } = await passkeyClient.register(formData.name);
 
             // 2. Send to Backend with registrationToken (contains verified email)
-            // Note: publicKey is no longer needed - wallet is already deployed by passkey-kit
+            // Note: publicKey is no longer needed - wallet is already deployed by smart-account-kit
             const response = await api.post('/investors/register', {
                 ...formData,
                 registrationToken,

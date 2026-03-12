@@ -1,5 +1,5 @@
 
-import { PasskeyKit } from 'passkey-kit';
+import { SmartAccountKit } from 'smart-account-kit';
 import { authStorage } from '@/utils/authStorage';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
@@ -16,7 +16,7 @@ export interface AuthResponse {
 }
 
 export class PasskeyClient {
-    private kit: PasskeyKit | null = null;
+    private kit: SmartAccountKit | null = null;
     private baseUrl: string;
 
     constructor() {
@@ -24,7 +24,8 @@ export class PasskeyClient {
     }
 
     /**
-     * Initialize the PasskeyKit with config from backend
+     * Initialize the SmartAccountKit with config from backend.
+     * Replaces the deprecated PasskeyKit initialization.
      */
     async init(): Promise<void> {
         if (this.kit) return;
@@ -35,17 +36,18 @@ export class PasskeyClient {
 
             const config = await response.json();
 
-            this.kit = new PasskeyKit({
+            this.kit = new SmartAccountKit({
                 rpcUrl: config.rpcUrl,
                 networkPassphrase: config.networkPassphrase,
-                walletWasmHash: config.walletWasmHash,
+                accountWasmHash: config.accountWasmHash,
+                webauthnVerifierAddress: config.webauthnVerifierAddress,
+                // Use backend as relay proxy for fee-sponsored submissions
+                relayerUrl: `${this.baseUrl}/wallets/relay`,
                 // Give 5 minutes for the passkey signing flow.
-                // Default is 30 seconds which is too short when the flow includes
-                // user passkey prompt + network round-trips + fee-bump wrapping.
                 timeoutInSeconds: 300,
             });
         } catch (error) {
-            console.error('Failed to initialize PasskeyKit:', error);
+            console.error('Failed to initialize SmartAccountKit:', error);
             throw error;
         }
     }
@@ -111,52 +113,34 @@ export class PasskeyClient {
     }
 
     /**
-     * Register a new passkey and deploy smart wallet
-     * Uses createWallet which handles passkey creation, builds deployment tx, and signs it.
-     * We then submit the signed tx to actually deploy on-chain.
+     * Register a new passkey and deploy smart wallet.
+     * Uses SmartAccountKit.createWallet() which handles:
+     *  - WebAuthn passkey creation
+     *  - Builds deployment transaction
+     *  - Signs with deployer keypair
+     *  - Optionally auto-submits
      */
     async register(username: string): Promise<{ credentialId: string; contractId: string }> {
         await this.init();
-        if (!this.kit) throw new Error('PasskeyKit not initialized');
+        if (!this.kit) throw new Error('SmartAccountKit not initialized');
 
         try {
-            // createWallet creates the passkey, builds the deploy tx, and signs it
-            // But it does NOT submit the transaction - we need to do that
-            const result = await this.kit.createWallet('Stellar Tokens', username);
+            // createWallet handles passkey creation + deploy TX building + signing
+            const result = await this.kit.createWallet('Stellar Tokens', username, {
+                autoSubmit: true, // Let the SDK submit via relayer (Channels)
+            });
 
-            if (!result || !result.keyIdBase64 || !result.contractId || !result.signedTx) {
+            if (!result || !result.credentialId || !result.contractId) {
                 throw new Error('Failed to create wallet - missing required data');
             }
 
-            console.log('[Passkey] Wallet created, submitting deployment transaction...');
-            console.log('[Passkey] Contract ID:', result.contractId);
-
-            // Submit the signed transaction to deploy the wallet on-chain
-            // Convert the Tx to XDR string (base64)
-            // @ts-ignore - toXDR may accept encoding parameter
-            const xdrString = result.signedTx.toXDR('base64');
-
-            console.log('[Passkey] XDR length:', xdrString?.length);
-
-            // Submit via Launchtube endpoint (backend proxy)
-            const submitResponse = await fetch(`${this.baseUrl}/wallets/submit-tx`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ xdr: xdrString }),
-            });
-
-            const submitResult = await submitResponse.json().catch(() => ({ success: false, error: 'Failed to parse response' }));
-
-            if (!submitResponse.ok || !submitResult.success) {
-                console.error('[Passkey] Transaction submission failed:', submitResult);
-                throw new Error(`Wallet deployment failed: ${submitResult.error || 'Unknown error'}`);
-            }
-
-            console.log('[Passkey] Transaction submitted successfully:', submitResult);
+            console.log('[SmartAccount] Wallet created successfully');
+            console.log('[SmartAccount] Contract ID:', result.contractId);
+            console.log('[SmartAccount] Credential ID:', result.credentialId);
 
             return {
-                credentialId: result.keyIdBase64,
-                contractId: result.contractId
+                credentialId: result.credentialId,
+                contractId: result.contractId,
             };
         } catch (error: any) {
             console.error('Registration error:', error);
@@ -165,33 +149,44 @@ export class PasskeyClient {
     }
 
     /**
-     * Sign a transaction with the user's Passkey
+     * Sign a transaction with the user's Passkey.
+     * Uses SmartAccountKit.signAndSubmit() for the full flow:
+     *   sign auth entries → re-simulate → assemble → submit
+     * 
      * @param xdr - The transaction XDR string to sign
-     * @param walletContractId - Optional smart wallet contract ID (required for smart wallet signing)
+     * @param walletContractId - Optional smart wallet contract ID
+     * @returns Signed transaction XDR string
      */
     async signTransaction(xdr: string, walletContractId?: string): Promise<string> {
         await this.init();
-        if (!this.kit) throw new Error('PasskeyKit not initialized');
+        if (!this.kit) throw new Error('SmartAccountKit not initialized');
 
         // Connect wallet if not already connected
-        if (!this.kit.wallet) {
+        if (!this.kit.contractId) {
             const user = authStorage.getUser<any>('investor') || authStorage.getUser<any>('company');
             const contractId = walletContractId || user?.stellarContractId;
             if (!contractId) {
                 throw new Error('Smart wallet contract ID not found. Cannot sign transaction.');
             }
-            console.log('[Passkey] Setting wallet for signing:', contractId);
-
-            const { Client } = await import('passkey-kit-sdk');
-            this.kit.wallet = new Client({
-                contractId,
-                networkPassphrase: this.kit.networkPassphrase,
-                rpcUrl: this.kit.rpcUrl,
-            });
+            console.log('[SmartAccount] Connecting wallet for signing:', contractId);
+            await this.kit.connectWallet({ contractId });
         }
 
         try {
-            const signedTx = await this.kit.sign(xdr);
+            // Import the bindings Client to parse XDR into AssembledTransaction
+            const { Client } = await import('smart-account-kit-bindings');
+            const wallet = new Client({
+                contractId: this.kit.contractId!,
+                networkPassphrase: this.kit.networkPassphrase,
+                rpcUrl: this.kit.rpcUrl,
+            });
+
+            // Parse the XDR into an AssembledTransaction using fromXDR
+            const tx = wallet.fromJSON.execute(xdr);
+            
+            // Sign the auth entries with passkey
+            const signedTx = await this.kit.sign(tx);
+            
             return signedTx.toXDR() as string;
         } catch (error: any) {
             console.error('Signing error:', error);

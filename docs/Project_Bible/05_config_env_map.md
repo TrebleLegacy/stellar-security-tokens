@@ -58,9 +58,10 @@
 ### Soroban / Smart Wallets
 | Variable | Required | Default | Used By |
 |----------|----------|---------|---------|
-| `LAUNCHTUBE_URL` | ❌ | `https://launchtube.xyz` | PasskeyWalletService |
-| `LAUNCHTUBE_JWT` | ✅ Prod | — | PasskeyWalletService |
-| `FACTORY_CONTRACT_ID` | ✅ Prod | — | PasskeyWalletService (wallet deploy) |
+| `CHANNELS_API_KEY` | ✅ Prod | — | PasskeyWalletService (Channels fee sponsorship) |
+| `ACCOUNT_WASM_HASH` | ✅ Prod | — | PasskeyWalletService (wallet deploy) |
+| `WEBAUTHN_VERIFIER_ADDRESS` | ✅ Prod | — | PasskeyWalletService (passkey signer) |
+| `ED25519_VERIFIER_ADDRESS` | ✅ Prod | — | PasskeyWalletService (Ledger signer) |
 | `SALE_WASM_HASH` | When Soroban enabled | — | SorobanSaleService (deploy) |
 | `XLM_SAC_CONTRACT_ID` | ✅ | Testnet default | platformAdminRoutes (sponsor) |
 | `USDC_SAC_CONTRACT_ID` | ✅ | Testnet default | PasskeyWalletService (balances) |
@@ -107,7 +108,6 @@
 | `VITE_STELLAR_NETWORK` | ❌ | — | Frontend config |
 | `VITE_SOROBAN_RPC_URL` | ❌ | — | Frontend config |
 | `VITE_STELLAR_NETWORK_PASSPHRASE` | ❌ | — | Frontend config |
-| `VITE_FACTORY_CONTRACT_ID` | ❌ | — | PasskeyKit init |
 | `VITE_SENTRY_DSN` | ❌ | — | Frontend Sentry |
 | `VITE_APP_VERSION` | ❌ | `1.0.0` | Sentry release tag |
 | `VITE_PUSHER_KEY` | ❌ | — | Pusher client |

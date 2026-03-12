@@ -19,7 +19,7 @@
 #   - XLM_SAC_CONTRACT_ID, USDC_SAC_CONTRACT_ID (mainnet SAC IDs)
 #   - WEBAUTHN_RP_ID, WEBAUTHN_ORIGIN (your production domain)
 #   - FRONTEND_URL
-#   - LAUNCHTUBE_JWT, FACTORY_CONTRACT_ID
+#   - CHANNELS_API_KEY (from OpenZeppelin Stellar Channels)
 #
 # SECRETS (Docker Secrets — never in .env):
 #   - Operations key stored at /root/.secrets/operations_key (chmod 600)
@@ -140,10 +140,11 @@ services:
       # WebAuthn - REQUIRED (must match production domain)
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:?WEBAUTHN_RP_ID is required}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:?WEBAUTHN_ORIGIN is required}
-      # Stellar Passkey Kit & Smart Wallets
-      LAUNCHTUBE_URL: ${LAUNCHTUBE_URL:-https://launchtube.xyz}
-      LAUNCHTUBE_JWT: ${LAUNCHTUBE_JWT:?LAUNCHTUBE_JWT is required}
-      FACTORY_CONTRACT_ID: ${FACTORY_CONTRACT_ID:?FACTORY_CONTRACT_ID is required}
+      # Smart Wallets (OpenZeppelin Stellar Channels)
+      CHANNELS_API_KEY: ${CHANNELS_API_KEY:?CHANNELS_API_KEY is required}
+      ACCOUNT_WASM_HASH: ${ACCOUNT_WASM_HASH:-}
+      WEBAUTHN_VERIFIER_ADDRESS: ${WEBAUTHN_VERIFIER_ADDRESS:-}
+      ED25519_VERIFIER_ADDRESS: ${ED25519_VERIFIER_ADDRESS:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -188,7 +189,6 @@ services:
         VITE_STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
         VITE_SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
         VITE_STELLAR_NETWORK_PASSPHRASE: "${VITE_STELLAR_NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}"
-        VITE_FACTORY_CONTRACT_ID: ${FACTORY_CONTRACT_ID}
     # Override base compose port 80 — only Caddy exposes ports externally
     ports: !override []
     depends_on:

@@ -173,7 +173,7 @@ router.post('/passkey-login/discover', [
     const { credentialId } = req.body;
 
 
-    // Find user by credentialId (passkey-kit doesn't set userHandle properly)
+    // Find user by credentialId (smart-account-kit doesn't set userHandle properly)
     // Look up in investors first
     let user = await prisma.investor.findFirst({
       where: { passkeyCredentialId: credentialId },

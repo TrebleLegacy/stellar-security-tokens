@@ -17,8 +17,9 @@ This document tracks items that need to be addressed **after** the initial Mainn
 - [ ] **Redis**: Set up managed Redis. Set `REDIS_PASSWORD`.
 - [ ] **API_KEY**: Generate new production API key.
 - [ ] **Pinata JWT**: ✅ Same key works for both dev and prod.
-- [ ] **Launchtube JWT**: ✅ Same key works for both networks.
-- [ ] **Factory Contract**: Deploy smart wallet factory to mainnet. Update `FACTORY_CONTRACT_ID`.
+- [ ] **Channels API Key**: Get production key from OpenZeppelin.
+- [ ] **Smart Account WASM**: Deploy OZ smart account WASM to mainnet. Update `ACCOUNT_WASM_HASH`.
+- [ ] **Verifier Contracts**: Deploy WebAuthn + Ed25519 verifiers. Update `WEBAUTHN_VERIFIER_ADDRESS`, `ED25519_VERIFIER_ADDRESS`.
 - [ ] **SAC Contract IDs**: Look up mainnet XLM and USDC SAC IDs on Stellar Expert.
 - [ ] **Pusher**: Set up Pusher account for real-time notifications.
 - [ ] **Operations Secret Key → Vault**: The Operations hot wallet (`OPERATIONS_SECRET_KEY`) is the **only** secret key in `.env`. Before mainnet, migrate it to **Google Secret Manager** (or equivalent vault) so it's never stored in plaintext. Issuer/Treasury/Distributor are already cold (Freighter/multisig only).
@@ -48,7 +49,7 @@ This document tracks items that need to be addressed **after** the initial Mainn
 ## 3. Features to Build
 - [ ] **Fiat On-Ramp**: PIX deposit flow to transition from sponsor-only to deposit-based activation.
 
-> ✅ **Completed:** No custom Soroban contracts needed — using SDF `passkey-kit` Smart Wallet (pre-verified) + SAC (protocol-native).
+> ✅ **Completed:** No custom Soroban contracts needed — using OZ Smart Account Kit (pre-verified) + SAC (protocol-native).
 
 ## 3.1 Company Features
 - [ ] **Full Company KYC** *(Low Priority — companies onboard offline for now)*: If needed later, implement in-app KYC to collect:
@@ -179,9 +180,9 @@ This means recovery IS possible without any data loss to the user.
 - **Rate limit recovery attempts** — prevent enumeration attacks
 
 ### Code References
-- Contract ID derivation: `PasskeyWalletService.deployWallet()` inline (L157-175 in `passkeyWallet.service.js`)
+- Contract ID derivation: `PasskeyWalletService.deploySmartWallet()` + `deriveContractAddress()` in `passkeyWallet.service.js`
 - WebAuthn verification: `WebAuthnService.verifyAuthentication()` (in `webauthn.service.js`)
-- Factory contract: `FACTORY_CONTRACT_ID` env variable
+- Smart account config: `ACCOUNT_WASM_HASH`, `WEBAUTHN_VERIFIER_ADDRESS` env variables
 
 ### Benefit
 This feature makes the system **resilient to database loss** while maintaining full user fund safety. The Stellar blockchain acts as an immutable backup of account existence.

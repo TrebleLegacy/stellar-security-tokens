@@ -75,7 +75,7 @@ Internal:  backend → postgres:5432
 | Key Mgmt | KEY_MANAGEMENT_MODE | `multisig` |
 | Auth | JWT_SECRET, API_KEY | required, no default |
 | WebAuthn | WEBAUTHN_RP_ID, WEBAUTHN_ORIGIN | required |
-| Passkey Kit | LAUNCHTUBE_URL/JWT, FACTORY_CONTRACT_ID | required |
+| Smart Account Kit | CHANNELS_API_KEY, ACCOUNT_WASM_HASH, WEBAUTHN_VERIFIER_ADDRESS | required |
 | Soroban | ENABLE_SOROBAN_SALE, SALE_WASM_HASH, XLM/USDC_SAC_CONTRACT_ID | `false` (kill switch) |
 | SEP-1 | STELLAR_HOME_DOMAIN | `radox.net` |
 | Email | RESEND_API_KEY, EMAIL_FROM | Radox noreply |

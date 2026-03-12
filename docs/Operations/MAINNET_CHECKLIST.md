@@ -46,9 +46,10 @@ Create a production `.env` file with the following changes:
 - [ ] **Account monitoring** — set up alerts on [stellar.expert](https://stellar.expert) for unexpected transactions on the Operations account.
 - [ ] **Key rotation plan** — document how to rotate the Operations key if compromised (generate new keypair, update `.env.production`, restart backend).
 
-### Smart Contracts (Passkey Wallet)
-- [ ] **`FACTORY_CONTRACT_ID`**: Deploy Factory to Mainnet and update this ID.
-- [ ] **`VITE_FACTORY_CONTRACT_ID`**: Update in Frontend `.env`.
+### Smart Contracts (Smart Account Kit)
+- [ ] **`ACCOUNT_WASM_HASH`**: Deploy OZ Smart Account WASM to Mainnet and record hash.
+- [ ] **`WEBAUTHN_VERIFIER_ADDRESS`**: Deploy WebAuthn verifier and record address.
+- [ ] **`ED25519_VERIFIER_ADDRESS`**: Deploy Ed25519 verifier and record address.
 
 ### Infrastructure & Security
 - [ ] **`DB_SSL`**: Set to `true` (Required for cloud databases).
@@ -60,7 +61,7 @@ Create a production `.env` file with the following changes:
 - [ ] **`VITE_API_URL`**: Keep as `/api` (same-origin proxy via nginx).
 
 ### Third Party Services
-- [ ] **Launchtube**: Get Mainnet JWT from Stellar Discord #launchtube.
+- [ ] **Channels API Key**: Get production API key from OpenZeppelin.
 
 ---
 
