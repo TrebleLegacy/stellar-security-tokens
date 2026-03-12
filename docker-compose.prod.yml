@@ -92,6 +92,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Key Management — MUST be multisig in production (Freighter/Ledger signing)
+      KEY_MANAGEMENT_MODE: ${KEY_MANAGEMENT_MODE:-multisig}
+      # Soroban Sale Kill Switch — explicitly false until ready to accept investments
+      ENABLE_SOROBAN_SALE: ${ENABLE_SOROBAN_SALE:-false}
+      SALE_WASM_HASH: ${SALE_WASM_HASH:-}
+      # SEP-1 Home Domain
+      STELLAR_HOME_DOMAIN: ${STELLAR_HOME_DOMAIN:-radox.net}
       # Database - REQUIRED
       DB_HOST: postgres
       DB_PORT: 5432
@@ -178,9 +185,9 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_URL: /api
-        VITE_STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
-        VITE_SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
-        VITE_STELLAR_NETWORK_PASSPHRASE: "${VITE_STELLAR_NETWORK_PASSPHRASE:-Test SDF Network ; September 2015}"
+        VITE_STELLAR_NETWORK: ${STELLAR_NETWORK:-public}
+        VITE_SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://mainnet.sorobanrpc.com}
+        VITE_STELLAR_NETWORK_PASSPHRASE: "${VITE_STELLAR_NETWORK_PASSPHRASE:-Public Global Stellar Network ; September 2015}"
         VITE_FACTORY_CONTRACT_ID: ${FACTORY_CONTRACT_ID}
     # Override base compose port 80 — only Caddy exposes ports externally
     ports: !override []
