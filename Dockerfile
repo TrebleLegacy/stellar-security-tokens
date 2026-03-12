@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install pg_dump for daily database backups (backup.service.js)
 RUN apk add --no-cache postgresql-client

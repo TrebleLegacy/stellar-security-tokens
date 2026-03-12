@@ -187,7 +187,7 @@ export function CompanyRegister() {
             const { credentialId, contractId } = await passkeyClient.register(formData.companyName);
 
             // 2. Send to Backend with registrationToken
-            // Note: publicKey is no longer needed - wallet is already deployed by passkey-kit
+            // Note: publicKey is no longer needed - wallet is already deployed by smart-account-kit
             const response = await api.post('/companies/register', {
                 name: formData.companyName,
                 legal_representative: formData.legalRepresentative || undefined,

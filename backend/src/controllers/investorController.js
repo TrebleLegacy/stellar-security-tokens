@@ -573,7 +573,7 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
       });
     }
 
-    // Validate that contractId was provided (wallet deployed by frontend via passkey-kit)
+    // Validate that contractId was provided (wallet deployed by frontend via smart-account-kit)
     if (!contractId) {
       return res.status(400).json({
         success: false,

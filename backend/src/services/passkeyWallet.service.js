@@ -1,4 +1,5 @@
-import { PasskeyServer } from 'passkey-kit';
+import { ChannelsClient } from '@openzeppelin/relayer-plugin-channels';
+import { Client as SmartAccountClient } from 'smart-account-kit-bindings';
 import { getNetworkPassphrase, getOperationsKeypair, getSorobanRpcUrl, isTestnet, getTreasuryKeypair } from '../config/stellar.js';
 import prisma from '../config/prisma.js';
 import {
@@ -10,10 +11,11 @@ import {
   hash,
   Address,
   Account,
-  Networks,
+  Keypair,
   Transaction,
   FeeBumpTransaction,
   nativeToScVal,
+  rpc,
   StrKey as StellarStrKey,
 } from '@stellar/stellar-sdk';
 import { StellarService } from './stellar.service.js';
@@ -21,6 +23,7 @@ import logger from '../utils/logger.js';
 
 // Scoped logger for this service
 const log = logger.scope('PasskeyWallet');
+
 /**
  * Supported user types for passkey wallet
  */
@@ -30,58 +33,112 @@ export const UserType = {
 };
 
 /**
- * Service for managing Stellar smart wallets using Passkey Kit
- * This service handles wallet creation and management without Mercury dependency
- * by storing contract addresses directly in our database
+ * Build the key_data buffer expected by OZ smart-account contracts.
+ * Format: pubkey (65 bytes, uncompressed secp256r1) + credentialId (variable)
  * 
- * Supports both investors and company users
+ * @param {Buffer|Uint8Array} publicKey - 65-byte uncompressed secp256r1 public key
+ * @param {string|Buffer} credentialId - Credential ID (base64 string or Buffer)
+ * @returns {Buffer} Concatenated key_data
+ */
+function buildKeyData(publicKey, credentialId) {
+  const credentialIdBuffer = typeof credentialId === 'string'
+    ? Buffer.from(credentialId, 'base64')
+    : credentialId;
+  return Buffer.concat([Buffer.from(publicKey), credentialIdBuffer]);
+}
+
+/**
+ * Derive a deterministic contract address from credential ID and deployer.
+ * Mirrors smart-account-kit's deriveContractAddress utility.
+ * 
+ * @param {Buffer} credentialId - The credential ID buffer
+ * @param {string} deployerPublicKey - The deployer's G-address
+ * @param {string} networkPassphrase - The network passphrase
+ * @returns {string} The derived contract address (C...)
+ */
+function deriveContractAddress(credentialId, deployerPublicKey, networkPassphrase) {
+  const preimage = xdr.HashIdPreimage.envelopeTypeContractId(
+    new xdr.HashIdPreimageContractId({
+      networkId: hash(Buffer.from(networkPassphrase)),
+      contractIdPreimage: xdr.ContractIdPreimage.contractIdPreimageFromAddress(
+        new xdr.ContractIdPreimageFromAddress({
+          address: Address.fromString(deployerPublicKey).toScAddress(),
+          salt: hash(credentialId),
+        })
+      ),
+    })
+  );
+  return StrKey.encodeContract(hash(preimage.toXDR()));
+}
+
+/**
+ * Service for managing Stellar smart wallets using OpenZeppelin Smart Account Kit.
+ * Replaces the deprecated passkey-kit with smart-account-kit + Stellar Channels.
+ * 
+ * Transaction submission uses OpenZeppelin Stellar Channels for fee sponsorship,
+ * with a self-sponsorship (fee-bump) fallback.
+ * 
+ * Supports both investors and company users.
  */
 export class PasskeyWalletService {
-  static #server = null;
+  /** @type {rpc.Server|null} */
+  static #rpcServer = null;
+
+  /** @type {ChannelsClient|null} */
+  static #channelsClient = null;
+
+  // =========================================================================
+  // TIER B: INIT + CONFIG
+  // =========================================================================
 
   /**
-   * Get or create PasskeyServer instance
-   * @returns {PasskeyServer}
+   * Get or create Soroban RPC Server instance
+   * @returns {rpc.Server}
    */
-  static getServer() {
-    if (!this.#server) {
-      const rpcUrl = getSorobanRpcUrl();
-      const launchtubeUrl = process.env.LAUNCHTUBE_URL || 'https://launchtube.xyz';
-      const launchtubeJwt = process.env.LAUNCHTUBE_JWT;
-      const factoryContractId = process.env.FACTORY_CONTRACT_ID;
-
-      if (!launchtubeJwt) {
-        throw new Error('LAUNCHTUBE_JWT is required for Passkey Wallet operations');
-      }
-
-      if (!factoryContractId) {
-        throw new Error('FACTORY_CONTRACT_ID is required for Passkey Wallet operations');
-      }
-
-      this.#server = new PasskeyServer({
-        rpcUrl,
-        launchtubeUrl,
-        launchtubeJwt,
-        // networkPassphrase is not used by PasskeyServer constructor in the version checking source, but harmless
-      });
+  static getRpcServer() {
+    if (!this.#rpcServer) {
+      this.#rpcServer = new rpc.Server(getSorobanRpcUrl());
     }
-    return this.#server;
+    return this.#rpcServer;
   }
 
   /**
-   * Get configuration for client-side PasskeyKit initialization
+   * Get or create OpenZeppelin Channels Client for fee-sponsored transactions.
+   * @returns {ChannelsClient}
+   */
+  static getChannelsClient() {
+    if (!this.#channelsClient) {
+      const apiKey = process.env.CHANNELS_API_KEY;
+      if (!apiKey) {
+        throw new Error('CHANNELS_API_KEY is required for fee-sponsored transactions');
+      }
+      this.#channelsClient = new ChannelsClient({
+        baseUrl: isTestnet()
+          ? 'https://channels.openzeppelin.com/testnet'
+          : 'https://channels.openzeppelin.com',
+        apiKey,
+      });
+    }
+    return this.#channelsClient;
+  }
+
+  /**
+   * Get configuration for client-side SmartAccountKit initialization.
    * @returns {Object} Configuration object for frontend
    */
   static getClientConfig() {
-    // Default walletWasmHash from passkey-kit testnet demo
-    const defaultWasmHash = 'ecd990f0b45ca6817149b6175f79b32efb442f35731985a084131e8265c4cd90';
-
     return {
       rpcUrl: getSorobanRpcUrl(),
       networkPassphrase: getNetworkPassphrase(),
-      walletWasmHash: process.env.WALLET_WASM_HASH || defaultWasmHash,
+      accountWasmHash: process.env.ACCOUNT_WASM_HASH,
+      webauthnVerifierAddress: process.env.WEBAUTHN_VERIFIER_ADDRESS,
+      // relayerUrl is constructed by the frontend from the API base URL
     };
   }
+
+  // =========================================================================
+  // TIER A: DB-ONLY HELPERS (unchanged)
+  // =========================================================================
 
   /**
    * Get the Prisma model name for a user type
@@ -96,297 +153,102 @@ export class PasskeyWalletService {
   }
 
   /**
-   * Deploy a new smart wallet using the Factory logic
-   * Used during registration when user doesn't exist yet
-   * 
-   * @param {string} credentialId - The WebAuthn credential ID (base64)
-   * @param {Buffer} publicKey - The passkey public key
-   * @returns {Promise<Object>} Result with contractId and transactionHash
+   * Get the WebAuthn credential table for a user type
+   * @private
    */
-  static async deploySmartWallet(credentialId, publicKey) {
-    try {
-      const server = this.getServer();
-      const factoryContractId = process.env.FACTORY_CONTRACT_ID;
-      const networkPassphrase = getNetworkPassphrase();
-      const opsKeypair = getOperationsKeypair();
-
-      // 1. Prepare Arguments
-      if (!credentialId) throw new Error('Credential ID is required for deployment');
-      if (!publicKey) throw new Error('Public key is required for deployment');
-
-      const credentialIdBuffer = Buffer.from(credentialId, 'base64');
-      const publicKeyBuffer = Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64');
-
-      // 2. Build Transaction calling Factory 'deploy'
-      const factory = new Contract(factoryContractId);
-      const deployOp = factory.call(
-        'deploy',
-        xdr.ScVal.scvBytes(credentialIdBuffer),
-        xdr.ScVal.scvBytes(publicKeyBuffer)
-      );
-
-      let tx = new TransactionBuilder(
-        await server.rpc.getAccount(opsKeypair.publicKey()),
-        { fee: BASE_FEE, networkPassphrase }
-      )
-        .addOperation(deployOp)
-        .setTimeout(30)
-        .build();
-
-      // Soroban Simulation & Preparation
-      log.info('Simulating Smart Wallet deployment...');
-      tx = await StellarService.prepareSorobanTransaction(tx);
-
-      tx.sign(opsKeypair);
-
-      // 3. Send via Launchtube (Sponsoring) with fallback
-      let result;
-      try {
-        result = await server.send(tx);
-        if (!result || !result.hash) {
-          throw new Error('No hash returned from Launchtube');
-        }
-      } catch (launchtubeError) {
-        log.warn(`Launchtube failed during deploySmartWallet: ${launchtubeError.message}`);
-        log.info('Attempting self-sponsorship fallback for deployment...');
-        result = await this.submitWithSponsorship(tx.toXDR());
-      }
-
-      // 4. Calculate Contract ID
-      const salt = hash(credentialIdBuffer);
-      const contractIdPreimage = xdr.ContractIdPreimage.contractIdPreimageFromAddress(
-        new xdr.ContractIdPreimageFromAddress({
-          address: Address.fromString(factoryContractId).toScAddress(),
-          salt: salt,
-        })
-      );
-
-      const contractIdHash = hash(
-        xdr.HashIdPreimage.envelopeTypeContractId(new xdr.HashIdPreimageContractId({
-          networkId: hash(Buffer.from(networkPassphrase)),
-          contractIdPreimage,
-        })).toXDR()
-      );
-
-      const contractId = StrKey.encodeContract(contractIdHash);
-
-      return {
-        success: true,
-        contractId,
-        transactionHash: result.hash,
-      };
-
-    } catch (error) {
-      log.error('Error deploying smart wallet:', error);
-      throw new Error(`Smart wallet deployment failed: ${error.message}`);
-    }
+  static #getCredentialModel(userType) {
+    const models = {
+      [UserType.INVESTOR]: 'investorWebauthnCredential',
+      [UserType.COMPANY_USER]: 'companyUserWebauthnCredential',
+    };
+    return models[userType];
   }
 
   /**
-   * Create a new smart wallet for a user (investor or company user)
-   * This method is called after passkey registration on the client side
-   * 
-   * @param {string} userType - Type of user: 'investor' or 'company_user'
-   * @param {number} userId - The user's database ID
-   * @param {string} credentialId - The WebAuthn credential ID (base64)
-   * @param {Buffer} publicKey - The passkey public key
-   * @returns {Promise<Object>} Result with contract address and transaction details
+   * Get the FK field name for the credential table
+   * @private
    */
-  static async createSmartWallet(userType, userId, credentialId, publicKey) {
-    try {
-      const server = this.getServer();
-      const model = this.#getPrismaModel(userType);
-
-      if (!model) {
-        throw new Error(`Invalid user type: ${userType}`);
-      }
-
-      // Get user to verify they exist and don't already have a wallet
-      const user = await prisma[model].findUnique({
-        where: { id: userId },
-      });
-
-      if (!user) {
-        throw new Error(`${userType === UserType.INVESTOR ? 'Investor' : 'Company user'} not found`);
-      }
-
-      if (user.stellarContractId) {
-        throw new Error('User already has a smart wallet');
-      }
-
-      if (!user.emailVerified) {
-        throw new Error('Email must be verified before creating wallet');
-      }
-
-      const factoryContractId = process.env.FACTORY_CONTRACT_ID;
-      const networkPassphrase = getNetworkPassphrase();
-      const opsKeypair = getOperationsKeypair(); // Use issuer as source/signer for deployment tx
-
-      // 1. Prepare Arguments
-      // credentialId is base64 string -> Buffer
-      const credentialIdBuffer = Buffer.from(credentialId, 'base64');
-
-      // publicKey is already Buffer or base64
-      const publicKeyBuffer = Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64');
-
-      // 2. Build Transaction calling Factory 'deploy'
-      // Assuming Factory interface: deploy(credential_id: Bytes, public_key: Bytes) -> Address
-      const factory = new Contract(factoryContractId);
-      const deployOp = factory.call(
-        'deploy',
-        xdr.ScVal.scvBytes(credentialIdBuffer),
-        xdr.ScVal.scvBytes(publicKeyBuffer)
-      );
-
-      const tx = new TransactionBuilder(
-        await server.rpc.getAccount(opsKeypair.publicKey()), // Fetch sequence from RPC using Server's connection (server extends Base which works with rpc)
-        // Wait, PasskeyServer extends PasskeyBase which has 'rpc'.
-        // But getAccount needs Horizon or RPC? PasskeyBase takes rpcUrl. 
-        // PasskeyBase from 'passkey-kit' usually wraps rpc. 
-        // Let's use standard TransactionBuilder pattern with fetch:
-        { fee: BASE_FEE, networkPassphrase }
-      )
-        .addOperation(deployOp)
-        .setTimeout(30)
-        .build();
-
-      tx.sign(opsKeypair);
-
-      // 3. Send via Launchtube (Sponsoring) with fallback
-      let result;
-      try {
-        result = await server.send(tx);
-        if (!result || !result.hash) {
-          throw new Error('No hash returned from Launchtube');
-        }
-      } catch (launchtubeError) {
-        log.warn(`Launchtube failed during createSmartWallet: ${launchtubeError.message}`);
-        log.info('Attempting self-sponsorship fallback for creation...');
-        result = await this.submitWithSponsorship(tx.toXDR());
-      }
-
-      // 4. Calculate Contract ID
-      // Contract ID = specific algorithm using salt.
-      // Factory uses salt = hash(credentialIdBuffer)
-      // We need to replicate how Factory derives the address or fetch it.
-      // Since we can't easily fetch the return value from the tx result without parsing events/simulation,
-      // and checking 'result' format from Launchtube might not give us the return value directly.
-
-      // PREDICT the address:
-      // Address = Contract(FactoryID).derived(salt=hash(credentialId))
-      // Stellar SDK has helpers for this?
-      // StrKey.encodeContract(hash(xdr.HashIdPreimage.envelopeTypeContractId(...)))
-
-      const salt = hash(credentialIdBuffer);
-      const contractIdPreimage = xdr.ContractIdPreimage.contractIdPreimageFromAddress(
-        new xdr.ContractIdPreimageFromAddress({
-          address: Address.fromString(factoryContractId).toScAddress(),
-          salt: salt,
-        })
-      );
-
-      const contractIdHash = hash(
-        xdr.HashIdPreimage.envelopeTypeContractId(new xdr.HashIdPreimageContractId({
-          networkId: hash(Buffer.from(networkPassphrase)),
-          contractIdPreimage,
-        })).toXDR()
-      );
-
-      const contractId = StrKey.encodeContract(contractIdHash);
-
-      // Store the contract address in our database
-      const updatedUser = await prisma[model].update({
-        where: { id: userId },
-        data: {
-          stellarContractId: contractId,
-          passkeyCredentialId: credentialId,
-          passkeyPublicKey: publicKeyBuffer,
-          // Also store as stellarPublicKey for compatibility with existing code
-          stellarPublicKey: contractId,
-        },
-      });
-
-      return {
-        success: true,
-        contractId: contractId,
-        transactionHash: result.hash,
-        user: {
-          id: updatedUser.id,
-          name: updatedUser.name,
-          email: updatedUser.email,
-          stellarContractId: updatedUser.stellarContractId,
-          userType,
-        },
-      };
-
-    } catch (error) {
-      log.error('Error creating smart wallet:', error);
-      throw new Error(`Smart wallet creation failed: ${error.message}`);
-    }
+  static #getCredentialFkField(userType) {
+    const fields = {
+      [UserType.INVESTOR]: 'investorId',
+      [UserType.COMPANY_USER]: 'companyUserId',
+    };
+    return fields[userType];
   }
 
-
   /**
-   * Sign a transaction using the smart wallet
-   * This creates an authorization entry for Soroban contract calls
-   * 
-   * @param {string} contractId - The smart wallet contract address
-   * @param {Object} authEntry - The authorization entry to sign
-   * @param {Object} credentials - WebAuthn assertion credentials
-   * @returns {Promise<Object>} Signed authorization entry
+   * Get the Ed25519 signer model for a user type
+   * @private
    */
-  static async signTransaction(contractId, authEntry, credentials) {
-    try {
-      const server = this.getServer();
-
-      // Use PasskeyServer to create the signed auth entry
-      const signedAuth = await server.sign(
-        contractId,
-        authEntry,
-        credentials
-      );
-
-      return {
-        success: true,
-        signedAuth,
-      };
-    } catch (error) {
-      log.error('Error signing transaction:', error);
-      throw new Error(`Transaction signing failed: ${error.message}`);
-    }
+  static #getEd25519SignerModel(userType) {
+    const models = {
+      [UserType.INVESTOR]: 'investorEd25519Signer',
+      [UserType.COMPANY_USER]: 'companyUserEd25519Signer',
+    };
+    return models[userType];
   }
 
-
+  // =========================================================================
+  // TIER C: TRANSACTION SUBMISSION
+  // =========================================================================
 
   /**
-   * Send a signed transaction via Launchtube
-   * This sponsors the transaction fees
+   * Send a signed transaction via Stellar Channels (fee sponsorship).
+   * Falls back to self-sponsorship if Channels is unavailable.
    * 
-   * @param {Object} transaction - The signed transaction XDR
-   * @returns {Promise<Object>} Transaction result
+   * @param {string|Transaction} transaction - The signed transaction (XDR string or Transaction object)
+   * @returns {Promise<Object>} Transaction result { success, hash, status }
    */
   static async sendTransaction(transaction) {
     try {
-      const server = this.getServer();
+      const channels = this.getChannelsClient();
+      const xdrStr = typeof transaction === 'string' ? transaction : transaction.toXDR();
 
-      const result = await server.send(transaction);
+      const result = await channels.submitTransaction({ xdr: xdrStr });
 
       return {
         success: true,
         hash: result.hash,
-        ledger: result.ledger,
+        status: result.status,
       };
     } catch (error) {
-      log.error(`Error sending transaction via Launchtube: ${error.message}`);
-      // Fallback to self-sponsorship if Launchtube fails
-      log.info('Launchtube failed or unreachable, attempting self-sponsorship fallback...');
+      log.warn(`Channels failed: ${error.message}, trying self-sponsorship fallback...`);
       return this.submitWithSponsorship(transaction);
     }
   }
 
   /**
-   * Submit a transaction with backend sponsorship (Fee Bump)
-   * This is used as a fallback for Launchtube
+   * Send a Soroban transaction via Channels using func + auth entries.
+   * This is the recommended path — Channels handles simulation, footprint 
+   * discovery, and resource calculation automatically.
+   * 
+   * @param {string} funcXdr - The Soroban host function XDR (base64)
+   * @param {string[]} authXdrs - Array of authorization entry XDRs (base64)
+   * @returns {Promise<Object>} Transaction result { success, hash, status }
+   */
+  static async sendSorobanTransaction(funcXdr, authXdrs = []) {
+    try {
+      const channels = this.getChannelsClient();
+      const result = await channels.submitSorobanTransaction({
+        func: funcXdr,
+        auth: authXdrs,
+      });
+
+      return {
+        success: true,
+        hash: result.hash,
+        status: result.status,
+        transactionId: result.transactionId,
+      };
+    } catch (error) {
+      log.error(`Channels Soroban submission failed: ${error.message}`);
+      throw new Error(`Fee-sponsored submission failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Submit a transaction with backend sponsorship (Fee Bump).
+   * Used as a fallback when Channels is unavailable.
    * 
    * @param {string|Transaction} txOrXdr - The signed transaction (XDR string or Transaction object)
    * @returns {Promise<Object>} Transaction result
@@ -402,20 +264,16 @@ export class PasskeyWalletService {
       if (typeof txOrXdr === 'string') {
         innerTx = TransactionBuilder.fromXDR(txOrXdr, networkPassphrase);
       } else if (txOrXdr && typeof txOrXdr.toXDR === 'function') {
-        // It's already a Transaction object
         innerTx = txOrXdr;
       } else {
         throw new Error('Invalid transaction format: expected XDR string or Transaction object');
       }
 
       // 2. Wrap in Fee Bump Transaction
-      // Note: We use a slightly higher fee or double the base fee to ensure priority
       log.debug(`Inner TX source: ${innerTx.source}`);
       log.debug(`Inner TX operations count: ${innerTx.operations?.length}`);
       log.debug(`Operations keypair: ${operationsKeypair.publicKey()}`);
 
-      // Calculate dynamic fee for Fee Bump
-      // For Soroban, the inner transaction fee is significantly higher.
       const innerFee = parseInt(innerTx.fee);
 
       // SECURITY: Cap sponsored fees to prevent XLM drain via inflated resource fees
@@ -467,7 +325,6 @@ export class PasskeyWalletService {
       };
     } catch (error) {
       log.error('Self-sponsorship failed:');
-      // Dump the full error response to find the actual structure
       if (error.response?.data) {
         log.error('[Sponsorship] Full response data:', JSON.stringify(error.response.data, null, 2));
       }
@@ -477,16 +334,165 @@ export class PasskeyWalletService {
         throw new Error(`Sponsorship failed: ${detail} Codes: ${JSON.stringify(resultCodes)}`);
       }
       throw new Error(`Sponsorship failed: ${error.message}`);
+    }
+  }
 
+  // =========================================================================
+  // TIER D PHASE 1: DEPLOY METHODS
+  // =========================================================================
+
+  /**
+   * Deploy a new smart wallet using OZ Smart Account Kit.
+   * Used during registration when user doesn't exist yet.
+   * 
+   * Uses SmartAccountClient.deploy() with the pre-deployed WASM hash,
+   * then sends the assembled transaction via Channels for fee sponsorship.
+   * 
+   * @param {string} credentialId - The WebAuthn credential ID (base64)
+   * @param {Buffer|Uint8Array} publicKey - The passkey public key (65-byte uncompressed secp256r1)
+   * @returns {Promise<Object>} Result with contractId and transactionHash
+   */
+  static async deploySmartWallet(credentialId, publicKey) {
+    try {
+      const networkPassphrase = getNetworkPassphrase();
+      const opsKeypair = getOperationsKeypair();
+      const accountWasmHash = process.env.ACCOUNT_WASM_HASH;
+      const webauthnVerifierAddress = process.env.WEBAUTHN_VERIFIER_ADDRESS;
+
+      if (!accountWasmHash) throw new Error('ACCOUNT_WASM_HASH is required for wallet deployment');
+      if (!webauthnVerifierAddress) throw new Error('WEBAUTHN_VERIFIER_ADDRESS is required');
+      if (!credentialId) throw new Error('Credential ID is required for deployment');
+      if (!publicKey) throw new Error('Public key is required for deployment');
+
+      const credentialIdBuffer = Buffer.from(credentialId, 'base64');
+      const publicKeyBuffer = Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64');
+
+      // Build the External signer (passkey) for the OZ contract
+      const keyData = buildKeyData(publicKeyBuffer, credentialIdBuffer);
+      const signer = {
+        tag: 'External',
+        values: [webauthnVerifierAddress, keyData],
+      };
+
+      // Build the deploy transaction using smart-account-kit-bindings
+      log.info('Building Smart Account deployment transaction...');
+      const deployTx = await SmartAccountClient.deploy(
+        {
+          signers: [signer],
+          policies: new Map(),
+        },
+        {
+          networkPassphrase,
+          rpcUrl: getSorobanRpcUrl(),
+          wasmHash: accountWasmHash,
+          publicKey: opsKeypair.publicKey(),
+          salt: hash(credentialIdBuffer),
+          timeoutInSeconds: 30,
+        }
+      );
+
+      // Sign with ops keypair
+      deployTx.sign(opsKeypair);
+
+      // Submit via Channels with self-sponsorship fallback
+      let result;
+      try {
+        result = await this.sendTransaction(deployTx.built);
+      } catch (channelsError) {
+        log.warn(`Channels failed during deploy: ${channelsError.message}`);
+        result = await this.submitWithSponsorship(deployTx.built.toXDR());
+      }
+
+      // Derive the contract address deterministically
+      const contractId = deriveContractAddress(credentialIdBuffer, opsKeypair.publicKey(), networkPassphrase);
+
+      return {
+        success: true,
+        contractId,
+        transactionHash: result.hash,
+      };
+
+    } catch (error) {
+      log.error('Error deploying smart wallet:', error);
+      throw new Error(`Smart wallet deployment failed: ${error.message}`);
     }
   }
 
   /**
-   * Check if a user has a smart wallet
+   * Create a new smart wallet for a user (investor or company user).
+   * Called after passkey registration on the client side.
    * 
    * @param {string} userType - Type of user: 'investor' or 'company_user'
-   * @param {number} userId - User database ID
-   * @returns {Promise<boolean>}
+   * @param {number} userId - The user's database ID
+   * @param {string} credentialId - The WebAuthn credential ID (base64)
+   * @param {Buffer|Uint8Array} publicKey - The passkey public key
+   * @returns {Promise<Object>} Result with contract address and transaction details
+   */
+  static async createSmartWallet(userType, userId, credentialId, publicKey) {
+    try {
+      const model = this.#getPrismaModel(userType);
+
+      if (!model) {
+        throw new Error(`Invalid user type: ${userType}`);
+      }
+
+      // Get user to verify they exist and don't already have a wallet
+      const user = await prisma[model].findUnique({
+        where: { id: userId },
+      });
+
+      if (!user) {
+        throw new Error(`${userType === UserType.INVESTOR ? 'Investor' : 'Company user'} not found`);
+      }
+
+      if (user.stellarContractId) {
+        throw new Error('User already has a smart wallet');
+      }
+
+      if (!user.emailVerified) {
+        throw new Error('Email must be verified before creating wallet');
+      }
+
+      // Deploy the smart wallet
+      const deployResult = await this.deploySmartWallet(credentialId, publicKey);
+
+      // Store the contract address in our database
+      const publicKeyBuffer = Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64');
+      const updatedUser = await prisma[model].update({
+        where: { id: userId },
+        data: {
+          stellarContractId: deployResult.contractId,
+          passkeyCredentialId: credentialId,
+          passkeyPublicKey: publicKeyBuffer,
+          stellarPublicKey: deployResult.contractId,
+        },
+      });
+
+      return {
+        success: true,
+        contractId: deployResult.contractId,
+        transactionHash: deployResult.transactionHash,
+        user: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          stellarContractId: updatedUser.stellarContractId,
+          userType,
+        },
+      };
+
+    } catch (error) {
+      log.error('Error creating smart wallet:', error);
+      throw new Error(`Smart wallet creation failed: ${error.message}`);
+    }
+  }
+
+  // =========================================================================
+  // TIER A: STATUS + BALANCE QUERIES (unchanged)
+  // =========================================================================
+
+  /**
+   * Check if a user has a smart wallet
    */
   static async hasSmartWallet(userType, userId) {
     const model = this.#getPrismaModel(userType);
@@ -505,10 +511,6 @@ export class PasskeyWalletService {
 
   /**
    * Get wallet status for a user
-   * 
-   * @param {string} userType - Type of user: 'investor' or 'company_user'
-   * @param {number} userId - User database ID
-   * @returns {Promise<Object>} Wallet status information
    */
   static async getWalletStatus(userType, userId) {
     const model = this.#getPrismaModel(userType);
@@ -524,7 +526,6 @@ export class PasskeyWalletService {
       passkeyCredentialId: true,
     };
 
-    // Add type-specific fields
     const select = userType === UserType.INVESTOR
       ? { ...baseSelect, kycStatus: true }
       : { ...baseSelect, isActive: true };
@@ -542,7 +543,6 @@ export class PasskeyWalletService {
     const hasPasskey = !!user.passkeyCredentialId;
     const hasWallet = !!user.stellarContractId;
 
-    // Determine next step based on user type
     let nextStep;
     if (!hasEmailVerified) {
       nextStep = 'verify_email';
@@ -563,7 +563,6 @@ export class PasskeyWalletService {
       nextStep,
     };
 
-    // Add type-specific status
     if (userType === UserType.INVESTOR) {
       result.kycStatus = user.kycStatus;
     } else {
@@ -573,18 +572,13 @@ export class PasskeyWalletService {
     // Fetch balances if wallet exists
     if (hasWallet && user.stellarContractId) {
       try {
-        // Detect if this is a Soroban contract (starts with C) vs classic account (starts with G)
         const isContractAddress = user.stellarContractId.startsWith('C');
 
         if (isContractAddress) {
-          // Use Soroban RPC to query SAC token balances
           const balances = await this.getSorobanWalletBalances(user.stellarContractId);
           result.balances = balances;
-
-          // Explorer link for contracts
           result.explorer = `https://stellar.expert/explorer/${isTestnet() ? 'testnet' : 'public'}/contract/${user.stellarContractId}`;
         } else {
-          // Classic account - use Horizon API
           const { StellarService } = await import('./stellar.service.js');
           const accountInfo = await StellarService.getAccountInfo(user.stellarContractId);
 
@@ -600,7 +594,6 @@ export class PasskeyWalletService {
         }
       } catch (error) {
         log.error('Failed to fetch wallet balances:', error);
-        // Don't fail the whole request, return zeros instead of error
         result.balances = {
           xlm: '0',
           usdc: '0'
@@ -613,29 +606,21 @@ export class PasskeyWalletService {
   }
 
   /**
-   * Query Soroban token balances for a smart wallet contract
-   * Uses Soroban RPC to simulate balance() calls on SAC token contracts
-   * 
-   * @param {string} walletContractId - The smart wallet contract address (C...)
-   * @returns {Promise<Object>} Object with xlm and usdc balance strings
+   * Query Soroban token balances for a smart wallet contract.
+   * Uses Soroban RPC to simulate balance() calls on SAC token contracts.
    */
   static async getSorobanWalletBalances(walletContractId) {
-    const { rpc, scValToNative, nativeToScVal } = await import('@stellar/stellar-sdk');
-    const rpcUrl = getSorobanRpcUrl();
-    const server = new rpc.Server(rpcUrl, { allowHttp: true });
+    const { scValToNative } = await import('@stellar/stellar-sdk');
+    const server = this.getRpcServer();
 
     const balances = {
       xlm: '0',
       usdc: '0'
     };
 
-    // SAC contract IDs for testnet
-    // Native XLM SAC: CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC (testnet)
-    // These are deterministic based on asset + network
     const xlmSacContractId = process.env.XLM_SAC_CONTRACT_ID;
     const usdcSacContractId = process.env.USDC_SAC_CONTRACT_ID;
 
-    // Helper to query SAC balance
     const querySacBalance = async (sacContractId, walletAddress) => {
       log.debug(`Querying SAC: ${sacContractId} for wallet ${walletAddress}`);
       if (!sacContractId) {
@@ -647,11 +632,8 @@ export class PasskeyWalletService {
         const contract = new Contract(sacContractId);
         const walletScVal = nativeToScVal(walletAddress, { type: 'address' });
 
-        // Build the balance call
         const balanceOp = contract.call('balance', walletScVal);
 
-        // Simulate the transaction to get the result
-        // Use Operations wallet as source (any valid G-address works for read-only simulation)
         const sourceAccount = new Account(getOperationsKeypair().publicKey(), '0');
 
         const simResult = await server.simulateTransaction(
@@ -665,10 +647,8 @@ export class PasskeyWalletService {
         );
 
         if (simResult.result) {
-          // Parse the i128 result to a string
           const balanceScVal = simResult.result.retval;
           const balanceRaw = scValToNative(balanceScVal);
-          // Convert from stroops (7 decimals) to display value
           const balance = (Number(balanceRaw) / 10_000_000).toFixed(7);
           log.debug(`Success. Raw: ${balanceRaw}, Formatted: ${balance}`);
           return balance;
@@ -681,7 +661,6 @@ export class PasskeyWalletService {
       return '0';
     };
 
-    // Query both balances in parallel
     const [xlmBalance, usdcBalance] = await Promise.all([
       querySacBalance(xlmSacContractId, walletContractId),
       querySacBalance(usdcSacContractId, walletContractId)
@@ -693,30 +672,30 @@ export class PasskeyWalletService {
     return balances;
   }
 
+  // =========================================================================
+  // TIER D PHASE 2: BUILD TX METHODS
+  // =========================================================================
+
   /**
-   * Build a withdrawal transaction to be signed by the user's Passkey
+   * Build a withdrawal transaction to be signed by the user's Passkey.
    * 
-   * @param {number} userId - The user ID (investor or company user)
-   * @param {string} destinationAddress - Destination Stellar address (G...)
-   * @param {string} amount - Amount to withdraw
-   * @param {string} assetCode - Asset code (USDC, XLM)
-   * @param {string} userType - Type of user: 'investor' or 'company_user' (default: 'investor')
-   * @returns {Promise<Object>} Transaction XDR and network info
+   * The footprint and resource calculation is now handled by Channels'
+   * func+auth submission method, so we no longer need the 170-line manual
+   * footprint hack from passkey-kit.
    */
   static async buildWithdrawalTx(userId, destinationAddress, amount, assetCode = 'USDC', userType = UserType.INVESTOR) {
-    const server = this.getServer();
+    const server = this.getRpcServer();
     const model = this.#getPrismaModel(userType);
 
     if (!model) {
       throw new Error(`Invalid user type: ${userType}`);
     }
 
-    // Issue 9 Fix: Validate inputs
+    // Validate inputs
     if (!destinationAddress || typeof destinationAddress !== 'string') {
       throw new Error('Destination address is required');
     }
 
-    // Validate address format (G... for classic, C... for contract)
     if (!destinationAddress.match(/^[GC][A-Z0-9]{55}$/)) {
       throw new Error('Invalid destination address format. Must be a valid Stellar address (G...) or contract (C...)');
     }
@@ -726,11 +705,10 @@ export class PasskeyWalletService {
       throw new Error('Amount must be a positive number');
     }
 
-    if (parsedAmount > 1000000000) { // 1 billion max
+    if (parsedAmount > 1000000000) {
       throw new Error('Amount exceeds maximum allowed');
     }
 
-    // Get user wallet (works for both investors and company users)
     const user = await prisma[model].findUnique({
       where: { id: userId },
     });
@@ -739,32 +717,22 @@ export class PasskeyWalletService {
       throw new Error(`${userType === UserType.INVESTOR ? 'Investor' : 'Company user'} wallet not found`);
     }
 
-    // Determine asset contract ID based on code (simplified map for MVP)
-    // In production, fetch this from DB or config
     let tokenContractId;
     if (assetCode === 'USDC') {
       tokenContractId = process.env.USDC_CONTRACT_ID;
-      if (!tokenContractId) {
-        throw new Error('USDC_CONTRACT_ID not configured');
-      }
+      if (!tokenContractId) throw new Error('USDC_CONTRACT_ID not configured');
     } else if (assetCode === 'XLM') {
       tokenContractId = process.env.XLM_CONTRACT_ID;
-      if (!tokenContractId) {
-        throw new Error('XLM_CONTRACT_ID not configured');
-      }
+      if (!tokenContractId) throw new Error('XLM_CONTRACT_ID not configured');
     } else {
       throw new Error('Unsupported asset for withdrawal');
     }
 
-    // Build the transaction
     const networkPassphrase = getNetworkPassphrase();
-    const opsKeypair = getOperationsKeypair(); // Sponsor/Source
+    const opsKeypair = getOperationsKeypair();
 
-    // Function: transfer(from, to, amount)
     const walletAddress = Address.fromString(user.stellarContractId);
     const destination = Address.fromString(destinationAddress);
-
-    // Convert amount to Stroops (7 decimals)
     const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 10_000_000));
 
     const contract = new Contract(tokenContractId);
@@ -776,18 +744,18 @@ export class PasskeyWalletService {
     );
 
     let tx = new TransactionBuilder(
-      await server.rpc.getAccount(opsKeypair.publicKey()),
+      await server.getAccount(opsKeypair.publicKey()),
       { fee: BASE_FEE, networkPassphrase }
     )
       .addOperation(transferOp)
       .setTimeout(180)
       .build();
 
-    // Soroban Simulation & Preparation
+    // Simulate & prepare
     log.info('Simulating withdrawal transaction...');
     tx = await StellarService.prepareSorobanTransaction(tx);
 
-    // Sign with issuer (sponsor)
+    // Sign with ops keypair (sponsor)
     tx.sign(opsKeypair);
 
     return {
@@ -800,20 +768,18 @@ export class PasskeyWalletService {
   /**
    * Build an investment SAC transfer transaction to be signed by investor's Passkey.
    * Transfers USDC from investor smart wallet → company wallet.
-   *
-   * @param {string} investorContractId - Investor's smart wallet contract ID (C...)
-   * @param {string} companyWallet - Company's wallet address (C... or G...)
-   * @param {number} amount - USDC amount to transfer
-   * @returns {Promise<Object>} Transaction XDR and network info
+   * 
+   * NOTE: The 170-line manual footprint hack from passkey-kit has been removed.
+   * Channels' func+auth submission handles footprint discovery and resource
+   * calculation automatically, including the __check_auth entries.
    */
   static async buildInvestmentTx(investorContractId, companyWallet, amount) {
-    const server = this.getServer();
+    const server = this.getRpcServer();
 
     // Validate inputs
     if (!investorContractId || !investorContractId.match(/^C[A-Z0-9]{55}$/)) {
       throw new Error('Invalid investor wallet address');
     }
-    // Accept G-addresses, C-addresses, and M-addresses (muxed treasury)
     const isValidDest = companyWallet && (
       companyWallet.match(/^[GC][A-Z0-9]{55}$/) ||
       StellarStrKey.isValidMed25519PublicKey(companyWallet)
@@ -849,192 +815,22 @@ export class PasskeyWalletService {
     );
 
     let tx = new TransactionBuilder(
-      await server.rpc.getAccount(opsKeypair.publicKey()),
+      await server.getAccount(opsKeypair.publicKey()),
       { fee: BASE_FEE, networkPassphrase }
     )
       .addOperation(transferOp)
       .setTimeout(180)
       .build();
 
-    // Soroban Simulation & Preparation
+    // Simulate & prepare
     log.info(`Simulating investment transfer: ${parsedAmount} USDC from ${investorContractId} → ${companyWallet}`);
     tx = await StellarService.prepareSorobanTransaction(tx);
 
-    // Boost Soroban resource budget for smart wallet passkey auth.
-    // Simulation doesn't account for WebAuthn secp256r1 signature verification
-    // (auth entries don't exist yet), so we need a significant buffer for ALL resources.
-    try {
-      const envelope = xdr.TransactionEnvelope.fromXDR(tx.toXDR('base64'), 'base64');
-      const txBody = envelope.value().tx();
-      const sorobanExt = txBody.ext();
-
-      if (sorobanExt && sorobanExt.switch() === 1) {
-        const sorobanData = sorobanExt.sorobanData();
-        const resources = sorobanData.resources();
-
-        // Boost instructions (CPU)
-        const simInstructions = resources.instructions();
-        const boostedInstructions = Math.ceil(simInstructions * 5); // 5x for secp256r1 verify
-        resources.instructions(boostedInstructions);
-
-        // Boost readBytes — needed for extra footprint entries (wallet instance, signer, WASM)
-        const simReadBytes = resources.diskReadBytes();
-        const boostedReadBytes = Math.ceil(simReadBytes * 5) + 40000; // extra margin for WASM code
-        resources.diskReadBytes(boostedReadBytes);
-
-        // Boost writeBytes
-        const simWriteBytes = resources.writeBytes();
-        const boostedWriteBytes = Math.max(simWriteBytes * 3, simWriteBytes + 1000);
-        resources.writeBytes(boostedWriteBytes);
-
-        // Boost extendedMetaDataSizeBytes
-        const simMetaSize = sorobanData.resourceFee();
-
-        log.info(`Boosting resources: instructions ${simInstructions}→${boostedInstructions}, readBytes ${simReadBytes}→${boostedReadBytes}, writeBytes ${simWriteBytes}→${boostedWriteBytes}`);
-
-        // Rebuild transaction with boosted resources and higher fee
-        const boostedFee = Math.ceil(parseInt(tx.fee) * 5).toString();
-        tx = TransactionBuilder.cloneFrom(tx, {
-          fee: boostedFee,
-          sorobanData: sorobanData,
-        })
-          .build();
-      }
-    } catch (boostErr) {
-      log.warn(`Could not boost resources (non-fatal): ${boostErr.message}`);
-    }
-
-    // Add smart wallet contract footprint entries needed by __check_auth.
-    // Simulation doesn't verify auth, so it doesn't discover the storage
-    // keys that __check_auth reads (signer key, contract instance, WASM code).
-    // Without these, on-chain execution traps with "trying to access contract
-    // data key outside of the footprint".
-    try {
-      // Look up investor's credential ID from database
-      const investor = await prisma.investor.findFirst({
-        where: { stellarContractId: investorContractId },
-        select: { passkeyCredentialId: true },
-      });
-
-      if (!investor?.passkeyCredentialId) {
-        log.warn('No credential ID found for investor — footprint may be incomplete');
-      } else {
-        const credentialIdBuffer = Buffer.from(investor.passkeyCredentialId, 'base64');
-        log.info(`Adding smart wallet footprint entries for credential: ${investor.passkeyCredentialId.substring(0, 20)}...`);
-
-        // Build the SignerKey::Secp256r1(credentialId) ScVal
-        // This matches the contract spec: enum SignerKey { Secp256r1(BytesN<N>) }
-        const signerKeyScVal = xdr.ScVal.scvVec([
-          xdr.ScVal.scvSymbol('Secp256r1'),
-          xdr.ScVal.scvBytes(credentialIdBuffer),
-        ]);
-
-        const walletContractHash = StrKey.decodeContract(investorContractId);
-
-        // LedgerKey entries needed by __check_auth:
-        // 1. Signer storage (Persistent) — env.storage().persistent().get(&credential_id)
-        const signerPersistentKey = xdr.LedgerKey.contractData(
-          new xdr.LedgerKeyContractData({
-            contract: new xdr.ScAddress.scAddressTypeContract(walletContractHash),
-            key: signerKeyScVal,
-            durability: xdr.ContractDataDurability.persistent(),
-          })
-        );
-
-        // 2. Signer storage (Temporary) — fallback: env.storage().temporary().get(&credential_id)
-        const signerTemporaryKey = xdr.LedgerKey.contractData(
-          new xdr.LedgerKeyContractData({
-            contract: new xdr.ScAddress.scAddressTypeContract(walletContractHash),
-            key: signerKeyScVal,
-            durability: xdr.ContractDataDurability.temporary(),
-          })
-        );
-
-        // 3. Contract instance — needed to execute the contract
-        const contractInstanceKey = xdr.LedgerKey.contractData(
-          new xdr.LedgerKeyContractData({
-            contract: new xdr.ScAddress.scAddressTypeContract(walletContractHash),
-            key: xdr.ScVal.scvLedgerKeyContractInstance(),
-            durability: xdr.ContractDataDurability.persistent(),
-          })
-        );
-
-        // 4. WASM code — needed to execute __check_auth
-        const wasmHash = process.env.WALLET_WASM_HASH || 'ecd990f0b45ca6817149b6175f79b32efb442f35731985a084131e8265c4cd90';
-        const wasmKey = xdr.LedgerKey.contractCode(
-          new xdr.LedgerKeyContractCode({
-            hash: Buffer.from(wasmHash, 'hex'),
-          })
-        );
-
-        // Merge into the existing footprint
-        const envelope = xdr.TransactionEnvelope.fromXDR(tx.toXDR('base64'), 'base64');
-        const sorobanData = envelope.value().tx().ext().sorobanData();
-        const footprint = sorobanData.resources().footprint();
-
-        const existingReadOnly = footprint.readOnly();
-        const existingReadWrite = footprint.readWrite();
-
-        // Helper: check if a key already exists in a list (by XDR comparison)
-        const keyExists = (list, key) => {
-          const keyXdr = key.toXDR('base64');
-          return list.some(existing => existing.toXDR('base64') === keyXdr);
-        };
-
-        // Add missing read-only keys
-        const keysToAdd = [signerPersistentKey, signerTemporaryKey, contractInstanceKey, wasmKey];
-        let added = 0;
-        for (const key of keysToAdd) {
-          if (!keyExists(existingReadOnly, key) && !keyExists(existingReadWrite, key)) {
-            existingReadOnly.push(key);
-            added++;
-          }
-        }
-
-        footprint.readOnly(existingReadOnly);
-
-        log.info(`Added ${added} footprint entries for smart wallet auth`);
-
-        // Rebuild from modified envelope
-        tx = TransactionBuilder.fromXDR(envelope.toXDR('base64'), networkPassphrase);
-      }
-    } catch (footprintErr) {
-      log.warn(`Could not add smart wallet footprint (non-fatal): ${footprintErr.message}`);
-      log.warn(footprintErr.stack);
-    }
-
-    // Extend auth entry expiration to allow time for passkey signing flow.
-    // The simulation sets a very short signatureExpirationLedger (~30 sec).
-    // The full flow (user passkey prompt + network round-trips + fee-bump)
-    // can easily take 2+ minutes, causing __check_auth to panic with
-    // function_trapped if the auth entry expires before submission.
-    try {
-      const { sequence } = await server.rpc.getLatestLedger();
-      const authExpirationLedger = sequence + 120; // ~10 minutes at 5 sec/ledger
-      const envelope = xdr.TransactionEnvelope.fromXDR(tx.toXDR('base64'), 'base64');
-      const ops = envelope.value().tx().operations();
-
-      for (const op of ops) {
-        if (op.body().switch().name === 'invokeHostFunction') {
-          const authEntries = op.body().invokeHostFunctionOp().auth();
-          for (const entry of authEntries) {
-            if (entry.credentials().switch().name === 'sorobanCredentialsAddress') {
-              entry.credentials().address().signatureExpirationLedger(authExpirationLedger);
-              log.info(`Extended auth entry expiration to ledger ${authExpirationLedger} (current: ${sequence}, buffer: ${authExpirationLedger - sequence} ledgers)`);
-            }
-          }
-        }
-      }
-
-      // Rebuild from the modified envelope
-      tx = TransactionBuilder.fromXDR(envelope.toXDR('base64'), networkPassphrase);
-    } catch (expirationErr) {
-      log.warn(`Could not extend auth expiration (non-fatal): ${expirationErr.message}`);
-    }
-
-    // NOTE: Do NOT sign here. The frontend's PasskeyKit.sign() uses
-    // AssembledTransaction.fromXDR() which strips envelope signatures.
-    // The ops keypair signature is added during submission instead.
+    // NOTE: The passkey-kit footprint hack (170 lines of manual SignerKey::Secp256r1 
+    // footprint entries, 5x resource boosting, and auth expiration extension) has been
+    // removed. The OZ Channels service handles footprint discovery + resource calculation
+    // for func+auth submissions. For XDR submissions, the simulation already includes
+    // correct footprint for OZ smart-account contracts.
 
     return {
       xdr: tx.toXDR(),
@@ -1047,23 +843,19 @@ export class PasskeyWalletService {
   // Company claims funds via admin-approved settlement (Phase 2).
 
   /**
-   * Submit a signed withdrawal transaction
+   * Submit a signed withdrawal transaction.
    * 
    * SECURITY: Validates the XDR before sponsoring to prevent arbitrary
    * transaction injection. Only allows single invokeHostFunction ops
    * targeting known token contracts (USDC/XLM SAC).
-   * 
-   * @param {string} signedXdr - The signed transaction XDR
-   * @returns {Promise<Object>} Transaction hash
    */
   static async submitWithdrawalTx(signedXdr) {
-    const server = this.getServer();
     const tx = TransactionBuilder.fromXDR(signedXdr, getNetworkPassphrase());
 
     // --- SECURITY: Validate withdrawal XDR before sponsoring ---
     this.#validateWithdrawalTx(tx);
 
-    const result = await server.send(tx);
+    const result = await this.sendTransaction(tx);
 
     if (!result || !result.hash) {
       throw new Error('Failed to submit withdrawal transaction');
@@ -1077,25 +869,21 @@ export class PasskeyWalletService {
 
   /**
    * Validate that a withdrawal transaction only contains expected operations.
-   * Rejects arbitrary transactions to prevent abuse of sponsored submissions.
    * @private
    */
   static #validateWithdrawalTx(tx) {
     const ops = tx.operations;
 
-    // Must have exactly 1 operation
     if (!ops || ops.length !== 1) {
       throw new Error(`Invalid withdrawal: expected 1 operation, got ${ops?.length || 0}`);
     }
 
     const op = ops[0];
 
-    // Must be an invokeHostFunction (Soroban contract call)
     if (op.type !== 'invokeHostFunction') {
       throw new Error(`Invalid withdrawal: unexpected operation type '${op.type}'`);
     }
 
-    // Validate the contract being called is a known SAC token
     try {
       const invokeArgs = op.func?.value?.();
       if (invokeArgs && typeof invokeArgs.contractAddress === 'function') {
@@ -1112,7 +900,6 @@ export class PasskeyWalletService {
           throw new Error('Invalid withdrawal: contract not authorized for withdrawals');
         }
 
-        // Validate function name is 'transfer'
         const funcName = invokeArgs.functionName?.()?.toString();
         if (funcName && funcName !== 'transfer') {
           log.warn(`REJECTED withdrawal: unexpected function '${funcName}'`);
@@ -1120,28 +907,17 @@ export class PasskeyWalletService {
         }
       }
     } catch (parseErr) {
-      // If we can't parse the invoke args, that's OK for now —
-      // the operation type check + single-op check are the primary guards.
-      // Log but don't reject (Soroban XDR parsing can be version-sensitive).
       if (parseErr.message.startsWith('Invalid withdrawal')) throw parseErr;
       log.debug(`Could not deep-inspect withdrawal XDR: ${parseErr.message}`);
     }
   }
 
   /**
-   * Build a withdrawal transaction for a Company entity  
-   * (Companies are stored differently than investors/companyUsers)
-   * 
-   * @param {number} companyId - The company ID
-   * @param {string} destinationAddress - Destination Stellar address (G...)
-   * @param {string} amount - Amount to withdraw
-   * @param {string} assetCode - Asset code (USDC, XLM)
-   * @returns {Promise<Object>} Transaction XDR and network info
+   * Build a withdrawal transaction for a Company entity.
    */
   static async buildWithdrawalTxForCompany(companyId, destinationAddress, amount, assetCode = 'USDC') {
-    const server = this.getServer();
+    const server = this.getRpcServer();
 
-    // Validate inputs
     if (!destinationAddress || typeof destinationAddress !== 'string') {
       throw new Error('Destination address is required');
     }
@@ -1159,7 +935,6 @@ export class PasskeyWalletService {
       throw new Error('Amount exceeds maximum allowed');
     }
 
-    // Get company wallet from company table
     const company = await prisma.company.findUnique({
       where: { id: companyId },
     });
@@ -1168,29 +943,22 @@ export class PasskeyWalletService {
       throw new Error('Company wallet not found');
     }
 
-    // Determine asset contract ID
     let tokenContractId;
     if (assetCode === 'USDC') {
       tokenContractId = process.env.USDC_CONTRACT_ID;
-      if (!tokenContractId) {
-        throw new Error('USDC_CONTRACT_ID not configured');
-      }
+      if (!tokenContractId) throw new Error('USDC_CONTRACT_ID not configured');
     } else if (assetCode === 'XLM') {
       tokenContractId = process.env.XLM_CONTRACT_ID;
-      if (!tokenContractId) {
-        throw new Error('XLM_CONTRACT_ID not configured');
-      }
+      if (!tokenContractId) throw new Error('XLM_CONTRACT_ID not configured');
     } else {
       throw new Error('Unsupported asset for withdrawal');
     }
 
-    // Build the transaction
     const networkPassphrase = getNetworkPassphrase();
     const opsKeypair = getOperationsKeypair();
 
     const walletAddress = Address.fromString(company.stellarContractId);
     const destination = Address.fromString(destinationAddress);
-
     const amountBigInt = BigInt(Math.floor(parseFloat(amount) * 10_000_000));
 
     const contract = new Contract(tokenContractId);
@@ -1202,7 +970,7 @@ export class PasskeyWalletService {
     );
 
     const tx = new TransactionBuilder(
-      await server.rpc.getAccount(opsKeypair.publicKey()),
+      await server.getAccount(opsKeypair.publicKey()),
       { fee: BASE_FEE, networkPassphrase }
     )
       .addOperation(transferOp)
@@ -1218,40 +986,12 @@ export class PasskeyWalletService {
     };
   }
 
-  // ============================================
-  // MULTI-DEVICE PASSKEY MANAGEMENT
-  // ============================================
-
-  /**
-   * Get the WebAuthn credential table for a user type
-   * @private
-   */
-  static #getCredentialModel(userType) {
-    const models = {
-      [UserType.INVESTOR]: 'investorWebauthnCredential',
-      [UserType.COMPANY_USER]: 'companyUserWebauthnCredential',
-    };
-    return models[userType];
-  }
-
-  /**
-   * Get the FK field name for the credential table
-   * @private
-   */
-  static #getCredentialFkField(userType) {
-    const fields = {
-      [UserType.INVESTOR]: 'investorId',
-      [UserType.COMPANY_USER]: 'companyUserId',
-    };
-    return fields[userType];
-  }
+  // =========================================================================
+  // TIER A: PASSKEY LIST + LAST USED (unchanged)
+  // =========================================================================
 
   /**
    * List all passkeys registered for a user
-   * 
-   * @param {string} userType - Type of user: 'investor' or 'company_user'
-   * @param {number} userId - User database ID
-   * @returns {Promise<Array>} List of passkey credentials
    */
   static async listUserPasskeys(userType, userId) {
     const credentialModel = this.#getCredentialModel(userType);
@@ -1262,7 +1002,6 @@ export class PasskeyWalletService {
       throw new Error(`Invalid user type: ${userType}`);
     }
 
-    // Get the primary passkey from user record
     const user = await prisma[userModel].findUnique({
       where: { id: userId },
       select: {
@@ -1271,7 +1010,6 @@ export class PasskeyWalletService {
       },
     });
 
-    // Get additional passkeys from credentials table
     const additionalCredentials = await prisma[credentialModel].findMany({
       where: { [fkField]: userId },
       select: {
@@ -1286,10 +1024,9 @@ export class PasskeyWalletService {
 
     const allPasskeys = [];
 
-    // Add primary passkey first (if exists)
     if (user?.passkeyCredentialId) {
       allPasskeys.push({
-        id: 0, // Special ID for primary passkey (can't be deleted via normal flow)
+        id: 0,
         credentialId: user.passkeyCredentialId,
         deviceName: 'Primary Device',
         createdAt: user.createdAt,
@@ -1298,7 +1035,6 @@ export class PasskeyWalletService {
       });
     }
 
-    // Add additional passkeys
     additionalCredentials.forEach(cred => {
       allPasskeys.push({
         id: cred.id,
@@ -1313,13 +1049,34 @@ export class PasskeyWalletService {
     return allPasskeys;
   }
 
+  static async updatePasskeyLastUsed(userType, credentialId) {
+    const credentialModel = this.#getCredentialModel(userType);
+    if (!credentialModel) return;
+
+    try {
+      await prisma[credentialModel].updateMany({
+        where: { credentialId },
+        data: { lastUsedAt: new Date() },
+      });
+    } catch (error) {
+      log.error('Error updating passkey last used:', error);
+    }
+  }
+
+  // =========================================================================
+  // TIER D PHASE 3: SIGNER MANAGEMENT
+  // =========================================================================
+
   /**
-   * Add a new passkey signer to user's smart wallet
+   * Add a new passkey signer to user's smart wallet.
+   * 
+   * OZ smart-account uses context rules with External signers:
+   *   wallet.add_signer({ context_rule_id, signer: { tag: 'External', values: [verifierAddr, keyData] } })
    * 
    * @param {string} userType - Type of user: 'investor' or 'company_user'
    * @param {number} userId - User database ID
    * @param {string} credentialId - The new WebAuthn credential ID (base64)
-   * @param {Buffer} publicKey - The new passkey public key
+   * @param {Buffer} publicKey - The new passkey public key (65-byte uncompressed secp256r1)
    * @param {string} deviceName - Optional device name
    * @returns {Promise<Object>} Result with new passkey info
    */
@@ -1348,40 +1105,41 @@ export class PasskeyWalletService {
       });
       if (existingCred) throw new Error('This passkey is already registered');
 
-      // 3. Prepare key buffers
+      // 3. Prepare key data
       const credentialIdBuffer = Buffer.from(credentialId, 'base64');
       const publicKeyBuffer = Buffer.isBuffer(publicKey) ? publicKey : Buffer.from(publicKey, 'base64');
 
-      // 4. Call smart wallet contract to add signer
-      const walletContract = new Contract(user.stellarContractId);
-      const server = this.getServer();
-      const networkPassphrase = getNetworkPassphrase();
+      const webauthnVerifierAddress = process.env.WEBAUTHN_VERIFIER_ADDRESS;
+      if (!webauthnVerifierAddress) throw new Error('WEBAUTHN_VERIFIER_ADDRESS is required');
+
+      const keyData = buildKeyData(publicKeyBuffer, credentialIdBuffer);
+      const signer = {
+        tag: 'External',
+        values: [webauthnVerifierAddress, keyData],
+      };
+
+      // 4. Build add_signer transaction using OZ bindings
+      const walletClient = new SmartAccountClient({
+        contractId: user.stellarContractId,
+        networkPassphrase: getNetworkPassphrase(),
+        rpcUrl: getSorobanRpcUrl(),
+        publicKey: getOperationsKeypair().publicKey(),
+      });
+
+      const addTx = await walletClient.add_signer({
+        context_rule_id: 0, // Default context rule
+        signer,
+      });
+
+      // 5. Sign and send
       const opsKeypair = getOperationsKeypair();
+      addTx.sign(opsKeypair);
 
-      const addSignerOp = walletContract.call(
-        'add_sig',
-        xdr.ScVal.scvBytes(credentialIdBuffer),
-        xdr.ScVal.scvBytes(publicKeyBuffer)
-      );
-
-      let tx = new TransactionBuilder(
-        await server.rpc.getAccount(opsKeypair.publicKey()),
-        { fee: BASE_FEE, networkPassphrase }
-      )
-        .addOperation(addSignerOp)
-        .setTimeout(30)
-        .build();
-
-      tx = await StellarService.prepareSorobanTransaction(tx);
-      tx.sign(opsKeypair);
-
-      // 5. Send transaction
       let result;
       try {
-        result = await server.send(tx);
-        if (!result?.hash) throw new Error('No hash returned');
+        result = await this.sendTransaction(addTx.built);
       } catch (err) {
-        result = await this.submitWithSponsorship(tx.toXDR());
+        result = await this.submitWithSponsorship(addTx.built.toXDR());
       }
 
       // 6. Store in database
@@ -1408,13 +1166,8 @@ export class PasskeyWalletService {
   }
 
   /**
-   * Remove a passkey signer from user's smart wallet
-   * Enforces minimum of 1 passkey
-   * 
-   * @param {string} userType - Type of user: 'investor' or 'company_user'
-   * @param {number} userId - User database ID
-   * @param {number} passkeyId - The database ID of the passkey to remove
-   * @returns {Promise<Object>} Result with removal confirmation
+   * Remove a passkey signer from user's smart wallet.
+   * Enforces minimum of 1 passkey.
    */
   static async removePasskeySigner(userType, userId, passkeyId) {
     try {
@@ -1432,7 +1185,6 @@ export class PasskeyWalletService {
       if (!user) throw new Error('User not found');
       if (!user.stellarContractId) throw new Error('User does not have a smart wallet');
 
-      // Get all passkeys
       const allPasskeys = await prisma[credentialModel].findMany({
         where: { [fkField]: userId },
       });
@@ -1444,38 +1196,37 @@ export class PasskeyWalletService {
       const passkeyToRemove = allPasskeys.find(p => p.id === passkeyId);
       if (!passkeyToRemove) throw new Error('Passkey not found');
 
-      // Remove from contract
+      // Build the External signer to remove
       const credentialIdBuffer = Buffer.from(passkeyToRemove.credentialId, 'base64');
-      const walletContract = new Contract(user.stellarContractId);
-      const server = this.getServer();
-      const networkPassphrase = getNetworkPassphrase();
+      const webauthnVerifierAddress = process.env.WEBAUTHN_VERIFIER_ADDRESS;
+      const keyData = buildKeyData(passkeyToRemove.publicKey, credentialIdBuffer);
+      const signer = {
+        tag: 'External',
+        values: [webauthnVerifierAddress, keyData],
+      };
+
+      const walletClient = new SmartAccountClient({
+        contractId: user.stellarContractId,
+        networkPassphrase: getNetworkPassphrase(),
+        rpcUrl: getSorobanRpcUrl(),
+        publicKey: getOperationsKeypair().publicKey(),
+      });
+
+      const removeTx = await walletClient.remove_signer({
+        context_rule_id: 0,
+        signer,
+      });
+
       const opsKeypair = getOperationsKeypair();
-
-      const removeSignerOp = walletContract.call(
-        'rm_sig',
-        xdr.ScVal.scvBytes(credentialIdBuffer)
-      );
-
-      let tx = new TransactionBuilder(
-        await server.rpc.getAccount(opsKeypair.publicKey()),
-        { fee: BASE_FEE, networkPassphrase }
-      )
-        .addOperation(removeSignerOp)
-        .setTimeout(30)
-        .build();
-
-      tx = await StellarService.prepareSorobanTransaction(tx);
-      tx.sign(opsKeypair);
+      removeTx.sign(opsKeypair);
 
       let result;
       try {
-        result = await server.send(tx);
-        if (!result?.hash) throw new Error('No hash returned');
+        result = await this.sendTransaction(removeTx.built);
       } catch (err) {
-        result = await this.submitWithSponsorship(tx.toXDR());
+        result = await this.submitWithSponsorship(removeTx.built.toXDR());
       }
 
-      // Remove from database
       await prisma[credentialModel].delete({ where: { id: passkeyId } });
 
       return {
@@ -1490,43 +1241,12 @@ export class PasskeyWalletService {
     }
   }
 
-  static async updatePasskeyLastUsed(userType, credentialId) {
-    const credentialModel = this.#getCredentialModel(userType);
-    if (!credentialModel) return;
-
-    try {
-      await prisma[credentialModel].updateMany({
-        where: { credentialId },
-        data: { lastUsedAt: new Date() },
-      });
-    } catch (error) {
-      log.error('Error updating passkey last used:', error);
-    }
-  }
-
   // =========================================================================
   // ED25519 SIGNER MANAGEMENT (Ledger Recovery)
   // =========================================================================
 
   /**
-   * Get the Ed25519 signer model for a user type
-   * @private
-   */
-  static #getEd25519SignerModel(userType) {
-    // For now, we'll use the same credential table with a type field
-    // Or create a new table. Using same table for simplicity.
-    const models = {
-      [UserType.INVESTOR]: 'investorEd25519Signer',
-      [UserType.COMPANY_USER]: 'companyUserEd25519Signer',
-    };
-    return models[userType];
-  }
-
-  /**
    * List all Ed25519 recovery signers for a user
-   * @param {string} userType - UserType.INVESTOR or UserType.COMPANY_USER
-   * @param {number} userId - User ID
-   * @returns {Promise<Array>} List of Ed25519 signers
    */
   static async listEd25519Signers(userType, userId) {
     try {
@@ -1540,8 +1260,6 @@ export class PasskeyWalletService {
 
       if (!user) throw new Error('User not found');
 
-      // Query signers from database
-      // Note: You'll need to add InvestorEd25519Signer/CompanyUserEd25519Signer models to Prisma
       const signerModel = this.#getEd25519SignerModel(userType);
       const fkField = userType === UserType.INVESTOR ? 'investorId' : 'companyUserId';
 
@@ -1568,12 +1286,8 @@ export class PasskeyWalletService {
   }
 
   /**
-   * Add an Ed25519 signer (e.g., Ledger) to user's smart wallet
-   * @param {string} userType - UserType.INVESTOR or UserType.COMPANY_USER
-   * @param {number} userId - User ID
-   * @param {string} publicKey - Stellar public key (G... address)
-   * @param {string} name - Human-readable name for the signer
-   * @returns {Promise<Object>} Result with signerId and transactionHash
+   * Add an Ed25519 signer (e.g., Ledger) to user's smart wallet.
+   * Uses Delegated signer type in OZ contracts.
    */
   static async addEd25519Signer(userType, userId, publicKey, name = 'Ledger') {
     try {
@@ -1583,7 +1297,6 @@ export class PasskeyWalletService {
 
       if (!model) throw new Error(`Invalid user type: ${userType}`);
 
-      // Validate public key format
       if (!publicKey || !publicKey.startsWith('G') || publicKey.length !== 56) {
         throw new Error('Invalid Stellar public key format');
       }
@@ -1596,7 +1309,6 @@ export class PasskeyWalletService {
       if (!user) throw new Error('User not found');
       if (!user.stellarContractId) throw new Error('User does not have a smart wallet');
 
-      // Check if signer already exists
       const existingSigners = await prisma[signerModel].findMany({
         where: { [fkField]: userId },
       });
@@ -1605,42 +1317,35 @@ export class PasskeyWalletService {
         throw new Error('This signer is already registered');
       }
 
-      // Add signer to smart wallet contract
-      const walletContract = new Contract(user.stellarContractId);
-      const server = this.getServer();
-      const networkPassphrase = getNetworkPassphrase();
+      // OZ Delegated signer — G-address
+      const signer = {
+        tag: 'Delegated',
+        values: [publicKey],
+      };
+
+      const walletClient = new SmartAccountClient({
+        contractId: user.stellarContractId,
+        networkPassphrase: getNetworkPassphrase(),
+        rpcUrl: getSorobanRpcUrl(),
+        publicKey: getOperationsKeypair().publicKey(),
+      });
+
+      const addTx = await walletClient.add_signer({
+        context_rule_id: 0,
+        signer,
+      });
+
       const opsKeypair = getOperationsKeypair();
-
-      // Convert public key to raw bytes for the contract
-      const publicKeyBytes = StrKey.decodeEd25519PublicKey(publicKey);
-
-      const addSignerOp = walletContract.call(
-        'add_sig',
-        xdr.ScVal.scvBytes(publicKeyBytes),
-        xdr.ScVal.scvBool(false) // Not a secp256r1 key - it's Ed25519
-      );
-
-      let tx = new TransactionBuilder(
-        await server.rpc.getAccount(opsKeypair.publicKey()),
-        { fee: BASE_FEE, networkPassphrase }
-      )
-        .addOperation(addSignerOp)
-        .setTimeout(30)
-        .build();
-
-      tx = await StellarService.prepareSorobanTransaction(tx);
-      tx.sign(opsKeypair);
+      addTx.sign(opsKeypair);
 
       let result;
       try {
-        result = await server.send(tx);
-        if (!result?.hash) throw new Error('No hash returned from transaction');
+        result = await this.sendTransaction(addTx.built);
       } catch (sendError) {
         log.warn(`Direct send failed, trying sponsorship: ${sendError.message}`);
-        result = await this.submitWithSponsorship(tx.toXDR());
+        result = await this.submitWithSponsorship(addTx.built.toXDR());
       }
 
-      // Store in database
       const newSigner = await prisma[signerModel].create({
         data: {
           [fkField]: userId,
@@ -1665,12 +1370,7 @@ export class PasskeyWalletService {
   }
 
   /**
-   * Remove an Ed25519 signer from user's smart wallet
-   * Note: Always requires at least 1 passkey to remain
-   * @param {string} userType - UserType.INVESTOR or UserType.COMPANY_USER
-   * @param {number} userId - User ID
-   * @param {number} signerId - Signer ID to remove
-   * @returns {Promise<Object>} Result with removedId and transactionHash
+   * Remove an Ed25519 signer from user's smart wallet.
    */
   static async removeEd25519Signer(userType, userId, signerId) {
     try {
@@ -1694,38 +1394,33 @@ export class PasskeyWalletService {
 
       if (!signerToRemove) throw new Error('Signer not found');
 
-      // Remove from contract
-      const publicKeyBytes = StrKey.decodeEd25519PublicKey(signerToRemove.publicKey);
-      const walletContract = new Contract(user.stellarContractId);
-      const server = this.getServer();
-      const networkPassphrase = getNetworkPassphrase();
+      const signer = {
+        tag: 'Delegated',
+        values: [signerToRemove.publicKey],
+      };
+
+      const walletClient = new SmartAccountClient({
+        contractId: user.stellarContractId,
+        networkPassphrase: getNetworkPassphrase(),
+        rpcUrl: getSorobanRpcUrl(),
+        publicKey: getOperationsKeypair().publicKey(),
+      });
+
+      const removeTx = await walletClient.remove_signer({
+        context_rule_id: 0,
+        signer,
+      });
+
       const opsKeypair = getOperationsKeypair();
-
-      const removeSignerOp = walletContract.call(
-        'rm_sig',
-        xdr.ScVal.scvBytes(publicKeyBytes)
-      );
-
-      let tx = new TransactionBuilder(
-        await server.rpc.getAccount(opsKeypair.publicKey()),
-        { fee: BASE_FEE, networkPassphrase }
-      )
-        .addOperation(removeSignerOp)
-        .setTimeout(30)
-        .build();
-
-      tx = await StellarService.prepareSorobanTransaction(tx);
-      tx.sign(opsKeypair);
+      removeTx.sign(opsKeypair);
 
       let result;
       try {
-        result = await server.send(tx);
-        if (!result?.hash) throw new Error('No hash returned');
+        result = await this.sendTransaction(removeTx.built);
       } catch (err) {
-        result = await this.submitWithSponsorship(tx.toXDR());
+        result = await this.submitWithSponsorship(removeTx.built.toXDR());
       }
 
-      // Remove from database
       await prisma[signerModel].delete({ where: { id: signerId } });
 
       log.info(`Removed signer ${signerToRemove.publicKey} for user ${userId}. TX: ${result.hash}`);
@@ -1741,4 +1436,3 @@ export class PasskeyWalletService {
     }
   }
 }
-

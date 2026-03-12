@@ -88,11 +88,12 @@ services:
       # WebAuthn
       WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
       WEBAUTHN_ORIGIN: ${WEBAUTHN_ORIGIN:-http://localhost:5173}
-      # Stellar Passkey Kit & Smart Wallets
+      # Smart Wallets (OpenZeppelin Stellar Channels)
       SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
-      LAUNCHTUBE_URL: ${LAUNCHTUBE_URL:-https://launchtube.xyz}
-      LAUNCHTUBE_JWT: ${LAUNCHTUBE_JWT}
-      FACTORY_CONTRACT_ID: ${FACTORY_CONTRACT_ID}
+      CHANNELS_API_KEY: ${CHANNELS_API_KEY:-}
+      ACCOUNT_WASM_HASH: ${ACCOUNT_WASM_HASH:-}
+      WEBAUTHN_VERIFIER_ADDRESS: ${WEBAUTHN_VERIFIER_ADDRESS:-}
+      ED25519_VERIFIER_ADDRESS: ${ED25519_VERIFIER_ADDRESS:-}
       # Soroban Sale Kill Switch
       ENABLE_SOROBAN_SALE: ${ENABLE_SOROBAN_SALE:-false}
       SALE_WASM_HASH: ${SALE_WASM_HASH:-}

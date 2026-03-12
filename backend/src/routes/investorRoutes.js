@@ -246,7 +246,7 @@ router.post('/resend-verification', [
  * /api/investors/passkey/config:
  *   get:
  *     summary: Obter configuração da passkey
- *     description: Retorna configuração do passkey-kit para o frontend
+ *     description: Retorna configuração do smart-account-kit para o frontend
  *     tags: [Investors]
  *     responses:
  *       200:

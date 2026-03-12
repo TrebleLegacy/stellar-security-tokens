@@ -149,7 +149,7 @@ export class CompanyUserController {
 
       // Single-step flow (frontend already created passkey and deployed wallet)
       if (credentialId && contractId) {
-        // Wallet is already deployed by frontend via passkey-kit
+        // Wallet is already deployed by frontend via smart-account-kit
         log.info(`[CompanyRegistration] Creating company user for ${email} with wallet ${contractId}`);
 
         // Generate verification token for email
