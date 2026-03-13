@@ -80,7 +80,7 @@ This document tracks items that need to be addressed **after** the initial Mainn
 > ✅ **Completed:** Admin seeding scripts have `NODE_ENV=production` guard. Body limit `100kb` in `app.js`. Redis-backed token blocklist with `POST /api/auth/logout`.
 
 ## Scalability & Reliability
-- [ ] **Channel Accounts (Worker Pool)**: Implement for Distributor wallet to prevent `Bad Sequence Number` errors during high-volume distributions.
+- [x] **Channel Accounts (Worker Pool)**: Implemented in `KeyManager.js` with round-robin pool (`CHANNEL_1_SECRET_KEY`..`CHANNEL_10_SECRET_KEY`). Used by both `signAndSubmitTransaction()` and `submitWithSponsorship()`. Falls back to Operations wallet if no channels defined.
 
 > ✅ **Completed:** USDC deposit safety warnings in UI. Unique memo validation for all deposits (supports exchanges).
 
