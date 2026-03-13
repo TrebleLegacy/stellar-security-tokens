@@ -1,6 +1,6 @@
 
 import { SmartAccountKit } from 'smart-account-kit';
-import { authStorage } from '@/utils/authStorage';
+
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -18,6 +18,8 @@ export interface AuthResponse {
 export class PasskeyClient {
     private kit: SmartAccountKit | null = null;
     private baseUrl: string;
+    /** Cached from the most recent login WebAuthn ceremony */
+    private lastCredentialId: string | null = null;
 
     constructor() {
         this.baseUrl = API_URL;
@@ -85,6 +87,9 @@ export class PasskeyClient {
             // Get credential ID as base64url
             const credentialIdBase64 = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)))
                 .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+
+            // Cache for later use in signTransaction (avoids double prompt)
+            this.lastCredentialId = credentialIdBase64;
 
             // 3. Authenticate with Backend using discover endpoint
             // Backend looks up user by credentialId
@@ -157,19 +162,21 @@ export class PasskeyClient {
      * @param walletContractId - Optional smart wallet contract ID
      * @returns Signed transaction XDR string
      */
-    async signTransaction(xdr: string, walletContractId?: string): Promise<string> {
+    async signTransaction(xdr: string, _walletContractId?: string): Promise<string> {
         await this.init();
         if (!this.kit) throw new Error('SmartAccountKit not initialized');
 
-        // Connect wallet if not already connected
-        if (!this.kit.contractId) {
-            const user = authStorage.getUser<any>('investor') || authStorage.getUser<any>('company');
-            const contractId = walletContractId || user?.stellarContractId;
-            if (!contractId) {
-                throw new Error('Smart wallet contract ID not found. Cannot sign transaction.');
+        // Ensure wallet is connected with a credential (needed for signAuthEntry)
+        if (!this.kit.credentialId) {
+            if (this.lastCredentialId) {
+                // Use cached credential from login — silent connect, no prompt
+                console.log('[SmartAccount] Silent connect with cached credential');
+                await this.kit.connectWallet({ credentialId: this.lastCredentialId });
+            } else {
+                // Fallback: prompt user for passkey (shouldn't happen in normal flow)
+                console.log('[SmartAccount] No cached credential, prompting passkey...');
+                await this.kit.connectWallet({ prompt: true });
             }
-            console.log('[SmartAccount] Connecting wallet for signing:', contractId);
-            await this.kit.connectWallet({ contractId, prompt: true });
         }
 
         try {
