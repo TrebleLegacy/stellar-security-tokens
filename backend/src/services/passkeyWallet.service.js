@@ -250,14 +250,22 @@ export class PasskeyWalletService {
    * Submit a transaction with backend sponsorship (Fee Bump).
    * Used as a fallback when Channels is unavailable.
    * 
+   * Uses the KeyManager channel account pool for parallel submissions,
+   * preventing tx_bad_seq errors under concurrent load.
+   * Configure pool via CHANNEL_1_SECRET_KEY..CHANNEL_10_SECRET_KEY env vars.
+   * Falls back to Operations wallet if no channels are defined.
+   * 
    * @param {string|Transaction} txOrXdr - The signed transaction (XDR string or Transaction object)
    * @returns {Promise<Object>} Transaction result
    */
   static async submitWithSponsorship(txOrXdr) {
     try {
-      const { stellarServer, getNetworkPassphrase, getOperationsKeypair } = await import('../config/stellar.js');
+      const { stellarServer, getNetworkPassphrase } = await import('../config/stellar.js');
+      const { keyManager } = await import('./KeyManager.js');
       const networkPassphrase = getNetworkPassphrase();
-      const operationsKeypair = getOperationsKeypair();
+
+      // Pick a channel account from the round-robin pool (prevents tx_bad_seq)
+      const channelKeypair = keyManager.getNextChannelKeypair();
 
       // 1. Parse the inner transaction (handle both XDR string and Transaction object)
       let innerTx;
@@ -269,10 +277,10 @@ export class PasskeyWalletService {
         throw new Error('Invalid transaction format: expected XDR string or Transaction object');
       }
 
-      // 2. Wrap in Fee Bump Transaction
+      // 2. Wrap in Fee Bump Transaction using channel account
       log.debug(`Inner TX source: ${innerTx.source}`);
       log.debug(`Inner TX operations count: ${innerTx.operations?.length}`);
-      log.debug(`Operations keypair: ${operationsKeypair.publicKey()}`);
+      log.debug(`Channel account: ${channelKeypair.publicKey()}`);
 
       const innerFee = parseInt(innerTx.fee);
 
@@ -286,14 +294,14 @@ export class PasskeyWalletService {
       const feeBumpFee = Math.max(parseInt(BASE_FEE) * 2, innerFee + parseInt(BASE_FEE));
 
       const feeBumpTx = TransactionBuilder.buildFeeBumpTransaction(
-        operationsKeypair.publicKey(),
+        channelKeypair.publicKey(),
         feeBumpFee.toString(),
         innerTx,
         networkPassphrase
       );
 
-      // 3. Sign the outer Fee Bump Transaction
-      feeBumpTx.sign(operationsKeypair);
+      // 3. Sign the outer Fee Bump Transaction with channel account
+      feeBumpTx.sign(channelKeypair);
 
       // 4. Submit directly to Horizon
       log.info('Submitting self-sponsored fee bump to Horizon...');

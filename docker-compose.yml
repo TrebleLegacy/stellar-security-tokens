@@ -65,6 +65,12 @@ services:
       ISSUER_SECRET_KEY: ${ISSUER_SECRET_KEY:-}
       DISTRIBUTOR_SECRET_KEY: ${DISTRIBUTOR_SECRET_KEY:-}
       TREASURY_SECRET_KEY: ${TREASURY_SECRET_KEY:-}
+      # Channel Accounts Pool — parallel fee sponsorship (prevents tx_bad_seq)
+      CHANNEL_1_SECRET_KEY: ${CHANNEL_1_SECRET_KEY:-}
+      CHANNEL_2_SECRET_KEY: ${CHANNEL_2_SECRET_KEY:-}
+      CHANNEL_3_SECRET_KEY: ${CHANNEL_3_SECRET_KEY:-}
+      CHANNEL_4_SECRET_KEY: ${CHANNEL_4_SECRET_KEY:-}
+      CHANNEL_5_SECRET_KEY: ${CHANNEL_5_SECRET_KEY:-}
       # Token Details
       # ASSET_CODE and ASSET_SUPPLY removed - using offer-specific assets
       # USDC_ISSUER is auto-detected based on STELLAR_NETWORK (testnet/mainnet)
