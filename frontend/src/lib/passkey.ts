@@ -169,25 +169,59 @@ export class PasskeyClient {
                 throw new Error('Smart wallet contract ID not found. Cannot sign transaction.');
             }
             console.log('[SmartAccount] Connecting wallet for signing:', contractId);
-            await this.kit.connectWallet({ contractId });
+            await this.kit.connectWallet({ contractId, prompt: true });
         }
 
         try {
-            // Import the bindings Client to parse XDR into AssembledTransaction
-            const { Client } = await import('smart-account-kit-bindings');
-            const wallet = new Client({
-                contractId: this.kit.contractId!,
-                networkPassphrase: this.kit.networkPassphrase,
-                rpcUrl: this.kit.rpcUrl,
-            });
+            const { TransactionBuilder } = await import('@stellar/stellar-sdk');
 
-            // Parse the XDR into an AssembledTransaction using fromXDR
-            const tx = wallet.fromJSON.execute(xdr);
-            
-            // Sign the auth entries with passkey
-            const signedTx = await this.kit.sign(tx);
-            
-            return signedTx.toXDR() as string;
+            // Parse the prepared transaction from base64 XDR
+            const tx = TransactionBuilder.fromXDR(xdr, this.kit.networkPassphrase);
+
+            // Get the Soroban auth entries from the transaction's invokeHostFunction operation
+            const op = tx.operations[0] as any;
+            if (!op?.auth?.length) {
+                console.warn('[SmartAccount] No auth entries found in transaction');
+                return tx.toXDR();
+            }
+
+            // Sign each auth entry that belongs to our smart wallet
+            const contractId = this.kit.contractId!;
+            const signedAuth: typeof op.auth = [];
+
+            for (const entry of op.auth) {
+                const creds = entry.credentials();
+                // Only sign Address-type credentials that match our wallet
+                if (creds.switch().name === 'sorobanCredentialsAddress') {
+                    const addrCreds = creds.address();
+                    const addr = addrCreds.address();
+                    // Check if this auth entry is for our smart wallet contract
+                    const addrType = addr.switch().name;
+                    if (addrType === 'scAddressTypeContract') {
+                        const entryContractId = (await import('@stellar/stellar-sdk')).StrKey.encodeContract(addr.contractId());
+                        if (entryContractId === contractId) {
+                            const signedEntry = await this.kit.signAuthEntry(entry);
+                            signedAuth.push(signedEntry);
+                            continue;
+                        }
+                    }
+                }
+                // Keep non-matching entries as-is
+                signedAuth.push(entry);
+            }
+
+            // Rebuild the transaction with signed auth entries
+            const { TransactionBuilder: TB, Operation } = await import('@stellar/stellar-sdk');
+            const newTx = TB.cloneFrom(tx as any, {
+                fee: tx.fee,
+            }).clearOperations().addOperation(
+                Operation.invokeHostFunction({
+                    func: op.func,
+                    auth: signedAuth,
+                })
+            ).build();
+
+            return newTx.toXDR();
         } catch (error: any) {
             console.error('Signing error:', error);
             throw error;
