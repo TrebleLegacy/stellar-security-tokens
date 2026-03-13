@@ -598,6 +598,32 @@ The fee-bump fallback method doesn't depend on any SDK — it's pure Stellar ope
 
 11 out of 22 methods in the backend service had zero passkey-kit dependencies (DB-only operations). Identifying these first halved the blast radius and gave confidence that the migration wouldn't break unrelated flows.
 
+### 🚨 `relayerUrl` endpoint MUST exist before registration works
+
+When using `SmartAccountKit.createWallet({ autoSubmit: true })`, the SDK POSTs the deploy transaction to `relayerUrl`. **If this endpoint doesn't exist, wallet creation silently fails** — the SDK still returns a deterministic `contractId` (derived from the salt + deployer keypair), but the contract is never deployed on-chain.
+
+**Symptom:** `contractId` is saved to the DB, wallet appears to exist, but all on-chain operations fail. The maintenance service will log `Contract Wallet ... not found on-chain.`
+
+**Fix:** Add `POST /api/wallets/relay` as a **public route** (before auth middleware) that forwards the signed XDR to `PasskeyWalletService.sendTransaction()`:
+
+```js
+// walletRoutes.js — BEFORE router.use(authenticateToken)
+router.post('/relay', strictLimiter, async (req, res) => {
+  const { xdr, func, auth } = req.body;
+  // Forward to Channels or fee-sponsored submission
+  const result = xdr
+    ? await PasskeyWalletService.sendTransaction(xdr)
+    : await PasskeyWalletService.sendSorobanTransaction(func, auth);
+  res.json(result);
+});
+```
+
+### 💡 Smart wallets don't need classic trustline authorization
+
+Classic Stellar accounts (`G...`) need `changeTrust` + `setTrustLineFlags` to hold non-XLM assets. Smart wallets (`C...`) use SAC (Stellar Asset Contract) — token balances are stored as Soroban contract data entries, not classic trustlines. Calling `server.loadAccount()` with a `C...` address returns "Bad Request" from Horizon.
+
+**Impact:** Any function that calls Horizon's `loadAccount()` (e.g., `authorizeAllUserTrustlines`, `freezeAccount`, `clawbackTokens`) must detect `C...` addresses and skip or use SAC-equivalent operations.
+
 ---
 
 ## Timeline

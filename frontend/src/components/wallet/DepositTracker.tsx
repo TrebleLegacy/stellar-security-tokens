@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ArrowDownLeft, Check, Loader2, X, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { investorsApi } from '@/api/investors';
@@ -74,6 +74,9 @@ export function DepositTracker() {
     const [dismissed, setDismissed] = useState<Set<number>>(new Set());
     const [minimized, setMinimized] = useState(false);
 
+    const dismissedRef = useRef(dismissed);
+    dismissedRef.current = dismissed;
+
     const fetchDeposits = useCallback(async () => {
         const user = authStorage.getUser<any>('investor');
         if (!user?.id) return;
@@ -87,7 +90,7 @@ export function DepositTracker() {
 
             // Auto-dismiss completed deposits after 8s
             active.forEach((d: ActiveDeposit) => {
-                if (d.status === 'completed' && !dismissed.has(d.id)) {
+                if (d.status === 'completed' && !dismissedRef.current.has(d.id)) {
                     setTimeout(() => {
                         setDismissed(prev => new Set([...prev, d.id]));
                     }, 8000);
@@ -96,7 +99,7 @@ export function DepositTracker() {
         } catch {
             // Silently ignore — user might not be logged in
         }
-    }, [dismissed]);
+    }, []);
 
     // Fetch once on mount — user can refresh manually
     useEffect(() => {
