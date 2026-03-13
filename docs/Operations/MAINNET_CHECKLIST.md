@@ -51,6 +51,16 @@ Create a production `.env` file with the following changes:
 - [ ] **`WEBAUTHN_VERIFIER_ADDRESS`**: Deploy WebAuthn verifier and record address.
 - [ ] **`ED25519_VERIFIER_ADDRESS`**: Deploy Ed25519 verifier and record address.
 
+### Channel Accounts Pool (Parallel Fee Sponsorship)
+- [ ] **Generate 5 new keypairs** for mainnet (never reuse testnet keys):
+  ```bash
+  node -e "const {Keypair}=require('@stellar/stellar-sdk'); for(let i=1;i<=5;i++){const k=Keypair.random(); console.log('CHANNEL_'+i+'_SECRET_KEY='+k.secret()); console.log('# Public: '+k.publicKey()); console.log();}"
+  ```
+- [ ] **Fund each with 2 XLM** from the Operations wallet (enough for ~20,000 fee-bump TXs each).
+- [ ] **Add secret keys** to production env (`CHANNEL_1_SECRET_KEY`..`CHANNEL_5_SECRET_KEY`).
+- [ ] **Verify pool loads** — backend log should show: `Initialized channel pool with 5 accounts.`
+- [ ] **File permissions** — ensure channel keys have same security as `OPERATIONS_SECRET_KEY` (chmod 600 or Docker Secrets).
+
 ### Infrastructure & Security
 - [ ] **`DB_SSL`**: Set to `true` (Required for cloud databases).
 - [ ] **`JWT_SECRET`**: Generate with `openssl rand -hex 32`.
