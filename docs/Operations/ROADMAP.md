@@ -13,15 +13,12 @@
 
 ---
 
-## Phase 2 — Kill Ticking Time Bombs (Week 1)
+## Phase 2 — Kill Ticking Time Bombs (Week 1) ✅
 
-- [ ] **WebAuthn challenges → Redis** — in-memory store breaks on server restart. ~30min fix.
-  - Reference: `06_security_audit.md`, `07_error_recovery.md`
-- [ ] **Fix `log` redeclaration in `platformAdminRoutes.js`** — crashes entire admin panel on first call
-  - Reference: `routes_layer.md`
-- [ ] **Fix validator ordering in `investmentRoutes.js`** — validators must run before auth, not after
-  - Reference: `routes_layer.md`
-- [ ] **Improve passkey registration UX** — simplify the onboarding flow, reduce information overload on the passkey creation step
+- [x] **WebAuthn challenges → Redis** — migrated to Redis-backed store with in-memory fallback
+- [x] **Fix `log` redeclaration in `platformAdminRoutes.js`** — moved declaration to top, resolved TDZ crash
+- [x] **Fix validator ordering in `investmentRoutes.js`** — reordered: `authenticateToken` now runs before validators
+- [x] **Improve passkey registration UX** — split Step 3 into profile + passkey steps, added browser ecosystem detection, Windows Hello warning, contextual sync reassurance
 
 ---
 
@@ -47,6 +44,22 @@
 - [ ] Extract `adminSorobanRoutes.js`
 - [ ] Move all inline handlers to `PlatformAdminController`
 - [ ] Reference: `routes_layer.md`
+
+---
+
+## Phase 5 — Passkey Recovery (Week 3)
+
+> Motivated by real incident: user lost access to Windows-encrypted passkey wallet with $150 in crypto.
+
+### Tier 2 — Recovery Key (Coinbase Model)
+- [ ] **Post-registration "Create Recovery Key" screen** — generate a recovery phrase while user has access; user stores offline
+- [ ] **Recovery flow** — recovery phrase registers a new passkey signer on the Stellar smart contract
+- [ ] Store recovery key hash in DB (not the key itself) to verify recovery attempts
+
+### Tier 3 — Server-Assisted Recovery (Future)
+- [ ] Email + identity verification → admin-assisted new passkey registration
+- [ ] Social recovery — trusted contacts approve new signer on smart contract
+- [ ] MPC key-splitting — server holds recovery share
 
 ---
 
