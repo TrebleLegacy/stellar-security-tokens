@@ -1,6 +1,6 @@
 # Radox — Production Roadmap
 
-> Last updated: 2026-03-13
+> Last updated: 2026-03-14
 > Status: Pre-production hardening
 
 ---
@@ -10,9 +10,12 @@
 > [!CAUTION]
 > All investor USDC goes to platform wallet — company gets $0. Custody violation.
 
-- [ ] **Fix custody: USDC must go to company wallet** — `offer.service.js:428`, `multiSigTransaction.service.js:485,880` set `treasury: km.getTreasuryPublicKey()` (platform). Must be `company.stellarContractId`.
-- [ ] **Add `platform` + `fee_bps` fields to Soroban Offer struct** — future-proof for on-chain fee split, set `fee_bps=0` for now (fees sponsored)
-- [ ] **Wire `buildCreateSaleXdr`** to accept `platform` and `feeBps` params
+- [x] ~~**Fix custody: USDC must go to company wallet**~~ — `treasury` now set to `company.stellarContractId` in offer approval flow
+- [x] ~~**Add `platform` + `fee_bps` fields to Soroban Offer struct**~~ — contract upgraded, `buildCreateSaleXdr` accepts `company` + `feeBps`, per-offer `platformFeeBps` stored in DB
+- [x] ~~**Wire `buildCreateSaleXdr`**~~ — 3 callsites updated, mock validates `company`/`feeBps` params
+- [x] ~~**Clean dead `INVESTMENT_FEE_PERCENT`**~~ — removed from FeeConfig, useInvestmentFees, help-content. Fee log category preserved as `INVESTMENT_FEE`.
+- [ ] **Contract upgrade: on-chain `fixed_fee` routing** — upgrade `trade()` to deduct a fixed blockchain fee (100% → treasury) before splitting remainder by `fee_bps`. ~20 lines Rust. Enables `BLOCKCHAIN_OPERATION_FEE_FIXED` to work end-to-end. Currently set to 0.
+- [ ] **Contract upgrade: on-chain dividend fee** — add dividend fee deduction to dividend distribution contract. Enables `DIVIDEND_FEE_PERCENT` to work on-chain. Currently functional off-chain.
 - [ ] When fees are enabled: log on-chain fee events to `FeeLog` via `SorobanEventIndexer` for dashboard reporting
 
 ---
