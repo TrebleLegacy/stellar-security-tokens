@@ -562,10 +562,17 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                     <span className="text-slate-500">Investment amount</span>
                                     <span className="text-white">${purchaseDetails.usdcAmount.toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Blockchain fee</span>
-                                    <span className="text-slate-400">+${purchaseDetails.feeAmount.toFixed(2)}</span>
-                                </div>
+                                    {purchaseDetails.feeAmount > 0 ? (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-slate-500">Blockchain fee</span>
+                                            <span className="text-slate-400">+${purchaseDetails.feeAmount.toFixed(2)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-slate-500">Fees</span>
+                                            <span className="text-emerald-400">Sponsored — enjoy!</span>
+                                        </div>
+                                    )}
                                 <div className="border-t border-white/8 pt-2 flex justify-between text-xs font-semibold">
                                     <span className="text-white">Total charged</span>
                                     <span className="text-white">${purchaseDetails.totalDeduction.toFixed(2)} USDC</span>
@@ -758,10 +765,17 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                             ~{tokensReceived.toFixed(2)} {offer.asset_code}
                                         </span>
                                     </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-muted-foreground">Blockchain fee</span>
-                                        <span className="text-slate-400">+{blockchainFee} USDC</span>
-                                    </div>
+                                    {blockchainFee > 0 ? (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-muted-foreground">Blockchain fee</span>
+                                            <span className="text-slate-400">+{blockchainFee} USDC</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-muted-foreground">Fees</span>
+                                            <span className="text-emerald-400">Sponsored — enjoy!</span>
+                                        </div>
+                                    )}
                                     <div className="border-t border-white/10 pt-1.5 flex justify-between text-xs font-semibold">
                                         <span className="text-white">Total deduction</span>
                                         <span className="text-white">{totalDeduction.toFixed(2)} USDC</span>

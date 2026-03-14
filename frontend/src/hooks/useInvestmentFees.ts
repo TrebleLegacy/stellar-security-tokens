@@ -7,7 +7,7 @@ interface FeeSchedule {
 }
 
 export function useInvestmentFees() {
-    const [fees, setFees] = useState<FeeSchedule>({ blockchainFee: 5, investmentFeePercent: 0 });
+    const [fees, setFees] = useState<FeeSchedule>({ blockchainFee: 0, investmentFeePercent: 0 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {

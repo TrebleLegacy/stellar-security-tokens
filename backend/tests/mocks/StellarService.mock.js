@@ -102,6 +102,58 @@ export class MockStellarService {
         };
     }
 
+    static async unfreezeAccount(investorPublicKey, assetCode) {
+        return {
+            success: true,
+            investorPublicKey,
+            assetCode,
+            transactionHash: 'mock_tx_hash_unfreeze',
+            ledger: 106,
+            message: 'Account unfrozen successfully (trustline authorization restored)',
+        };
+    }
+
+    static async extendContractTTL(contractId) {
+        return {
+            success: true,
+            contractId,
+            newTtl: 535680,
+            transactionHash: 'mock_tx_hash_ttl_extend',
+            ledger: 107,
+        };
+    }
+
+    static async disableClawbackForTrustline(investorPublicKey, assetCode) {
+        return {
+            success: true,
+            investorPublicKey,
+            assetCode,
+            transactionHash: 'mock_tx_hash_disable_clawback',
+            ledger: 108,
+        };
+    }
+
+    static buildDisableClawbackOp(investorPublicKey, assetCode) {
+        return {}; // Returns an Operation object placeholder
+    }
+
+    static async listAssetHolders(assetCode) {
+        return [
+            {
+                publicKey: 'GHOLDER1234567890123456789012345678901234567890123456789012',
+                balance: '500.0000000',
+                isAuthorized: true,
+                isClawbackEnabled: true,
+            },
+        ];
+    }
+
+    static async listAccountAssets(publicKey) {
+        return [
+            { assetCode: 'TEST01', assetIssuer: 'GBISSUERMOCK123456789012345678901234567890123456789012', balance: '1000.0000000' },
+        ];
+    }
+
     static async simulateSorobanTransaction(transaction) {
         return { success: true, results: [] };
     }

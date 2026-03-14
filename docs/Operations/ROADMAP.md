@@ -8,12 +8,12 @@
 ## Phase 1 — Fix the Money (Week 1)
 
 > [!CAUTION]
-> Revenue is being lost on every trade. Fees are logged but never collected on-chain.
+> All investor USDC goes to platform wallet — company gets $0. Custody violation.
 
-- [ ] **On-chain fee collection** in `trade()` contract function
-  - Option A: Fee split in `trade()` — atomic, USDC goes to treasury AND platform in one TX ⭐ preferred
-  - Option B: Post-trade fee sweep via `SorobanEventIndexer` — easier to ship, less atomic
-  - Reference: `02_feature_matrix.md` → Fee Collection row, `smart_contract_layer.md`
+- [ ] **Fix custody: USDC must go to company wallet** — `offer.service.js:428`, `multiSigTransaction.service.js:485,880` set `treasury: km.getTreasuryPublicKey()` (platform). Must be `company.stellarContractId`.
+- [ ] **Add `platform` + `fee_bps` fields to Soroban Offer struct** — future-proof for on-chain fee split, set `fee_bps=0` for now (fees sponsored)
+- [ ] **Wire `buildCreateSaleXdr`** to accept `platform` and `feeBps` params
+- [ ] When fees are enabled: log on-chain fee events to `FeeLog` via `SorobanEventIndexer` for dashboard reporting
 
 ---
 
@@ -38,6 +38,7 @@
 - [ ] Remove password fields from `types/index.ts`
 - [ ] Consolidate API clients: kill `lib/api.ts`, migrate `passkey.ts` to use Axios client
 - [ ] Sweep remaining dead code from `04_dead_code.md`
+- [ ] **DRY audit** — find and consolidate duplicated constants, magic numbers, and repeated logic across backend/frontend (e.g. fee defaults were hardcoded in 3 files)
 
 ---
 
