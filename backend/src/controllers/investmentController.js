@@ -152,7 +152,7 @@ export const purchaseInvestment = async (req, res, next) => {
     // Fee Logic
     const grossAmount = parseFloat(usdcAmount);
     const feePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
-    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0);
+    const fixedFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 0);
 
     if (grossAmount <= 0) {
       return res.status(400).json({
@@ -299,7 +299,7 @@ export const getInvestmentStatus = async (req, res, next) => {
  */
 export const getFeeSchedule = async (req, res, next) => {
   try {
-    const blockchainFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 5.0);
+    const blockchainFee = await ConfigService.getFloat('BLOCKCHAIN_OPERATION_FEE_FIXED', 0);
     const investmentFeePercent = await ConfigService.getFloat('INVESTMENT_FEE_PERCENT', 0);
 
     res.json({

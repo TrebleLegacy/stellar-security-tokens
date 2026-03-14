@@ -13,7 +13,7 @@ import logger from '../utils/logger.js';
 // Scoped logger for this service
 const log = logger.scope('CompanyPayment');
 // Configuration
-const PLATFORM_FEE_PERCENT = 0.01; // 1% MVP
+// Platform fee is handled on-chain in the Soroban trade() contract (fee_bps field)
 const LATE_FEE_PERCENT_PER_DAY = 0.001; // 0.1% per day
 const GRACE_PERIOD_DAYS = 10;
 const DEFAULT_FEE_PERCENT = 0.05; // 5% of owed amount
@@ -380,48 +380,7 @@ export class CompanyPaymentService {
         return payments.filter(p => p.totalOwed > 0 || p.totalPayout > 0);
     }
 
-    /**
-     * Process token sale - distribute fees
-     * @param {number} investorId - Investor ID
-     * @param {number} offerId - Offer ID
-     * @param {number} usdcAmount - Total USDC paid by investor
-     * @returns {Promise<Object>} Fee distribution result
-     */
-    static async processTokenSaleFees(investorId, offerId, usdcAmount) {
-        const platformFee = usdcAmount * PLATFORM_FEE_PERCENT;
-        const companyProceeds = usdcAmount - platformFee;
 
-        const offer = await prisma.offer.findUnique({
-            where: { id: offerId },
-            include: { company: true }
-        });
-
-        if (!offer) {
-            throw new Error(`Offer ${offerId} not found`);
-        }
-
-        // Record the fee distribution
-        // In a full implementation, this would also trigger USDC transfers
-        // Platform fee goes to platform wallet
-        // Company proceeds go to company wallet
-
-        log.info(`Token sale processed:`, {
-            investorId,
-            offerId,
-            totalPaid: usdcAmount,
-            platformFee,
-            companyProceeds,
-            companyId: offer.companyId
-        });
-
-        return {
-            totalPaid: usdcAmount,
-            platformFee,
-            platformFeePercent: PLATFORM_FEE_PERCENT * 100,
-            companyProceeds,
-            companyId: offer.companyId
-        };
-    }
 
     /**
      * Create a payment transaction for company to sign
