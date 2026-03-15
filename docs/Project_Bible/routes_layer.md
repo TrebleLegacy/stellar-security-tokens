@@ -11,7 +11,7 @@
 |---|------|-------|-----------|-----------|
 | 1 | `investorRoutes.js` | 521 | `/api/investors` | public (reg), `authenticateToken`, `requireInvestor`, `requireOwnData` |
 | 2 | `investmentRoutes.js` | 114 | `/api/investments` | `authenticateToken` |
-| 3 | `offerRoutes.js` | 458 | mixed: `/api/companies/offers`, `/api/offers`, `/api/admin/offers` | `requireCompanyUser`, `requirePlatformAdmin`, `optionalAuth`, `requireRole` |
+| 3 | `offerRoutes.js` | ~530 | mixed: `/api/companies/offers`, `/api/offers`, `/api/admin/offers` | `requireCompanyUser`, `requirePlatformAdmin`, `optionalAuth`, `requireRole` |
 | 4 | `companyRoutes.js` | 414 | `/api/companies` | public (reg), `requireCompanyUser`, `requirePlatformAdmin` |
 | 5 | `companyUserRoutes.js` | 257 | `/api/company-users` | public (reg), `requireCompanyUser` |
 | 6 | `authRoutes.js` | 367 | `/api/auth` | public (login), `authenticateToken` (logout) |
@@ -23,7 +23,7 @@
 | 12 | `notificationRoutes.js` | 26 | `/api/notifications` | `authenticateToken` (global `router.use`) |
 | 13 | `securityRoutes.js` | 519 | `/api/security` | `authenticateToken`, public (`passkey-config`) |
 | 14 | `adminTransactionRoutes.js` | 593 | `/api/admin/transactions` | `authenticatePlatformAdmin` |
-| 15 | `companyPaymentRoutes.js` | 237 | `/api/company/payments` | `authenticateToken` + `requireCompanyUser` |
+| 15 | `companyPaymentRoutes.js` | ~260 | `/api/company/payments` | `authenticateToken` + `requireCompanyUser` |
 
 ---
 
@@ -148,6 +148,7 @@
 | *Wallets* | `/api/wallets`, `/api/wallets/transactions/*` | System wallet + multisig |
 | *Contracts* | `/api/admin/contracts/*` | Full Soroban sale admin |
 | *Admin TX* | `/api/admin/transactions/*` | Multisig lifecycle |
+| POST | `/api/admin/offers/:id/reconcile-chain` | On-chain → DB reconciliation (maturity) |
 
 ### Security (authenticateToken)
 

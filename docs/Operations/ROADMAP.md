@@ -13,6 +13,24 @@
 
 ---
 
+## Phase 1.5 — Bullet Maturity (Week 1) ✅
+
+- [x] **Atomic maturity clawback** — batch prepare (49 investors/TX, guard + clawback ops), multisig queue with `$transaction` atomic flip
+- [x] **Company batch signing UI** — auto-loop prepare→sign→submit, timeline progress, "DO NOT INTERACT" popup
+- [x] **Admin grouped batch view** — maturity batches grouped by `batchGroupId` in approval queue
+- [x] **On-chain reconciliation** — `POST /admin/offers/:id/reconcile-chain` compares chain vs DB
+- [ ] **Reconciliation results UI** — display discrepancies table in admin detail panel
+- [ ] **Persistent batch_pending status** — show "waiting for admin" on PayInvestors if batches exist in pending state
+
+> [!CAUTION]
+> **Trading Market Lockout**: Do NOT unlock tokens for secondary trading before maturity date.
+> If tokens are unlocked and traded, the maturity clawback will fail because holder balances
+> won't match the original investment records. This is a known constraint — when a secondary
+> market is implemented, maturity payout must account for current on-chain balances at clawback
+> time, not the original investment amounts.
+
+---
+
 ## Phase 2 — Kill Ticking Time Bombs (Week 1) ✅
 
 - [x] **WebAuthn challenges → Redis** — migrated to Redis-backed store with in-memory fallback
