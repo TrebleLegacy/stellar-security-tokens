@@ -1,6 +1,6 @@
 import { Investor } from '../models/Investor.js';
 import { StellarService } from '../services/stellar.service.js';
-import { PaymentService } from '../services/payment.service.js';
+
 import { DepositRelayService } from '../services/depositRelay.service.js';
 import { PasskeyWalletService, UserType } from '../services/passkeyWallet.service.js';
 import { EmailService } from '../services/email.service.js';

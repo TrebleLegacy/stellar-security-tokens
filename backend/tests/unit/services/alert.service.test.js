@@ -17,9 +17,7 @@ describe('AlertService - Structure Tests', () => {
       'warning',
       'error',
       'critical',
-      'distributionFailed',
       'paymentMonitorFailed',
-      'distributionQueueFailed',
       'investmentStuck',
     ];
 

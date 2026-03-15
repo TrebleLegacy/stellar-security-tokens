@@ -9,9 +9,6 @@ describe('PaymentService Unit Tests', async () => {
     // Mock all dependencies to ensure clean load of PaymentService
     const module = await esmock('../../../src/services/payment.service.js', {
       '../../../src/config/prisma.js': { default: {} },
-      '../../../src/models/Investor.js': { Investor: {} },
-      '../../../src/models/Token.js': { Token: {} },
-      '../../../src/models/Offer.js': { Offer: {} },
       '../../../src/services/stellar.service.js': { StellarService: { getAccountRPC: async () => ({}) } }, // Mock the new dependency
       '../../../src/services/email.service.js': { EmailService: {} },
       '../../../src/services/config.service.js': { ConfigService: {} },
@@ -38,8 +35,8 @@ describe('PaymentService Unit Tests', async () => {
         'getInvestorsWithBalances',
         'calculateMonthlyInterest',
         'createBatchUSDCPayment',
-        'recordInterestPayments',
-        'processMonthlyInterestPayments'
+        'processBulletPayments',
+        'getInvestorsWithBalancesByOffer'
       ];
       requiredMethods.forEach(method => {
         assert.strictEqual(typeof PaymentService[method], 'function', `${method} should be a function`);

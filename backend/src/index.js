@@ -102,28 +102,40 @@ app.listen(PORT, async () => {
     console.error('Failed to start payment reminder scheduler:', error.message);
   }
 
-  // Start overdue payment status checker (runs daily at 00:30 UTC)
-  // This updates offer statuses to overdue/defaulted based on payment due dates
+  // Daily payment cron (runs at 00:30 UTC)
+  // 1. Notify companies about due payments (bullet maturity + periodic)
+  // 2. Check/penalize overdue payments (late fees + defaults)
   try {
     const cron = await import('node-cron');
     const { CompanyPaymentService } = await import('./services/companyPayment.service.js');
+    const { PaymentService } = await import('./services/payment.service.js');
 
     cron.default.schedule('30 0 * * *', async () => {
-      console.log('[OverdueChecker] Running daily overdue/maturity check');
+      console.log('[DailyPayments] Running notifications + overdue check');
+
+      // 1. Notify companies about due payments (must run BEFORE overdue check)
+      try {
+        await PaymentService.processAllScheduledPayments();
+        console.log('[DailyPayments] Payment notifications sent');
+      } catch (error) {
+        console.error('[DailyPayments] Notification error (non-blocking):', error);
+      }
+
+      // 2. Check/penalize overdue payments
       try {
         const result = await CompanyPaymentService.checkOverduePayments();
-        console.log('[OverdueChecker] Completed:', result);
+        console.log('[DailyPayments] Overdue check completed:', result);
       } catch (error) {
-        console.error('[OverdueChecker] Error:', error);
+        console.error('[DailyPayments] Overdue check error:', error);
       }
     }, {
       scheduled: true,
       timezone: 'UTC'
     });
 
-    console.log('Overdue payment checker enabled - payment statuses will be updated daily at 00:30 UTC');
+    console.log('Daily payment cron enabled - notifications + overdue checks at 00:30 UTC');
   } catch (error) {
-    console.error('Failed to start overdue payment checker:', error.message);
+    console.error('Failed to start daily payment cron:', error.message);
   }
 
   // Start MultiSig Expiry Checker (runs once daily at midnight UTC)

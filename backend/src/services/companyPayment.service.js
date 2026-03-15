@@ -6,14 +6,17 @@ import prisma from '../config/prisma.js';
 import { StellarService } from './stellar.service.js';
 import { PaymentService } from './payment.service.js';
 import { EmailService } from './email.service.js';
+import { ConfigService } from './config.service.js';
 import { Keypair, Asset, Operation, TransactionBuilder, Networks } from '@stellar/stellar-sdk';
 import { getUsdcIssuer } from '../config/stellar.js';
+import { keyManager } from './KeyManager.js';
 import logger from '../utils/logger.js';
 
 // Scoped logger for this service
 const log = logger.scope('CompanyPayment');
 // Configuration
 // Platform fee is handled on-chain in the Soroban trade() contract (fee_bps field)
+const DIVIDEND_FEE_PERCENT_DEFAULT = 0.02; // Fallback if ConfigService has no value
 const LATE_FEE_PERCENT_PER_DAY = 0.001; // 0.1% per day
 const GRACE_PERIOD_DAYS = 10;
 const DEFAULT_FEE_PERCENT = 0.05; // 5% of owed amount
@@ -407,21 +410,58 @@ export class CompanyPaymentService {
             throw new Error('Company does not have a Stellar wallet linked');
         }
 
-        // Build transaction with payment operations to each investor
+        // Calculate platform fee
+        //
+        //  Company pays $1000 total:
+        //  ├── $20 → Platform Treasury  (DIVIDEND_FEE_PERCENT = 2%)
+        //  └── $980 → Split among investors (proportional to holdings)
+        //
+        // Read fee from ConfigService (editable via Admin > Fee Config)
+        const feePercent = await ConfigService.getFloat('DIVIDEND_FEE_PERCENT', DIVIDEND_FEE_PERCENT_DEFAULT);
+        const platformFee = Math.round(paymentDetails.totalOwed * (feePercent / 100) * 100) / 100;
+        const netToInvestors = Math.round((paymentDetails.totalOwed - platformFee) * 100) / 100;
+        const feeRatio = paymentDetails.totalOwed > 0 ? netToInvestors / paymentDetails.totalOwed : 1;
+
+        // Build transaction with payment operations
         const companyKeypair = Keypair.fromPublicKey(offer.company.stellarPublicKey);
         const usdcAsset = new Asset(USDC_ASSET_CODE, USDC_ISSUER);
+        const operations = [];
 
-        const operations = paymentDetails.breakdown
-            .filter(b => b.investorWallet && b.interestOwed > 0)
-            .map(b => Operation.payment({
-                destination: b.investorWallet,
+        // Op 1: Platform fee to treasury (skip if fee is zero)
+        if (platformFee > 0) {
+            const treasuryAddress = keyManager.getTreasuryPublicKey();
+            operations.push(Operation.payment({
+                destination: treasuryAddress,
                 asset: usdcAsset,
-                amount: b.interestOwed.toFixed(7),
+                amount: platformFee.toFixed(7),
             }));
+        }
 
-        if (operations.length === 0) {
+        // Ops 2+: Investor payments (adjusted for fee deduction)
+        const investorOps = paymentDetails.breakdown
+            .filter(b => b.investorWallet && b.interestOwed > 0)
+            .map(b => {
+                const adjustedAmount = Math.round(b.interestOwed * feeRatio * 100) / 100;
+                return Operation.payment({
+                    destination: b.investorWallet,
+                    asset: usdcAsset,
+                    amount: Math.max(adjustedAmount, 0.0000001).toFixed(7),
+                });
+            });
+
+        operations.push(...investorOps);
+
+        if (investorOps.length === 0) {
             throw new Error('No valid investor wallets to pay');
         }
+
+        log.info('Payment transaction prepared', {
+            offerId,
+            totalOwed: paymentDetails.totalOwed,
+            platformFee,
+            netToInvestors,
+            investorCount: investorOps.length
+        });
 
         // Create unsigned transaction
         // Company will sign this with their passkey
@@ -435,7 +475,9 @@ export class CompanyPaymentService {
             transactionXDR: transaction.toXDR(),
             offerId,
             totalAmount: paymentDetails.totalOwed,
-            investorCount: operations.length,
+            platformFee,
+            netToInvestors,
+            investorCount: investorOps.length,
             breakdown: paymentDetails.breakdown,
             expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min expiry
         };

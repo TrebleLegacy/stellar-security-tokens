@@ -38,7 +38,6 @@ describe('CompanyPaymentService', () => {
                 'calculateOwedAmount',
                 'calculateBulletPayment',
                 'getUpcomingPayments',
-                'processTokenSaleFees',
                 'createPaymentTransaction',
                 'processSignedPayment',
                 'checkOverduePayments',
