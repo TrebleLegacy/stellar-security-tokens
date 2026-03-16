@@ -614,7 +614,7 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
 
           const opsKeypair = getOperationsKeypair();
           const rpcServer = new rpcMod.Server(getSorobanRpcUrl());
-          const AMOUNT = 10_0000000n; // 10 USDC (7 decimals)
+          const AMOUNT = 2_0000000n; // 2 USDC (7 decimals)
 
           const sac = new Contract(sacContractId);
           const op = sac.call('transfer',
@@ -638,7 +638,7 @@ export const registerInvestorWithPasskey = async (req, res, next) => {
           tx = rpcMod.assembleTransaction(tx, sim).build();
           tx.sign(opsKeypair);
           const result = await rpcServer.sendTransaction(tx);
-          log.info(`[Registration] ✅ Auto-funded 10 USDC to ${contractId} — tx: ${result.hash}`);
+          log.info(`[Registration] ✅ Auto-funded 2 USDC to ${contractId} — tx: ${result.hash}`);
         } catch (err) {
           log.warn(`[Registration] Testnet auto-fund failed (non-fatal): ${err.message}`);
         }
