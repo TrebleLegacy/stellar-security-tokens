@@ -95,6 +95,29 @@
 
 ---
 
+## Multi-User Companies (Future — When Needed)
+
+> **Build when:** A company needs more than one user (e.g., CFO + legal + operations).
+> **Current state:** Endpoint `/company-users/register-passkey` is locked behind `requirePlatformAdmin` (Fix #4 security patch).
+
+To activate multi-user company registration:
+
+1. **New admin endpoint** — `POST /api/platform-admins/invite-company-user` (or company admin self-serve)
+   - Accepts `{ companyId, email, role }`, validates company exists + is approved
+   - Signs a JWT `{ companyId, email, role, type: 'company_invitation' }`, expires 7 days
+   - Returns `{ invitationToken, invitationUrl }`
+2. **Swap middleware** — in `companyUserRoutes.js`, replace `requirePlatformAdmin` with invitation token validation
+   - Verify JWT signature, extract `companyId` from token (not from request body)
+   - Compare email in token with email in request body
+3. **New frontend page** — `CompanyUserRegister.tsx`
+   - Reads `?invite=<JWT>` from URL
+   - Shows company name + pre-filled email + passkey creation
+4. **Email template** — `sendCompanyInvitation(email, companyName, inviteUrl)`
+
+Reference: Security audit Fix #4 (Mar 2026), `companyUserRoutes.js` comments.
+
+---
+
 ## Post-Launch — Deferred from PR #3
 
 > These items were scoped in PR #3 but are not needed for MVP. Each has a clear trigger for when to build.
