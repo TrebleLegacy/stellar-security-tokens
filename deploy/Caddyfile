@@ -29,3 +29,8 @@ app.radox.net {
 api.radox.net {
     reverse_proxy backend:3000
 }
+
+# www redirect — sends www.radox.net to radox.net
+www.radox.net {
+    redir https://radox.net{uri} permanent
+}

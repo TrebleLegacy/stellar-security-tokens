@@ -1,16 +1,15 @@
 #!/bin/bash
 # =============================================================================
-# GCE VM Setup Script — Run ONCE on a fresh Ubuntu 22.04 VM
+# DigitalOcean Droplet Setup Script — Run ONCE on a fresh Ubuntu 22.04 VM
 # =============================================================================
 # Prerequisites:
-#   - GCE VM created (e2-medium, 30GB disk, Ubuntu 22.04)
-#   - SSH access configured
-#   - DNS records pointing to VM IP (radox.net, app.radox.net, api.radox.net)
+#   - DigitalOcean Droplet created (4GB RAM, Ubuntu 22.04)
+#   - SSH access configured (ssh root@<droplet-ip>)
+#   - DNS records pointing to Droplet IP (radox.net, app.radox.net, api.radox.net)
 #
 # Usage:
-#   gcloud compute ssh radox-prod
-#   curl -sL https://raw.githubusercontent.com/<repo>/main/deploy/setup-vm.sh | bash
-#   # OR copy and run manually
+#   ssh root@<droplet-ip>
+#   # Copy this script to the VM and run it, or run manually step by step
 # =============================================================================
 
 set -euo pipefail
@@ -32,10 +31,15 @@ sudo apt-get install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-
 sudo usermod -aG docker $USER
 echo "✅ Docker installed ($(docker --version))"
 
-# 2. Clone repository
+# 2. Clone repository (private repo — requires a GitHub Personal Access Token)
 echo "📥 Cloning repository..."
 if [ ! -d ~/radox ]; then
-    git clone https://github.com/TrebleLegacy/stellar-security-tokens.git ~/radox
+    if [ -z "${GITHUB_PAT:-}" ]; then
+        echo "⚠️  Set GITHUB_PAT before running: export GITHUB_PAT=ghp_your_token"
+        echo "   Then re-run this script."
+        exit 1
+    fi
+    git clone https://${GITHUB_PAT}@github.com/TrebleLegacy/stellar-security-tokens.git ~/radox
 else
     echo "   Repository already exists at ~/radox"
 fi
