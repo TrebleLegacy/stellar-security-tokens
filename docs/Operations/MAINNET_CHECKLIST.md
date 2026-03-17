@@ -142,6 +142,22 @@ npm run multisig:setup    # Configure production signers
   - `auth_required: true`
   - `auth_revocable: true`
   - `auth_clawback_enabled: true`
+
+- [ ] **Set up issuer thresholds for SAC auto-authorization** ⚠️
+  > Without this, every investment fails with `"balance is deauthorized"`.
+  > The operations key needs to be a signer on the issuer account so it can
+  > call `set_authorized()` on the SAC automatically during purchases.
+  
+  Go to [Stellar Laboratory](https://laboratory.stellar.org/#txbuilder?network=public) → **Set Options** on the **issuer account**:
+  - Master Weight: `10`
+  - Low Threshold: `1`
+  - Medium Threshold: `2`
+  - High Threshold: `10`
+  - Signer: Operations public key, weight `2`
+  
+  Sign with Freighter (issuer key). This allows:
+  - Ops key (weight=2) → `set_authorized` (medium=2) ✅
+  - Only issuer (weight=10) → mint/clawback/set_admin (high=10) 🔒
   
 - [ ] **Lock issuer account AFTER initial token minting**
   ```bash
