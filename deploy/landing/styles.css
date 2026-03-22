@@ -456,9 +456,16 @@ input, select { font-family: inherit; }
   justify-content: center;
   gap: 2.5rem;
 }
-.trust-logos img { opacity: 0.6; }
-.trust-logos img:first-child { height: 3rem; }
-.trust-logos img:last-child { height: 2rem; }
+.trust-logo-stellar { height: 2rem; width: auto; color: var(--sds-gray-09); }
+.trust-logo-soroban {
+  font-family: var(--sds-ff-heading);
+  font-size: 1.5rem;
+  font-weight: var(--sds-fw-semi-bold);
+  color: var(--sds-gray-09);
+  letter-spacing: -0.02em;
+  padding-left: 2.5rem;
+  border-left: 1px solid var(--sds-gray-04);
+}
 
 /* ==========================================================================
    HOW IT WORKS
