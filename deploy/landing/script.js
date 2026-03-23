@@ -24,7 +24,7 @@
         { title: 'Blockchain Transparency', desc: 'Every transaction recorded on-chain. Full auditability.' },
         { title: 'Real Yields', desc: 'Earn interest from real-world assets, not speculation.' },
         { title: 'Your Keys, Your Assets', desc: 'Self-custody with smart wallet technology. No middleman.' }
-      ], cta: 'Join the Whitelist' },
+      ], cta: 'Join the Waiting List' },
       forInvestors: { title: 'For Partners & VCs', cards: [
         { title: 'Massive Market Opportunity', desc: 'The RWA tokenization market is projected to reach $16T by 2030. Get in early.' },
         { title: 'Recurring Revenue Model', desc: 'Platform fees on issuance, trading, and custody generate predictable cash flows.' },
@@ -60,7 +60,7 @@
         { title: 'On-Chain Transparency', desc: 'All transactions verifiable on the Stellar blockchain.' },
         { title: 'Smart Wallet Technology', desc: 'Passkey-based wallets — no seed phrases, no complexity.' }
       ]},
-      whitelist: { title: 'Join the Whitelist', sub: 'Be among the first to access the platform.', name: 'Name', role: 'I am a...', roleOptions: ['Investor', 'Company', 'Partner / VC', 'Other'], submit: 'Join the Whitelist', success: "You're on the whitelist! We'll be in touch." },
+      whitelist: { title: 'Join the Waiting List', sub: 'Be among the first to access the platform.', name: 'Name', role: 'I am a...', roleOptions: ['Investor', 'Company', 'Partner / VC', 'Other'], submit: 'Join the Waiting List', success: "You're on the waiting list! We'll be in touch." },
       footer: { tagline: 'Tokenization infrastructure for real-world assets', platform: 'Platform', legal: 'Legal', connect: 'Connect', terms: 'Terms of Service', privacy: 'Privacy Policy', risk: 'Risk Disclaimer', disclaimer: 'Radox is not a broker-dealer or investment advisor. Securities offered through the platform are subject to applicable regulatory requirements. Past performance does not guarantee future results.' },
       ticker: { asset: 'Asset', type: 'Type', yield: 'Yield', volume: 'Volume', disclaimer: 'Simulated data for illustration purposes' }
     },
@@ -78,7 +78,7 @@
         { title: 'Transparência Blockchain', desc: 'Cada transação registrada on-chain. Auditoria completa.' },
         { title: 'Rendimentos Reais', desc: 'Receba juros de ativos reais, não especulação.' },
         { title: 'Suas Chaves, Seus Ativos', desc: 'Autocustódia com tecnologia de carteira inteligente. Sem intermediários.' }
-      ], cta: 'Entrar na Whitelist' },
+      ], cta: 'Entrar na Lista de Espera' },
       forInvestors: { title: 'Para Parceiros e VCs', cards: [
         { title: 'Oportunidade de Mercado Massiva', desc: 'O mercado de tokenização de ativos reais deve atingir $16T até 2030. Entre cedo.' },
         { title: 'Modelo de Receita Recorrente', desc: 'Taxas de emissão, negociação e custódia geram fluxos de caixa previsíveis.' },
@@ -114,7 +114,7 @@
         { title: 'Transparência On-Chain', desc: 'Todas as transações verificáveis na blockchain Stellar.' },
         { title: 'Tecnologia de Carteira Inteligente', desc: 'Carteiras baseadas em passkey — sem seed phrases, sem complexidade.' }
       ]},
-      whitelist: { title: 'Entre na Whitelist', sub: 'Esteja entre os primeiros a acessar a plataforma.', name: 'Nome', role: 'Eu sou...', roleOptions: ['Investidor', 'Empresa', 'Parceiro / VC', 'Outro'], submit: 'Entrar na Whitelist', success: 'Você está na whitelist! Entraremos em contato.' },
+      whitelist: { title: 'Entre na Lista de Espera', sub: 'Esteja entre os primeiros a acessar a plataforma.', name: 'Nome', role: 'Eu sou...', roleOptions: ['Investidor', 'Empresa', 'Parceiro / VC', 'Outro'], submit: 'Entrar na Lista de Espera', success: 'Você está na lista de espera! Entraremos em contato.' },
       footer: { tagline: 'Infraestrutura de tokenização para ativos reais', platform: 'Plataforma', legal: 'Legal', connect: 'Conecte-se', terms: 'Termos de Serviço', privacy: 'Política de Privacidade', risk: 'Aviso de Risco', disclaimer: 'Radox não é corretora de valores nem consultora de investimentos. Os valores mobiliários oferecidos através da plataforma estão sujeitos aos requisitos regulatórios aplicáveis. Rentabilidade passada não garante resultados futuros.' },
       ticker: { asset: 'Ativo', type: 'Tipo', yield: 'Rendimento', volume: 'Volume', disclaimer: 'Dados simulados para fins ilustrativos' }
     }
@@ -420,12 +420,12 @@
       const role = form.querySelector('[name="role"]').value.trim().slice(0, 50);
 
       const message = encodeURIComponent(
-        `New Whitelist Signup:\n\nName: ${name}\nEmail: ${email}\nWhatsApp: ${whatsapp}\nRole: ${role}`
+        `New Waiting List Signup:\n\nName: ${name}\nEmail: ${email}\nWhatsApp: ${whatsapp}\nRole: ${role}`
       );
       window.open(`https://wa.me/5521994028261?text=${message}`, '_blank');
 
       const mailBody = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nWhatsApp: ${whatsapp}\nRole: ${role}`);
-      const mailSubject = encodeURIComponent('New Whitelist Signup - Radox');
+      const mailSubject = encodeURIComponent('New Waiting List Signup - Radox');
       window.location.href = `mailto:pedro@radox.net?subject=${mailSubject}&body=${mailBody}`;
 
       // Show success
