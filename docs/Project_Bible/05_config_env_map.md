@@ -10,7 +10,7 @@
 | Variable | Values | Effect |
 |----------|--------|--------|
 | `NODE_ENV` | `development` / `production` | Debug routes enabled, error detail in responses, Sentry enabled |
-| `KEY_MANAGEMENT_MODE` | `env` / `multisig` | `env`: server signs with secret keys. `multisig`: Freighter/Ledger signing |
+| `KEY_MANAGEMENT_MODE` | `env` / `multisig` | `multisig`: Freighter/Ledger signing (dev & prod default). `env`: server signs with secret keys (test scripts only) |
 | `ENABLE_SOROBAN_SALE` | `true` / `false` | Enables event indexer, reconciler, metrics, Soroban dashboard |
 | `ENABLE_PAYMENT_MONITORING` | `true` / `false` | Enables deposit relay (PaymentMonitor streaming) |
 
@@ -52,7 +52,7 @@
 | `ISSUER_SECRET_KEY` | Only in env mode | — | StellarService |
 | `DISTRIBUTOR_SECRET_KEY` | Only in env mode | — | StellarService |
 | `TREASURY_SECRET_KEY` | Only in env mode | — | platformAdminRoutes (sponsor) |
-| `OPERATIONS_SECRET_KEY` | Only in env mode | — | StellarService (gasless) |
+| `OPERATIONS_SECRET_KEY` | Both modes (hot wallet) | — | StellarService (gasless) |
 
 ### Soroban / Smart Wallets
 | Variable | Required | Default | Used By |

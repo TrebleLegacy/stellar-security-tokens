@@ -107,7 +107,7 @@
 | JWT tokens | httpOnly cookie + Bearer header | ✅ |
 | Refresh tokens | httpOnly, Secure, SameSite=Lax | ✅ |
 | Passkey credentials | Public key only in DB | ✅ |
-| Secret keys (env mode) | Environment variables | ⚠️ Acceptable for dev |
+| Secret keys (ops only) | Docker Secrets (tmpfs) / `.env` | ✅ Only OPERATIONS stored server-side |
 | Secret keys (prod) | Docker Secrets (tmpfs) | ✅ |
 | Error details | Stripped in production responses | ✅ |
 | Sentry data | PII scrubbed (tokens, URLs) | ✅ |

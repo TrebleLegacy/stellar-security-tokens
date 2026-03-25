@@ -49,7 +49,7 @@ services:
       DB_PASSWORD: postgres
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/stellar_tokens
       # Key Management Mode ('multisig' = Freighter/Ledger, 'env' = server-side keys)
-      KEY_MANAGEMENT_MODE: ${KEY_MANAGEMENT_MODE:-env}
+      KEY_MANAGEMENT_MODE: ${KEY_MANAGEMENT_MODE:-multisig}
       # Stellar Network
       STELLAR_NETWORK: ${STELLAR_NETWORK:-testnet}
       STELLAR_HORIZON_URL: ${STELLAR_HORIZON_URL:-https://horizon-testnet.stellar.org}
@@ -60,7 +60,7 @@ services:
       DISTRIBUTOR_PUBLIC_KEY: ${DISTRIBUTOR_PUBLIC_KEY}
       OPERATIONS_PUBLIC_KEY: ${OPERATIONS_PUBLIC_KEY}
       TREASURY_PUBLIC_KEY: ${TREASURY_PUBLIC_KEY}
-      # Stellar Accounts - Secret keys (only needed when KEY_MANAGEMENT_MODE=env)
+      # Stellar Accounts - OPERATIONS_SECRET_KEY is the ONLY secret stored server-side (both dev & prod)
       # In production, OPERATIONS uses Docker Secrets (see docker-compose.prod.yml)
       ISSUER_SECRET_KEY: ${ISSUER_SECRET_KEY:-}
       DISTRIBUTOR_SECRET_KEY: ${DISTRIBUTOR_SECRET_KEY:-}

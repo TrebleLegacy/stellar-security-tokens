@@ -13,24 +13,26 @@ const log = logger.scope('KeyManager');
  * 
  * Centralizes the retrieval of sensitive keys with dual-mode support:
  * 
- * MODE: 'env' (Development/Testnet)
+ * MODE: 'env' (Automated test scripts ONLY)
  * - Retrieves full keypairs from process.env
  * - Allows auto-signing of transactions
- * - Used for local development and testnet
+ * - Used exclusively by E2E test scripts that inject throwaway keys
+ * - NOT used in normal development — dev uses multisig + Freighter
  * 
  * MODE: 'multisig' (Production)
  * - Only returns public keys
  * - Private keys stay on Ledger hardware wallets
  * - Transactions are queued for manual signing
  * 
- * SECURITY NOTE: In production, only the Operations ("hot wallet") secret key
- * should be stored on the server. It funds automated sponsorships and trustlines
- * with minimal XLM. All other keys (Issuer, Treasury, Distributor) must stay on
- * hardware wallets / Freighter and go through MultiSig approval.
+ * SECURITY NOTE: Only the Operations ("hot wallet") secret key is stored
+ * server-side (.env / Docker Secrets), in BOTH dev and production. It funds
+ * automated sponsorships and trustlines with minimal XLM.
+ * All other keys (Issuer, Treasury, Distributor) are signed via Freighter and
+ * go through MultiSig approval — they are NEVER stored in .env.
  */
 class KeyManager {
     constructor() {
-        this.mode = process.env.KEY_MANAGEMENT_MODE || 'env';
+        this.mode = process.env.KEY_MANAGEMENT_MODE || 'multisig';
         this.env = process.env.NODE_ENV || 'development';
 
         if (this.mode === 'multisig') {
