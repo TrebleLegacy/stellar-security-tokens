@@ -118,6 +118,48 @@ Reference: Security audit Fix #4 (Mar 2026), `companyUserRoutes.js` comments.
 
 ---
 
+### Fee Model Redesign
+> **Principle:** Company is the customer. Investor's yield is sacred. Platform earns via spread.
+
+#### Change 1 — Fixed Processing Fee + feeBps=0
+- [ ] Set `feeBps = 0` permanently (company gets 100% of capital raised)
+- [ ] Fix `sorobanSale.service.js` default: `feeBps = 10000` → `feeBps = 0`
+- [ ] Add `fixed_fee: i128` field to Soroban Offer struct (contract upgrade)
+- [ ] In `trade()`: deduct `fixed_fee` ($5 USDC = 50_000_000 stroops) → treasury, remainder → company
+- [ ] Add `processingFee` field to Prisma Offer model
+- [ ] Redeploy WASM + upgrade active contracts
+
+#### Change 2 — Yield Spread (Invisible Fee)
+- [ ] Add `investorRate` field to Offer schema
+- [ ] Payout math: company pays at `annualInterestRate`, investor receives at `investorRate`, delta → treasury
+- [ ] Remove `DIVIDEND_FEE_PERCENT` logic entirely from `companyPayment.service.js`
+- [ ] Frontend: investor sees `investorRate` as "APY", company sees `annualInterestRate` as "Cost of Capital"
+- [ ] Migration: existing offers default `investorRate = annualInterestRate` (spread=0)
+
+#### Change 3 — Admin/AUM Fee (Recurring Monthly)
+- [ ] Add `adminFeePercent` field to Offer schema (default 1.0%)
+- [ ] New `adminFee.service.js` — monthly cron charges `AUM × adminFeePercent / 12`
+- [ ] Company wallet → treasury, automated USDC transfer
+- [ ] FeeLog category: `ADMINISTRATION`
+- [ ] Insufficient balance handling: grace period → auto-pause offer
+
+#### Change 4 — Network Fee (evaluate: merge with Change 1?)
+- [ ] Decide: is the $5 processing fee (Change 1) sufficient, or add separate $0.50 network fee?
+- [ ] If merged: $5 covers everything (processing + network). Done.
+- [ ] If separate: implement as second fixed fee in contract
+
+#### Change 5 — Late/Default Fee Enablement
+> **Build when:** Legal framework established (CVM/contract terms reviewed by counsel).
+
+Infrastructure is **already built** in `companyPayment.service.js:22-24`. Just needs non-zero values:
+- [ ] Legal review: confirm late fee + default penalty terms are enforceable under Brazilian law
+- [ ] Set `LATE_FEE_PERCENT_PER_DAY = 0.1` (0.1%/day after 10-day grace)
+- [ ] Set `DEFAULT_FEE_PERCENT = 5.0` (5% one-time penalty on default)
+- [ ] Update investor + company terms of service
+- [ ] Add fee disclosure to offer prospectus documents
+
+---
+
 ## Post-Launch — Deferred from PR #3
 
 > These items were scoped in PR #3 but are not needed for MVP. Each has a clear trigger for when to build.
@@ -150,11 +192,11 @@ Backend route exists (`POST /contracts/batch/ttl` → `ContractController.batchE
 - [ ] Scrollable log section in `ContractDetail.tsx`
 
 ### Fee UX (Investor-Facing)
-> **Build now:** Hide fee breakdown from investor payment history. Show only net amount received.
+> **Build with** Change 2 (yield spread). Once spread model is live, investor never sees a "fee."
 
-- [ ] Remove `platformFeeAmount` column from investor payment history UI
-- [ ] Payment notification shows: "Payment received: R$ 980.00 (net of 2% platform service fee)"
-- [ ] Admin panel retains full fee visibility (grossAmount, netAmount, platformFeeAmount)
+- [ ] Investor payment history shows net amount only (= `investorRate` yield, no deductions)
+- [ ] Admin panel retains full visibility: `companyRate`, `investorRate`, `spread`, `treasuryAmount`
+- [ ] Payment notification: "Payment received: R$ 800.00 — 8.0% APY on your R$ 10,000 investment"
 
 ### Loyalty Points Program 🎯
 > **Build when:** Post-MVP, when investor retention becomes a priority.

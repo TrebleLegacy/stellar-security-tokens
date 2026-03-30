@@ -573,6 +573,11 @@ async function main() {
       investorUsdcAfterTrade === 500 - INVEST_USDC,
       `Investor USDC after trade: ${investorUsdcAfterTrade} === ${500 - INVEST_USDC}`,
     );
+    // feeBps=0 → company gets 100% of investor's USDC (no contract retention)
+    assert(
+      companyUsdcAfterTrade >= INVEST_USDC,
+      `Company received trade USDC: ${companyUsdcAfterTrade} >= ${INVEST_USDC} (feeBps=0, full amount)`,
+    );
 
     // ─── PHASE 4: BULLET PAYOUT + BURN ────────────────────────
     console.log('\n╔════════════════════════════════════════════╗');
@@ -659,6 +664,7 @@ async function main() {
 
     try {
       if (testIds.offerId) {
+        await prisma.companyPayment.deleteMany({ where: { offerId: testIds.offerId } }).catch(() => {});
         await prisma.interestPayment.deleteMany({ where: { offerId: testIds.offerId } });
         await prisma.feeLog.deleteMany({ where: { assetCode: ASSET_CODE } }).catch(() => {});
         await prisma.investment.deleteMany({ where: { offerId: testIds.offerId } });
