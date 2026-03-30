@@ -200,7 +200,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const [isExtendedWait, setIsExtendedWait] = useState(false);
     const { purchase, submitSignedTx, loading, error } = useInvestment();
     const { usdcBalance, loading: balanceLoading, refresh: refreshBalance } = useWalletBalance();
-    const { blockchainFee } = useInvestmentFees();
+    const { processingFee } = useInvestmentFees();
     const confirmTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
     // KYC gate
@@ -234,7 +234,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
     const isNearCutoff = daysUntilCutoff !== null && daysUntilCutoff > 0 && daysUntilCutoff <= 30;
 
     // Fee calculations
-    const totalDeduction = isValidAmount ? parsedAmount + blockchainFee : 0;
+    const totalDeduction = isValidAmount ? parsedAmount + processingFee : 0;
     const tokensReceived = isValidAmount ? parsedAmount / unitPrice : 0;
     const hasInsufficientFunds = usdcBalance !== null && isValidAmount && totalDeduction > usdcBalance;
     const shortfall = hasInsufficientFunds ? totalDeduction - (usdcBalance || 0) : 0;
@@ -259,8 +259,8 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                 // Capture purchase details for the receipt
                 const details: PurchaseDetails = {
                     usdcAmount,
-                    feeAmount: blockchainFee,
-                    totalDeduction: usdcAmount + blockchainFee,
+                    feeAmount: processingFee,
+                    totalDeduction: usdcAmount + processingFee,
                     tokensReceived: result.investmentContext?.tokenAmount ?? (usdcAmount / unitPrice),
                     assetCode: offer.asset_code,
                     offerName: offer.offer_name,
@@ -564,7 +564,7 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                 </div>
                                     {purchaseDetails.feeAmount > 0 ? (
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Blockchain fee</span>
+                                            <span className="text-slate-500">Processing fee</span>
                                             <span className="text-slate-400">+${purchaseDetails.feeAmount.toFixed(2)}</span>
                                         </div>
                                     ) : (
@@ -765,10 +765,10 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                                             ~{tokensReceived.toFixed(2)} {offer.asset_code}
                                         </span>
                                     </div>
-                                    {blockchainFee > 0 ? (
+                                    {processingFee > 0 ? (
                                         <div className="flex justify-between text-xs">
-                                            <span className="text-muted-foreground">Blockchain fee</span>
-                                            <span className="text-slate-400">+{blockchainFee} USDC</span>
+                                            <span className="text-muted-foreground">Processing fee</span>
+                                            <span className="text-slate-400">+{processingFee} USDC</span>
                                         </div>
                                     ) : (
                                         <div className="flex justify-between text-xs">
