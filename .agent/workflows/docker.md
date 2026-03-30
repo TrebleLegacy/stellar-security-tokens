@@ -44,18 +44,32 @@ docker exec stellar_backend sh -c 'cd /app/backend && NODE_ENV=test node --impor
 docker exec stellar_backend sh -c 'cd /app/backend && NODE_ENV=test node --import tsx --test tests/unit/middleware/auth.test.js'
 ```
 
-### 7. View Backend Logs
+### 7. Run E2E Tests (Token Lifecycle)
+
+The `contracts/` directory is volume-mounted as read-only in dev mode, so the
+WASM binary is available automatically.
+
+```bash
+docker exec stellar_backend sh -c 'cd /app/backend && node --import tsx ../backend/tests/e2e/tokenLifecycle.test.js'
+```
+
+> **Note:** E2E tests take ~4 minutes (7 phases, real Stellar testnet transactions).
+> Requires: Docker running, internet access, testnet not rate-limited.
+> If you get `ENOENT` for the WASM file, force-recreate the backend to pick up the volume mount:
+> `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate backend`
+
+### 8. View Backend Logs
 // turbo
 ```bash
 docker compose logs -f --tail=50 backend
 ```
 
-### 8. Stop All
+### 9. Stop All
 ```bash
 docker compose down
 ```
 
-### 9. Clean Up Orphans (After Stale Container Errors)
+### 10. Clean Up Orphans (After Stale Container Errors)
 ```bash
 docker compose down --remove-orphans
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
@@ -64,6 +78,6 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 ## Important Notes
 
 - **Never use** `docker compose down -v` unless you want to delete the database
-- **Volume mounts** in dev: `src/`, `prisma/`, `tests/` auto-sync
+- **Volume mounts** in dev: `src/`, `prisma/`, `tests/`, `contracts/` (read-only) auto-sync
 - **Requires rebuild**: `package.json`, Dockerfile changes
 - **Requires force-recreate**: docker-compose.yml changes, `.env` changes
