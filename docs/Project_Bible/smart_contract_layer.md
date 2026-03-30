@@ -7,7 +7,7 @@
 
 ## Contract Overview
 
-**TokenSale v5** — Atomic token sale contract on Soroban.
+**TokenSale v6** — Atomic token sale contract on Soroban.
 
 Two-role access control:
 - **Admin** (cold/multisig): upgrade, withdraw, drain, freeze, admin transfer
@@ -21,30 +21,37 @@ pub struct Offer {
     seller: Address,          // Operational key
     sell_token: Address,      // Token being sold (SAC)
     buy_token: Address,       // Payment token (USDC SAC)
-    treasury: Address,        // USDC auto-forwarded here on trade
+    treasury: Address,        // Fee destination
+    company: Address,         // Investment destination (gets 100% of buy_token_amount)
+    fixed_fee: i128,          // v6: additive flat fee in stroops. 0 = no fee.
     sell_price: u32,          // Price numerator
     buy_price: u32,           // Price denominator
     is_active: bool,          // Pause/resume flag
     deadline_ledger: u32,     // 0 = no deadline
     min_buy_amount: i128,     // 0 = no minimum
     max_buy_per_buyer: i128,  // 0 = no cap, cumulative per buyer
-    fixed_fee: i128,          // v5: flat USDC fee per trade (stroops). 0 = no fee.
 }
 ```
 
+### v6 Migration Notes (2026-03-30)
+- **Breaking change**: `trade()` fee model is now **additive** — investor pays `buy_amount + fee`
+- **v5 (old)**: Fee was subtractive — `company = buy_amount - fee`, tokens on `buy_amount - fee`
+- **v6 (new)**: Fee is additive — `company = buy_amount (100%)`, tokens on `buy_amount`, investor pays `buy_amount + fee`
+- **Rationale**: Company receives full investment principal. Fee is transparent and separate.
+- **WASM hash**: `1178db3fd6358552f9e1547ab0e104e3b5ec1c3111361b28e1b5012dd43fd5a0`
+- **Strategy**: New contracts only — existing v5 contracts are immutable and continue operating with their original parameters.
+
 ### v5 Migration Notes (2026-03-30)
-- **Removed**: `fee_bps: u32` (percentage-based fee, existed in v4 but was a trust-eroding landmine)
+- **Removed**: `fee_bps: u32` (percentage-based fee from v4)
 - **Added**: `fixed_fee: i128` (flat fee in stroops, e.g. 50_000_000 = $5 USDC)
-- **Rationale**: Transparent, predictable fees. Investor pays exactly what they see. No hidden percentage.
-- **WASM hash**: `13e1d732b2db74af8ea67866af0890d4e059452d2134018e5e0c1052941fb874`
-- **Strategy**: New contracts only — existing v4 contracts are immutable and continue operating with their original parameters.
+- **Added**: `company: Address` and `treasury: Address` split (v4 had single treasury)
 
 ## Public Functions (15)
 
 | Function | Auth | Risk | Purpose |
 |----------|------|------|---------|
 | `create` | Admin | Setup | Initialize offer (starts INACTIVE) |
-| `trade` | Buyer | Core | Atomic USDC→token swap (3 transfers, fixed fee deducted) |
+| `trade` | Buyer | Core | Atomic USDC→token swap (additive fee: pulls buy_amount + fee) |
 | `withdraw` | Admin | High | Withdraw any token from contract |
 | `emergency_drain` | Admin | Critical | Pause + withdraw ALL sell_token |
 | `set_active` | Seller | Medium | Pause/resume trading |
@@ -58,37 +65,38 @@ pub struct Offer {
 | `get_offer` | Public | Read | Return offer state |
 | `get_balance` | Public | Read | Contract's sell_token balance |
 | `get_buyer_spent` | Public | Read | Buyer's cumulative spend |
-| `version` | Public | Read | Returns 5 |
+| `version` | Public | Read | Returns 6 |
 
-## Trade Flow (Atomic, v5)
-
-```
-buyer sends: buy_token_amount (USDC) → contract
-
-contract checks: buy_token_amount > fixed_fee (else InsufficientForFee)
-
-contract splits:
-  ├─ fixed_fee (USDC)                    → treasury
-  └─ buy_token_amount - fixed_fee (USDC) → company (seller)
-
-contract sends:
-  └─ sell_token_amount (tokens)          → buyer
-
-Formula: sell_amount = (buy_amount - fixed_fee) * sell_price / buy_price
-```
+## Trade Flow (Atomic, v6 — Additive Fee)
 
 ```
-  ┌─────────┐     buy_token_amount      ┌──────────┐
-  │  BUYER  │ ──────────────────────────▶│ CONTRACT │
-  └─────────┘                            └────┬─────┘
-       ▲                                      │
-       │  sell_token_amount                   ├── fixed_fee ──────▶ TREASURY
-       │                                      │
-       └──────────────────────────────────────┘
-                                              └── remainder ─────▶ COMPANY
+buyer calls: trade(buyer, buy_token_amount)
+
+contract computes:
+  total_pull = buy_token_amount + fixed_fee
+
+contract transfers:
+  1. buyer → contract:  total_pull (buy_token_amount + fixed_fee)
+  2. contract → buyer:  sell_token_amount (tokens)
+  3. contract → company: buy_token_amount (100% of investment)
+  4. contract → treasury: fixed_fee (if > 0)
+
+Formula: sell_amount = buy_token_amount * sell_price / buy_price
+         (fee is NOT subtracted — tokens calculated on full investment)
 ```
 
-Checks: active, deadline, min amount, buyer not frozen, per-buyer cap, overflow, buy_amount > fixed_fee.
+```
+  ┌─────────┐   buy_token_amount + fee   ┌──────────┐
+  │  BUYER  │ ──────────────────────────▶ │ CONTRACT │
+  └─────────┘                             └────┬─────┘
+       ▲                                       │
+       │  sell_token_amount                    ├── buy_token_amount ─▶ COMPANY (100%)
+       │  (tokens on full                      │
+       │   buy_token_amount)                   └── fixed_fee ────────▶ TREASURY
+       └───────────────────────────────────────┘
+```
+
+Checks: active, deadline, min amount, buyer not frozen, per-buyer cap, overflow.
 
 ## Storage Layout
 
@@ -99,7 +107,7 @@ Checks: active, deadline, min amount, buyer not frozen, per-buyer cap, overflow,
 | `DataKey::BuyerSpent(addr)` | Persistent | Cumulative spend per buyer |
 | `DataKey::BuyerBlocked(addr)` | Persistent | Buyer blocklist |
 
-## Error Codes (12)
+## Error Codes (13)
 
 | Code | Name | Trigger |
 |------|------|---------|
@@ -115,7 +123,7 @@ Checks: active, deadline, min amount, buyer not frozen, per-buyer cap, overflow,
 | 10 | BuyerBlocked | Buyer is frozen |
 | 11 | NoPendingAdmin | No pending admin to accept |
 | 12 | NotPendingAdmin | Wrong address accepting |
-| 13 | InsufficientForFee | buy_token_amount ≤ fixed_fee (v5) |
+| 13 | InsufficientForFee | Overflow when computing buy_token_amount + fixed_fee |
 
 ## TTL Configuration
 - Threshold: 518,400 ledgers (~30 days at 5s/ledger)
@@ -140,9 +148,9 @@ JS: fixedFee = BigInt(processingFee * 10_000_000) = 50_000_000n (stroops)
 {
   "processingFee": 5.0,
   "yieldFee": "Spread-based (company rate - investor rate)",
-  "description": "A fixed $5 processing fee is deducted per trade on-chain."
+  "description": "A fixed $5 processing fee is added per trade on-chain."
 }
 ```
 
 ## Test Coverage (75 snapshots)
-Happy path, edge cases (overflow, zero caps, double-create), buyer cap enforcement (independent per buyer), admin transfer chain, emergency drain, pause/resume, supply exhaustion, blocklist, deadline, **fixed fee deduction** (5 tests: zero fee, non-zero fee, fee equals trade, fee exceeds trade, fee treasury balance).
+Happy path, edge cases (overflow, zero caps, double-create), buyer cap enforcement (independent per buyer), admin transfer chain, emergency drain, pause/resume, supply exhaustion, blocklist, deadline, **additive fixed fee** (5 tests: zero fee, non-zero fee, fee overflow, fee-only trade, fee treasury balance). All tests verify company receives 100% of `buy_token_amount` and treasury receives `fixed_fee`.
