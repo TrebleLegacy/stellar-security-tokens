@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 
 interface FeeSchedule {
-    blockchainFee: number;
+    processingFee: number;
 }
 
 export function useInvestmentFees() {
-    const [fees, setFees] = useState<FeeSchedule>({ blockchainFee: 0 });
+    const [fees, setFees] = useState<FeeSchedule>({ processingFee: 5 });
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -15,10 +15,10 @@ export function useInvestmentFees() {
                 const response = await api.get('/investments/fee-schedule');
                 const data = response.data || response;
                 setFees({
-                    blockchainFee: data.blockchainFee ?? 0,
+                    processingFee: data.processingFee ?? 5,
                 });
             } catch {
-                // Use defaults on error
+                // Use defaults on error ($5 processing fee)
             } finally {
                 setLoading(false);
             }

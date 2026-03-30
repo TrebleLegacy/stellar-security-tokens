@@ -1188,11 +1188,11 @@ fn test_create_negative_fixed_fee() {
 // ═══════════════════════════════════════════════════════
 
 #[test]
-fn test_version_returns_5() {
+fn test_version_returns_6() {
     let e = Env::default();
     let sale_id = e.register(TokenSale, ());
     let sale = TokenSaleClient::new(&e, &sale_id);
-    assert_eq!(sale.version(), 5);
+    assert_eq!(sale.version(), 6);
 }
 
 #[test]

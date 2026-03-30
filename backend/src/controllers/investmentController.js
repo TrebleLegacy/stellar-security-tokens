@@ -271,7 +271,7 @@ export const purchaseInvestment = async (req, res, next) => {
         investorId: parseInt(investorId, 10),
         offerId: parseInt(offerId),
         usdcAmount: grossAmount,
-        feeAmount: fixedFee,
+        feeAmount: processingFee,
         totalDeduction: totalDeduction,
         tokenAmount: tokenAmount,
         assetCode: assetCode,
