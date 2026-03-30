@@ -121,13 +121,15 @@ Reference: Security audit Fix #4 (Mar 2026), `companyUserRoutes.js` comments.
 ### Fee Model Redesign
 > **Principle:** Company is the customer. Investor's yield is sacred. Platform earns via spread.
 
-#### Change 1 — Fixed Processing Fee + feeBps=0
-- [ ] Set `feeBps = 0` permanently (company gets 100% of capital raised)
-- [ ] Fix `sorobanSale.service.js` default: `feeBps = 10000` → `feeBps = 0`
-- [ ] Add `fixed_fee: i128` field to Soroban Offer struct (contract upgrade)
-- [ ] In `trade()`: deduct `fixed_fee` ($5 USDC = 50_000_000 stroops) → treasury, remainder → company
-- [ ] Add `processingFee` field to Prisma Offer model
-- [ ] Redeploy WASM + upgrade active contracts
+#### Change 1 — Fixed Processing Fee ✅ (2026-03-30)
+- [x] Removed `feeBps` entirely from Soroban Offer struct
+- [x] Added `fixed_fee: i128` field — flat $5 USDC per trade (50_000_000 stroops)
+- [x] In `trade()`: deduct `fixed_fee` → treasury, remainder → company
+- [x] Added `processingFee` field to Prisma Offer model (Decimal, default 5.0)
+- [x] Bumped `CONTRACT_VERSION` to 5, added `InsufficientForFee` error
+- [x] Built + deployed v5 WASM to testnet: `13e1d732...1fb874`
+- [x] E2E verified: 75/75 Rust, 38/38 E2E lifecycle
+- [x] Updated Project Bible `smart_contract_layer.md`
 
 #### Change 2 — Yield Spread (Invisible Fee)
 - [ ] Add `investorRate` field to Offer schema
@@ -157,6 +159,26 @@ Infrastructure is **already built** in `companyPayment.service.js:22-24`. Just n
 - [ ] Set `DEFAULT_FEE_PERCENT = 5.0` (5% one-time penalty on default)
 - [ ] Update investor + company terms of service
 - [ ] Add fee disclosure to offer prospectus documents
+
+#### v6 — On-Chain Distribution Contract (Future)
+> **Build when:** Post-MVP, when investor trust and regulatory audit trail are priorities.
+
+Hybrid architecture: backend computes yield math, contract validates and executes atomically.
+
+```
+Company deposits USDC → Distribution Contract
+Backend submits plan [(investor_A, 50), (investor_B, 30)]
+Contract validates: sum(payouts) + fee ≤ deposited
+Contract executes: USDC → each investor, fee → treasury, clawback tokens
+```
+
+- [ ] New Soroban contract: `token_distribution`
+  - `deposit(company, amount)` — company sends USDC to contract
+  - `distribute(admin, plan[])` — backend submits the split, contract validates + executes
+  - `clawback_and_close(admin)` — maturity settlement
+- [ ] Backend: adapt `companyPayment.service.js` to submit distribution plan to contract
+- [ ] E2E: verify atomic payout + clawback via contract
+- [ ] Subsumes Changes 2-3 by enforcing fee split on-chain
 
 ---
 
