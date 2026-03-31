@@ -4,34 +4,6 @@
 
 This document details all specific actions required to transition the **Radox** platform from Testnet to Mainnet (Production).
 
-## ✅ Code Changes (Already Complete)
-
-### Backend Logic
-- [x] **Friendbot Calls (`backend/src/services/stellar.service.js`):** Already wrapped in `if (process.env.STELLAR_NETWORK === 'testnet')` blocks.
-- [x] **CORS Policy (`backend/src/app.js`):** Already uses `process.env.FRONTEND_URL`.
-- [x] **JWT Fail-Fast (`backend/src/middleware/auth.js`):** App crashes if `JWT_SECRET` is missing.
-- [x] **Network-Aware Config (`passkeyWallet.service.js`):** Uses centralized `getSorobanRpcUrl()` and `isTestnet()`.
-- [x] **Production Startup Guard (`index.js`):** Blocks `NODE_ENV=test` in production without explicit `ALLOW_TEST_MODE=1`.
-
-### Hardcoded Values
-- [x] **Asset Code:** Configurable via env vars.
-- [x] **USDC Issuer:** Auto-detected based on `STELLAR_NETWORK`. Mainnet: `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`.
-
-### Fee Model
-- [x] **Soroban v6 contract** — additive $5 fixed fee per trade (`CONTRACT_VERSION = 6`)
-- [x] **Yield spread model** — `investorRate` vs `annualInterestRate`, spread → treasury
-- [x] **FeeLog** — all fee events recorded to DB, admin `GET /fee-logs` endpoint active
-
-### SEP-1 / Asset Discoverability
-- [x] **TOML generation** — `TomlService.js` produces SEP-1 compliant `stellar.toml`
-- [x] **IPFS metadata** — standard fields (`attestation_of_reserve`, `redemption_instructions`) with valid IPFS links
-- [x] **Caddy routing** — `/.well-known/stellar.toml` served for `radox.net`
-
-### Email
-- [x] **Resend HTTP API** — email service uses Resend (not SMTP). Requires `RESEND_API_KEY` env var.
-
----
-
 ## 🌍 Environment Variables Configuration
 
 Create a production `.env` file with the following changes:
@@ -52,15 +24,14 @@ Create a production `.env` file with the following changes:
 - [ ] **Generate new mainnet keypairs** for Issuer, Distributor, Treasury, Operations. Fund each with XLM.
 - [ ] **All `*_PUBLIC_KEY` vars**: Update in `.env.production` with mainnet public keys.
 
-### Operations Hot Wallet Security (CRITICAL)
-> `OPERATIONS_SECRET_KEY` is the **only** secret key on the server. It sponsors gasless transactions (wallet creation, trustlines). Protect it:
+### Operations Hot Wallet Security
+> `OPERATIONS_SECRET_KEY` is the **only** secret key on the server. It sponsors gasless transactions (wallet creation, trustlines).
 
-- [ ] **Fresh keypair** — generate a new mainnet Operations key. Never reuse testnet keys.
+- [x] **Docker Secrets** — key stored at `/root/.secrets/operations_key` (chmod 600), mounted to container at `/run/secrets/operations_key` (tmpfs, never on disk). `KeyManager.#readOperationsSecret()` reads it automatically.
+- [ ] **Fresh keypair** — generate a new mainnet Operations key at deploy time. Never reuse testnet keys.
 - [ ] **Minimal balance** — keep only ~50 XLM (enough for ~1000 sponsored txns). Refill as needed.
-- [ ] **Secrets Manager** — migrate from `.env.production` to a secrets manager (DigitalOcean Vault, HashiCorp Vault, or Google Secret Manager). The backend reads the key at startup via API call.
-- [ ] **File permissions** — if staying in `.env.production`, ensure `chmod 600` on the file (root-only).
 - [ ] **Account monitoring** — set up alerts on [stellar.expert](https://stellar.expert) for unexpected transactions on the Operations account.
-- [ ] **Key rotation plan** — document how to rotate the Operations key if compromised (generate new keypair, update `.env.production`, restart backend).
+- [ ] **Key rotation plan** — document how to rotate the Operations key if compromised (replace `/root/.secrets/operations_key`, recreate backend container).
 
 ### Smart Contracts (Smart Account Kit)
 - [ ] **`ACCOUNT_WASM_HASH`**: Deploy OZ Smart Account WASM to Mainnet and record hash.
@@ -91,17 +62,6 @@ Create a production `.env` file with the following changes:
 - [ ] **Channels API Key**: Get production API key from OpenZeppelin.
 - [ ] **`RESEND_API_KEY`**: Production Resend API key (already configured for testnet).
 - [ ] **Launchtube Mainnet JWT**: Obtain from SDF for sponsoring Soroban transactions on mainnet.
-
----
-
-## 📧 Email Configuration
-
-Email uses **Resend HTTP API** (not SMTP). Only one env var needed:
-
-- [ ] `RESEND_API_KEY` — production key from [Resend dashboard](https://resend.com)
-- [ ] Verify sender domain `radox.net` is configured in Resend DNS settings
-
-> **Note:** The old SMTP fields (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`) are no longer used. The email service was migrated to Resend in Mar 2026.
 
 ---
 
@@ -185,8 +145,7 @@ npm run multisig:setup    # Configure production signers
   ```
   This sets `masterWeight: 0` preventing any further minting.
 
-- [ ] **Remove secret keys from production .env** when using multisig mode
-  - Only public keys + `OPERATIONS_SECRET_KEY` needed when `KEY_MANAGEMENT_MODE=multisig`
+- [x] **Remove secret keys from production .env** — `.env.production` has zero Stellar secret keys. Only public keys + `OPERATIONS_SECRET_KEY` present.
   - Issuer/Treasury/Distributor transactions require Ledger/Freighter signatures
 
 ### Post-Launch Verification

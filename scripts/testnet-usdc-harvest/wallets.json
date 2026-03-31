@@ -1,0 +1,62 @@
+[
+  {
+    "publicKey": "GAOSI2FXS7SYABH2RZXFA55KG4W245TUSKIL36RNFFXN33ASIKNL6J4B",
+    "secretKey": "SCXSO2LG7LSEJC7UG45YDOOCYQ4L6MQG57UKU7PHBOPEXM2TLGDTHTCJ",
+    "funded": true,
+    "trustline": true,
+    "faucetClaimed": false,
+    "swept": true,
+    "createdAt": "2026-03-31T19:29:47.280Z",
+    "sweptAmount": 20,
+    "sweptAt": "2026-03-31T19:47:22.267Z",
+    "sweptTx": "3da38ccd5b21029a3a72bb87d3b2d23acdad5d99b04b8f76a3f037bf9af9392d"
+  },
+  {
+    "publicKey": "GCI26QDKU3MNTIXQEJMO5ROPDU47WEIQPEWLMFI2CDQM4GM3RLVIUK63",
+    "secretKey": "SCV7P3BB7B2OPZYXVSTM46OREZZ77ONIIZVUJ4BX22ABCDE7R5G6Y4R3",
+    "funded": true,
+    "trustline": true,
+    "faucetClaimed": false,
+    "swept": true,
+    "createdAt": "2026-03-31T19:29:57.853Z",
+    "sweptAmount": 20,
+    "sweptAt": "2026-03-31T19:47:27.843Z",
+    "sweptTx": "c2b7cfcfa7be096a35c62fb8296ab57345a0fa8066b63696723a64fd53beb757"
+  },
+  {
+    "publicKey": "GA62R5CCFRP655W6PH5Z7NGJLEL54KAOQJQKURKSKSFQI2BEIBDYR2EJ",
+    "secretKey": "SB77HO636EJNRRMBNE6YABTMGJRPL6E3TILBREPNTO4XSW2LOH2DQVQS",
+    "funded": true,
+    "trustline": true,
+    "faucetClaimed": false,
+    "swept": true,
+    "createdAt": "2026-03-31T19:30:07.277Z",
+    "sweptAmount": 20,
+    "sweptAt": "2026-03-31T19:47:32.844Z",
+    "sweptTx": "cfb1e838d803b54eb8cc0abda554b4a8d22566da67e90854f5fd3c52895d377a"
+  },
+  {
+    "publicKey": "GDGZJT6D5BDLKMWNKBSTXDRL5JG5LFNWTBYANUJTU5L6GANY525AQNV6",
+    "secretKey": "SDSG57ZAXJHIT3P2CZPWFDAT3KDWKFQK6B5LOUBKSYHYE2WOUQ7OXBJH",
+    "funded": true,
+    "trustline": true,
+    "faucetClaimed": false,
+    "swept": true,
+    "createdAt": "2026-03-31T19:30:17.277Z",
+    "sweptAmount": 20,
+    "sweptAt": "2026-03-31T19:47:37.844Z",
+    "sweptTx": "38d7dd30a5dfd2db099a67275105373577f0ad6917e5dea260f261ce7f15d20d"
+  },
+  {
+    "publicKey": "GCCDZ5P5FAPCSTOO2QGBZWT4HGU6567FKGBZM4VNE52I6BIWIM4ZXOK7",
+    "secretKey": "SD2B2IHUBJKUTY3ILX3JIYLFQWTLV3ZAW33QVQC3LGIJINARHRCXCWIH",
+    "funded": true,
+    "trustline": true,
+    "faucetClaimed": false,
+    "swept": true,
+    "createdAt": "2026-03-31T19:30:27.855Z",
+    "sweptAmount": 20,
+    "sweptAt": "2026-03-31T19:47:42.266Z",
+    "sweptTx": "1ffee253f054b8f8c8cb5f9c6dde9d2f46cc6011de5d3f5db6b6e1e9b015d8ff"
+  }
+]
