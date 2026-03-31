@@ -61,7 +61,7 @@ export const HELP_CONTENT = {
         },
         totalInvestments: {
             title: "Total Investments",
-            content: `All-time gross USDC raised across every offering (active + completed). Platform fees are deducted separately. This number only goes up — it doesn't decrease when investors sell tokens on secondary markets.`,
+            content: `All-time gross USDC raised across every offering (active + completed). The $5 processing fee is charged separately (additive, not deducted from this total). This number only goes up.`,
         },
         cnpjField: {
             title: "CNPJ (Brazilian Tax ID)",
@@ -260,8 +260,8 @@ export const HELP_CONTENT = {
             content: `Platform fees are now set per-offer during offer approval and enforced on-chain by the Soroban sale contract. This config key is no longer used.`,
         },
         dividendFee: {
-            title: "Dividend Fee",
-            content: `Deducted from the total dividend pool before distribution to investors. The investor receives dividends minus this fee. Revenue goes to the Fee Collector wallet.`,
+            title: "Yield Spread",
+            content: `The difference between the company's annual interest rate and the investor's rate. At payout time, the company pays the full rate — investors receive their rate, and the spread goes to the treasury. Set per-offer during admin approval.`,
         },
         blockchainFee: {
             title: "Blockchain Fixed Fee",
