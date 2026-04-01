@@ -1,35 +1,35 @@
 #!/bin/bash
 # =============================================================================
-# Bootstrap Admin — Run ONCE on first production deployment
+# Bootstrap Admin (Dev) — Seeds admin accounts for local development
 # =============================================================================
-# Creates the initial admin accounts so Freighter login works.
-# checkAndCreateAdmin.js refuses to run in NODE_ENV=production,
-# so we insert directly via psql.
+# Use this on dev/testnet. For production, use deploy/bootstrap-admin.sh.
 #
-# Usage (from project root on the VM):
-#   chmod +x deploy/bootstrap-admin.sh
-#   ./deploy/bootstrap-admin.sh
+# Reads ADMIN_1_EMAIL, ADMIN_1_NAME, ADMIN_2_EMAIL, ADMIN_2_NAME from .env.
+# Freighter keys are testnet keys — safe to hardcode here.
+#
+# Usage (from project root):
+#   chmod +x deploy/bootstrap-admin.dev.sh
+#   ./deploy/bootstrap-admin.dev.sh
 # =============================================================================
 
 set -euo pipefail
 
-# Load env vars for DB credentials
-if [ -f .env.production ]; then
-    export $(grep -E '^(POSTGRES_(USER|PASSWORD|DB)|ADMIN_[12]_EMAIL|ADMIN_[12]_NAME)=' .env.production | xargs)
+# Load env vars from .env (dev)
+if [ -f .env ]; then
+    export $(grep -E '^(DB_USER|DB_PASSWORD|DB_NAME|ADMIN_[12]_EMAIL|ADMIN_[12]_NAME)=' .env | xargs)
 fi
 
-POSTGRES_USER=${POSTGRES_USER:-stellar_prod}
-POSTGRES_DB=${POSTGRES_DB:-stellar_tokens}
-ADMIN_1_EMAIL=${ADMIN_1_EMAIL:?'ERROR: ADMIN_1_EMAIL must be set in .env.production'}
+DB_USER=${DB_USER:-postgres}
+DB_NAME=${DB_NAME:-stellar_tokens}
+ADMIN_1_EMAIL=${ADMIN_1_EMAIL:?'ERROR: ADMIN_1_EMAIL must be set in .env'}
 ADMIN_1_NAME=${ADMIN_1_NAME:-'Pedro Wakigawa Saragossy'}
 ADMIN_2_EMAIL=${ADMIN_2_EMAIL:-''}
 ADMIN_2_NAME=${ADMIN_2_NAME:-'Gabriel'}
 
-echo "🔐 Bootstrapping admin accounts..."
+echo "🔐 Bootstrapping dev admin accounts..."
 echo "   Admin 1: $ADMIN_1_NAME <$ADMIN_1_EMAIL>"
 
-docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-    exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+docker compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" -c "
 INSERT INTO platform_admins (
     email, name, password_hash, role, is_active,
     stellar_public_key, created_at, updated_at
@@ -39,7 +39,7 @@ INSERT INTO platform_admins (
     'FREIGHTER_ONLY',
     'super_admin',
     true,
-    -- ⚠️ UPDATE before mainnet: replace with your mainnet Freighter public key
+    -- Testnet Freighter key — safe to hardcode for dev
     'GCQPERDSGG4524J5N33IFUXOHRJKFJFBNDX27KXET7MC6OV7XJAG5VX5',
     NOW(), NOW()
 ) ON CONFLICT (email) DO UPDATE SET
@@ -50,8 +50,7 @@ INSERT INTO platform_admins (
 
 if [ -n "$ADMIN_2_EMAIL" ]; then
     echo "   Admin 2: $ADMIN_2_NAME <$ADMIN_2_EMAIL>"
-    docker compose -f docker-compose.yml -f docker-compose.prod.yml \
-        exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "
+    docker compose exec -T postgres psql -U "$DB_USER" -d "$DB_NAME" -c "
 INSERT INTO platform_admins (
     email, name, password_hash, role, is_active,
     stellar_public_key, created_at, updated_at
@@ -61,7 +60,7 @@ INSERT INTO platform_admins (
     'FREIGHTER_ONLY',
     'admin',
     true,
-    -- ⚠️ UPDATE before mainnet: replace with Gabriel's mainnet Freighter public key
+    -- ⚠️ Replace with Gabriel's testnet Freighter public key
     'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
     NOW(), NOW()
 ) ON CONFLICT (email) DO UPDATE SET
@@ -71,4 +70,4 @@ INSERT INTO platform_admins (
 "
 fi
 
-echo "✅ Admin accounts created. Login via Freighter at https://app.radox.net/admin/login"
+echo "✅ Done. Login via Freighter at https://dev.radox.net/admin/login"
