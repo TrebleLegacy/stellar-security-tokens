@@ -5,7 +5,6 @@
   "scripts": {
     "start": "cd backend && npm start",
     "dev": "cd backend && npm run dev",
-    "seed": "cd backend && npm run seed",
     "prisma:generate": "cd backend && npm run prisma:generate",
     "prisma:studio": "cd backend && npm run prisma:studio",
     "prisma:migrate": "cd backend && npm run prisma:migrate",

@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node --import tsx src/index.js",
     "dev": "node --watch --import tsx src/index.js",
-    "seed": "node src/database/seed.js",
     "bootstrap-admins": "node ../scripts/bootstrap-admins.js",
     "prisma:generate": "dotenv -e ../.env -- prisma generate",
     "prisma:studio": "dotenv -e ../.env -- prisma studio",
