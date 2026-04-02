@@ -87,7 +87,7 @@ export function EmergencyControls() {
             setLoading(true);
             const [tokensRes, offersRes] = await Promise.all([
                 tokensApi.getAll(),
-                api.get('/platform-admins/offers'),
+                api.get('/admin/offers'),
             ]);
             setTokens(tokensRes.data || []);
             setOffers(offersRes.data.data || []);
@@ -149,7 +149,7 @@ export function EmergencyControls() {
         setActionLoading(`pause-${offer.id}`);
         setError(null);
         try {
-            await api.put(`/admin/offers/${offer.id}/review`, { status: 'paused' });
+            await api.put(`/admin/offers/${offer.id}/pause-toggle`, { status: 'paused' });
             setSuccess(`Offer "${offer.offer_name}" paused`);
             await loadData();
         } catch (err: any) {
@@ -163,7 +163,7 @@ export function EmergencyControls() {
         setActionLoading(`resume-${offer.id}`);
         setError(null);
         try {
-            await api.put(`/admin/offers/${offer.id}/review`, { status: 'active' });
+            await api.put(`/admin/offers/${offer.id}/pause-toggle`, { status: 'active' });
             setSuccess(`Offer "${offer.offer_name}" resumed`);
             await loadData();
         } catch (err: any) {

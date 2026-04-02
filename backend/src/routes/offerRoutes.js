@@ -337,6 +337,63 @@ router.put('/admin/offers/:id/review', requirePlatformAdmin, reviewValidation, O
 
 /**
  * @swagger
+ * /api/admin/offers/{id}/pause-toggle:
+ *   put:
+ *     summary: "[Admin] Emergency pause/resume an offer"
+ *     description: Toggle an active offer to paused or a paused offer to active. Used by emergency controls.
+ *     tags: [Offers]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [paused, active]
+ *     responses:
+ *       200:
+ *         description: Offer status toggled
+ *       400:
+ *         description: Invalid status transition
+ */
+router.put('/admin/offers/:id/pause-toggle', requirePlatformAdmin, async (req, res) => {
+    const { status } = req.body;
+    if (!status || !['paused', 'active'].includes(status)) {
+        return res.status(400).json({ success: false, error: 'Status must be "paused" or "active"' });
+    }
+
+    const { Offer } = await import('../models/Offer.js');
+    const offer = await Offer.findById(parseInt(req.params.id));
+    if (!offer) {
+        return res.status(404).json({ success: false, error: 'Offer not found' });
+    }
+
+    // Only allow toggle between active <-> paused
+    if (status === 'paused' && offer.status !== 'active') {
+        return res.status(400).json({ success: false, error: 'Can only pause active offers' });
+    }
+    if (status === 'active' && offer.status !== 'paused') {
+        return res.status(400).json({ success: false, error: 'Can only resume paused offers' });
+    }
+
+    const updated = await Offer.updateStatus(parseInt(req.params.id), status, req.user?.userId);
+    res.json({ success: true, data: updated });
+});
+
+/**
+ * @swagger
  * /api/admin/offers/{id}/due-diligence:
  *   post:
  *     summary: "[Admin] Adicionar notas de due diligence"
