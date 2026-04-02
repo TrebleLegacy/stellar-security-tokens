@@ -177,6 +177,7 @@ services:
       "
     volumes:
       - backups_data:/app/backups
+      - ./contracts:/app/contracts:ro
 
   frontend:
     build:
