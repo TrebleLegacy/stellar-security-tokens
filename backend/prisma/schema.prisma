@@ -30,6 +30,7 @@ enum OfferStatus {
   approved
   rejected
   active
+  paused  // Emergency pause by admin
   closed
   matured // Bullet offer reached maturity, awaiting company payment
 }
