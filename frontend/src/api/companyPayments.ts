@@ -204,6 +204,25 @@ export const companyPaymentsApi = {
         const response = await api.post(`/company/payments/${offerId}/submit-deposit`, { signedXDR });
         return response.data;
     },
+
+    /**
+     * Get settlement contract status (company-facing, no admin auth needed)
+     */
+    getSettlementStatus: async (offerId: number): Promise<{
+        success: boolean;
+        data: {
+            offerId: number;
+            offerType: string;
+            offerStatus: string;
+            settlementContractId: string | null;
+            contractBalance: number | null;
+            maturityDate: string | null;
+            hasSettlementContract: boolean;
+        };
+    }> => {
+        const response = await api.get(`/company/payments/${offerId}/settlement-status`);
+        return response.data;
+    },
 };
 
 export default companyPaymentsApi;

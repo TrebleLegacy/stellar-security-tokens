@@ -346,7 +346,9 @@ export class SorobanSettlementService {
 
         log.info(`[executeFullSettlement] Offer ${offerId}: ${allInvestors.length} investors in ${batches.length} batches`);
 
+        const issuerKeypair = keyManager.getIssuerKeypair();
         const results = [];
+
         for (let bIdx = 0; bIdx < batches.length; bIdx++) {
             const batch = batches[bIdx];
             const batchPayout = batch.reduce((s, inv) => s + inv.payout, 0);
@@ -355,16 +357,36 @@ export class SorobanSettlementService {
                 : Math.round(totalPlatformFee * (batchPayout / totalPayout) * 10_000_000) / 10_000_000;
 
             const { xdr: batchXdr } = await this.buildSettleBatchXdr(offerId, batch, batchFee);
+
+            // Sign with issuer key (contract admin) and submit
+            const { TransactionBuilder: TxBuilder } = await import('@stellar/stellar-sdk');
+            const tx = TxBuilder.fromXDR(batchXdr, getNetworkPassphrase());
+            tx.sign(issuerKeypair);
+            const signedXdr = tx.toXDR('base64');
+
+            const submitResult = await StellarService.submitTransaction(signedXdr);
+            if (!submitResult.success) {
+                throw new Error(`Batch ${bIdx + 1} submission failed: ${submitResult.error || 'Unknown error'}`);
+            }
+
             results.push({
                 batchIndex: bIdx,
                 investorCount: batch.length,
                 payout: batchPayout,
                 fee: batchFee,
-                xdr: batchXdr,
+                txHash: submitResult.hash || submitResult.transactionHash,
             });
 
-            log.info(`[executeFullSettlement] Batch ${bIdx + 1}/${batches.length}: ${batch.length} investors, payout=${batchPayout}, fee=${batchFee}`);
+            log.info(`[executeFullSettlement] Batch ${bIdx + 1}/${batches.length}: ${batch.length} investors, payout=${batchPayout}, fee=${batchFee}, hash=${results[bIdx].txHash}`);
         }
+
+        // All batches settled → close the offer
+        await prisma.offer.update({
+            where: { id: offerId },
+            data: { status: 'closed' },
+        });
+
+        log.info(`[executeFullSettlement] Offer ${offerId} → closed. ${allInvestors.length} investors settled.`);
 
         return {
             offerId,

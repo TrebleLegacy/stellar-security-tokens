@@ -351,4 +351,45 @@ router.post('/:offerId/submit-deposit', authenticateToken, requireCompanyUser, a
     }
 });
 
+/**
+ * GET /api/company/payments/:offerId/settlement-status
+ * Company-facing: check if settlement contract exists and its balance.
+ * Used by PayInvestors to show deposit state (already deposited, awaiting settlement, etc).
+ */
+router.get('/:offerId/settlement-status', authenticateToken, requireCompanyUser, async (req, res) => {
+    try {
+        const { offerId } = req.params;
+        const { companyId } = req.user;
+
+        const offer = await prisma.offer.findFirst({
+            where: { id: parseInt(offerId), companyId }
+        });
+        if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+
+        let contractBalance = null;
+        if (offer.sorobanSettlementContractId) {
+            try {
+                const { SorobanSettlementService } = await import('../services/sorobanSettlement.service.js');
+                contractBalance = await SorobanSettlementService.getContractBalance(parseInt(offerId));
+            } catch { /* silent — contract may not be deployed yet */ }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                offerId: parseInt(offerId),
+                offerType: offer.offerType,
+                offerStatus: offer.status,
+                settlementContractId: offer.sorobanSettlementContractId || null,
+                contractBalance,
+                maturityDate: offer.maturityDate,
+                hasSettlementContract: !!offer.sorobanSettlementContractId,
+            },
+        });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
 export default router;
+

@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import { companyPaymentsApi, type PaymentDetails, type BulletPaymentDetails } from "@/api/companyPayments";
 import { usePasskey } from "@/hooks/usePasskey";
-import { offersApi } from "@/api/offers";
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -196,7 +195,7 @@ export function PayInvestors() {
                 // For bullet offers: check settlement contract status
                 if (response.data && 'totalPayout' in response.data) {
                     try {
-                        const statusRes = await offersApi.getSettlementStatus(parseInt(offerId!));
+                        const statusRes = await companyPaymentsApi.getSettlementStatus(parseInt(offerId!));
                         if (statusRes.success && statusRes.data) {
                             setSettlementStatus(statusRes.data);
                         }
@@ -297,7 +296,7 @@ export function PayInvestors() {
             setDepositBreakdown(null);
 
             // Refresh settlement status
-            const statusRes = await offersApi.getSettlementStatus(parseInt(offerId!));
+            const statusRes = await companyPaymentsApi.getSettlementStatus(parseInt(offerId!));
             if (statusRes.success && statusRes.data) setSettlementStatus(statusRes.data);
         } catch (err: any) {
             setError(err.message || 'Failed to sign or submit deposit');
