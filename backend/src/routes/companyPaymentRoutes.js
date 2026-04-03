@@ -338,21 +338,35 @@ router.post('/:offerId/submit-deposit', authenticateToken, requireCompanyUser, a
             try {
                 const admins = await prisma.platformAdmin.findMany({
                     where: { isActive: true },
-                    select: { id: true },
+                    select: { id: true, email: true, name: true },
                 });
                 const { NotificationService } = await import('../services/notification.service.js');
+                const { EmailService } = await import('../services/email.service.js');
                 const companyName = req.user.companyName || 'Company';
+                const notifTitle = `💰 Maturity Deposit — ${offer.offerName || offer.assetCode}`;
+                const notifMessage = `${companyName} deposited USDC to the settlement contract for "${offer.offerName}". Review the offer and execute settlement when ready.`;
+                const actionLink = `/admin?tab=offers&id=${offer.id}`;
+
                 for (const admin of admins) {
+                    // Bell notification
                     await NotificationService.createNotification(
                         admin.id,
                         'platform_admin',
                         'warning',
-                        `💰 Maturity Deposit — ${offer.offerName || offer.assetCode}`,
-                        `${companyName} deposited USDC to the settlement contract for "${offer.offerName}". Review the offer and execute settlement when ready.`,
-                        `/admin?tab=offers&id=${offer.id}`,
+                        notifTitle,
+                        notifMessage,
+                        actionLink,
                     );
+                    // Email alert
+                    await EmailService.sendAdminAlert(admin.email, admin.name, {
+                        title: `Maturity Deposit — ${offer.offerName || offer.assetCode}`,
+                        message: notifMessage,
+                        actionUrl: actionLink,
+                        actionLabel: 'Review Settlement',
+                        severity: 'warning',
+                    });
                 }
-                log.info(`[submit-deposit] Notified ${admins.length} admins about deposit for offer ${offerId}`);
+                log.info(`[submit-deposit] Notified ${admins.length} admins (bell + email) about deposit for offer ${offerId}`);
             } catch (notifErr) {
                 log.warn('[submit-deposit] Failed to send admin notifications:', notifErr.message);
             }
