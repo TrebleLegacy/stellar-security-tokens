@@ -440,6 +440,19 @@ export const getSaleWasmHash = () => {
   return hash;
 };
 
+/**
+ * Get the WASM hash for the MaturitySettlement Soroban contract
+ * @returns {string} WASM hash (hex)
+ * @throws {Error} If SETTLEMENT_WASM_HASH is not set
+ */
+export const getSettlementWasmHash = () => {
+  const h = process.env.SETTLEMENT_WASM_HASH;
+  if (!h) {
+    throw new Error('[StellarConfig] SETTLEMENT_WASM_HASH environment variable is required for settlement contract deployment');
+  }
+  return h;
+};
+
 export default {
   stellarServer,
   createFreshServer,
@@ -458,4 +471,5 @@ export default {
   getUsdcIssuer,
   getUsdcAsset,
   getSaleWasmHash,
+  getSettlementWasmHash,
 };

@@ -393,6 +393,10 @@ model Offer {
   sorobanInitStatus   String?   @map("soroban_init_status") @db.VarChar(20)
   sorobanInitError    String?   @map("soroban_init_error") @db.Text
 
+  // Soroban MaturitySettlement contract (for debt offers with maturity)
+  // Deployed at offer approval. Handles atomic payout + token burn at maturity.
+  sorobanSettlementContractId  String?  @map("soroban_settlement_contract_id") @db.VarChar(56)
+
   // Fixed processing fee per trade in USDC. Deducted from investor's trade amount → treasury.
   // 5.0 = $5 USDC per trade. 0 = no processing fee. Globally configurable via ConfigService.
   processingFee       Decimal   @default(5.0) @map("processing_fee") @db.Decimal(20, 7)
@@ -419,6 +423,7 @@ model Offer {
   @@index([paymentDueStatus])
   @@index([nextPaymentDue])
   @@index([sorobanContractId])
+  @@index([sorobanSettlementContractId])
   @@map("offers")
 }
 
