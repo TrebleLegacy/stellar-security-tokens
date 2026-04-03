@@ -334,6 +334,29 @@ router.post('/:offerId/submit-deposit', authenticateToken, requireCompanyUser, a
                 hash: result.hash || result.transactionHash,
             });
 
+            // Notify all platform admins that a company deposited for maturity settlement
+            try {
+                const admins = await prisma.platformAdmin.findMany({
+                    where: { isActive: true },
+                    select: { id: true },
+                });
+                const { NotificationService } = await import('../services/notification.service.js');
+                const companyName = req.user.companyName || 'Company';
+                for (const admin of admins) {
+                    await NotificationService.createNotification(
+                        admin.id,
+                        'platform_admin',
+                        'warning',
+                        `💰 Maturity Deposit — ${offer.offerName || offer.assetCode}`,
+                        `${companyName} deposited USDC to the settlement contract for "${offer.offerName}". Review the offer and execute settlement when ready.`,
+                        `/admin?tab=offers&id=${offer.id}`,
+                    );
+                }
+                log.info(`[submit-deposit] Notified ${admins.length} admins about deposit for offer ${offerId}`);
+            } catch (notifErr) {
+                log.warn('[submit-deposit] Failed to send admin notifications:', notifErr.message);
+            }
+
             res.json({
                 success: true,
                 data: {
