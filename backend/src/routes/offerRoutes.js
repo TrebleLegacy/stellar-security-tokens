@@ -576,5 +576,179 @@ router.post('/admin/offers/:id/reconcile-chain', requirePlatformAdmin, async (re
     });
 });
 
+// ═══════════════════════════════════════════════════════════════
+// SETTLEMENT CONTRACT ENDPOINTS (MaturitySettlement Soroban)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/deploy-settlement:
+ *   post:
+ *     summary: "[Admin] Deploy MaturitySettlement contract for a debt offer"
+ *     description: Deploys and initializes the settlement contract. Only for collateral (debt) offers with a maturity date.
+ *     tags: [Settlement]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               max_fee_bps:
+ *                 type: integer
+ *                 default: 500
+ *                 description: Maximum platform fee in basis points (500 = 5%)
+ *     responses:
+ *       200:
+ *         description: Contract deployed
+ *       400:
+ *         description: Not a debt offer or missing maturityDate
+ */
+router.post('/admin/offers/:id/deploy-settlement', requirePlatformAdmin, async (req, res) => {
+    try {
+        const { SorobanSettlementService } = await import('../services/sorobanSettlement.service.js');
+        const offerId = parseInt(req.params.id);
+        const maxFeeBps = req.body.max_fee_bps || 500;
+        const result = await SorobanSettlementService.deployForOffer(offerId, maxFeeBps);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/settlement-deposit:
+ *   post:
+ *     summary: "[Admin] Build deposit TX for company USDC → settlement contract"
+ *     description: Returns XDR for the company to sign, depositing USDC into the settlement contract.
+ *     tags: [Settlement]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amount
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 description: USDC amount to deposit
+ *     responses:
+ *       200:
+ *         description: Deposit XDR ready for signing
+ */
+router.post('/admin/offers/:id/settlement-deposit', requirePlatformAdmin, async (req, res) => {
+    try {
+        const { SorobanSettlementService } = await import('../services/sorobanSettlement.service.js');
+        const offerId = parseInt(req.params.id);
+        const { amount } = req.body;
+        if (!amount || amount <= 0) {
+            return res.status(400).json({ success: false, error: 'amount is required and must be positive' });
+        }
+        const result = await SorobanSettlementService.buildDepositXdr(offerId, amount);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/settle:
+ *   post:
+ *     summary: "[Admin] Execute maturity settlement (all investors, multi-batch)"
+ *     description: Calculates payouts, splits into batches of 30, and returns XDRs for signing. Contract pays investors and burns ALL their tokens atomically.
+ *     tags: [Settlement]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Settlement batches prepared
+ */
+router.post('/admin/offers/:id/settle', requirePlatformAdmin, async (req, res) => {
+    try {
+        const { SorobanSettlementService } = await import('../services/sorobanSettlement.service.js');
+        const offerId = parseInt(req.params.id);
+        const result = await SorobanSettlementService.executeFullSettlement(offerId);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        const { SorobanSettlementService } = await import('../services/sorobanSettlement.service.js');
+        const parsed = SorobanSettlementService.parseContractError(error);
+        res.status(400).json({ success: false, error: parsed.message, code: parsed.code });
+    }
+});
+
+/**
+ * @swagger
+ * /api/admin/offers/{id}/settlement-status:
+ *   get:
+ *     summary: "[Admin] Check settlement contract balance and status"
+ *     tags: [Settlement]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Settlement status
+ */
+router.get('/admin/offers/:id/settlement-status', requirePlatformAdmin, async (req, res) => {
+    try {
+        const { SorobanSettlementService } = await import('../services/sorobanSettlement.service.js');
+        const { default: prisma } = await import('../config/prisma.js');
+        const offerId = parseInt(req.params.id);
+
+        const offer = await prisma.offer.findUnique({ where: { id: offerId } });
+        if (!offer) return res.status(404).json({ success: false, error: 'Offer not found' });
+
+        const contractBalance = offer.sorobanSettlementContractId
+            ? await SorobanSettlementService.getContractBalance(offerId)
+            : null;
+
+        res.json({
+            success: true,
+            data: {
+                offerId,
+                offerType: offer.offerType,
+                offerStatus: offer.status,
+                settlementContractId: offer.sorobanSettlementContractId || null,
+                contractBalance,
+                maturityDate: offer.maturityDate,
+                hasSettlementContract: !!offer.sorobanSettlementContractId,
+            },
+        });
+    } catch (error) {
+        res.status(400).json({ success: false, error: error.message });
+    }
+});
+
 export default router;
+
 
