@@ -889,4 +889,88 @@ export class EmailService {
       throw new Error(`Failed to send offer status email: ${error.message}`);
     }
   }
+
+  /**
+   * Send an alert email to a platform admin.
+   * Reusable for any admin-facing notification (settlement, security, etc).
+   * @param {string} adminEmail - Admin email address
+   * @param {string} adminName - Admin name
+   * @param {Object} opts - { title, message, actionUrl?, actionLabel?, severity? }
+   */
+  static async sendAdminAlert(adminEmail, adminName, opts) {
+    const { title, message, actionUrl, actionLabel = 'View in Dashboard', severity = 'warning' } = opts;
+
+    const SEVERITY_COLORS = {
+      info: { bg: '#3b82f6', accent: '#dbeafe', text: '#1e40af' },
+      warning: { bg: '#f59e0b', accent: '#fef3c7', text: '#92400e' },
+      error: { bg: '#ef4444', accent: '#fee2e2', text: '#991b1b' },
+      success: { bg: '#10b981', accent: '#d1fae5', text: '#065f46' },
+    };
+    const colors = SEVERITY_COLORS[severity] || SEVERITY_COLORS.warning;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost';
+    const fullActionUrl = actionUrl ? (actionUrl.startsWith('http') ? actionUrl : `${frontendUrl}${actionUrl}`) : null;
+
+    try {
+      return await sendEmail({
+        to: adminEmail,
+        subject: `[Admin] ${title} — Radox`,
+        html: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <style>
+              body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0A1628; }
+              .wrapper { width: 100%; background-color: #0A1628; padding: 40px 0; }
+              .container { max-width: 520px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.3); }
+              .header { background: linear-gradient(135deg, #0A1628 0%, #1a2d4a 100%); padding: 32px 30px; text-align: center; }
+              .logo { font-size: 24px; font-weight: 700; color: #C9A962; letter-spacing: 1px; font-family: Georgia, 'Times New Roman', serif; }
+              .header-subtitle { color: rgba(255,255,255,0.6); font-size: 12px; text-transform: uppercase; letter-spacing: 2px; margin-top: 6px; }
+              .content { padding: 32px 30px; background-color: #ffffff; }
+              .greeting { color: #0A1628; font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+              .alert-box { background-color: ${colors.accent}; border-left: 4px solid ${colors.bg}; padding: 16px 20px; border-radius: 0 12px 12px 0; margin: 20px 0; }
+              .alert-title { color: ${colors.text}; font-size: 16px; font-weight: 700; margin: 0 0 8px 0; }
+              .alert-message { color: ${colors.text}; font-size: 14px; margin: 0; line-height: 1.6; }
+              .button-container { text-align: center; margin: 28px 0 8px 0; }
+              .button { display: inline-block; background: linear-gradient(135deg, #C9A962 0%, #a88a4a 100%); color: #0A1628; font-weight: 600; padding: 14px 36px; text-decoration: none; border-radius: 8px; font-size: 14px; box-shadow: 0 4px 15px rgba(201,169,98,0.3); }
+              .footer { background-color: #f8f9fa; padding: 20px 30px; text-align: center; border-top: 1px solid #e2e8f0; }
+              .footer-text { color: #a0aec0; font-size: 11px; line-height: 1.5; }
+              .brand { color: #0A1628; font-weight: 600; }
+            </style>
+          </head>
+          <body>
+            <div class="wrapper">
+              <div class="container">
+                <div class="header">
+                  <div class="logo">✦ RADOX</div>
+                  <div class="header-subtitle">Admin Notification</div>
+                </div>
+                <div class="content">
+                  <p class="greeting">Hi ${adminName},</p>
+                  <div class="alert-box">
+                    <p class="alert-title">${title}</p>
+                    <p class="alert-message">${message}</p>
+                  </div>
+                  ${fullActionUrl ? `
+                  <div class="button-container">
+                    <a href="${fullActionUrl}" class="button">${actionLabel}</a>
+                  </div>` : ''}
+                </div>
+                <div class="footer">
+                  <p class="footer-text">Automated notification from <span class="brand">Radox</span> Admin System.<br>Do not reply to this email.</p>
+                </div>
+              </div>
+            </div>
+          </body>
+          </html>
+        `,
+        text: `[Admin] ${title}\n\nHi ${adminName},\n\n${message}\n\n${fullActionUrl ? `Action: ${fullActionUrl}\n` : ''}\n— Radox Admin System`,
+      });
+    } catch (error) {
+      log.error(`Error sending admin alert to ${adminEmail}:`, error);
+      // Non-blocking: don't throw, just log
+      return null;
+    }
+  }
 }
