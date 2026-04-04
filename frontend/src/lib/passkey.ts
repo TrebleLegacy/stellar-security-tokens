@@ -157,6 +157,11 @@ export class PasskeyClient {
             // createWallet handles passkey creation + deploy TX building + signing
             const result = await this.kit.createWallet('Stellar Tokens', username, {
                 autoSubmit: true, // Let the SDK submit via relayer (Channels)
+                authenticatorSelection: {
+                    authenticatorAttachment: 'platform',
+                    residentKey: 'required',
+                    userVerification: 'required',
+                },
             });
 
             if (!result || !result.credentialId || !result.contractId) {
