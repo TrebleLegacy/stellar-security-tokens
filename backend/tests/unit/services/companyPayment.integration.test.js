@@ -88,7 +88,7 @@ mock.module('../../../src/config/prisma.js', {
         },
         multiSigTransaction: {
             findFirst: async () => null,  // No pre-existing admin-visible TXs
-            findMany: async () => [],     // No pre-existing batch_pending TXs
+            findMany: async () => [],     // No pre-existing pending TXs for this operation
             create: async (args) => { calls.multiSigCreate.push(args); return { id: calls.multiSigCreate.length, ...args.data }; },
             updateMany: async (args) => { calls.multiSigUpdateMany.push(args); return { count: 1 }; },
             count: async () => 1,

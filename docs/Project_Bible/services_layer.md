@@ -158,18 +158,19 @@ submit(opts) → KeyManager mode === 'multisig'
 | `calculateBulletPayment` | Principal + accrued interest at maturity |
 | `getUpcomingPayments` | All due payments for a company |
 | `processTokenSaleFees` | 1% platform fee on token sale |
-| `createPaymentTransaction` | Build unsigned TX — periodic (direct) or bullet (49-cap batches with guard + clawback ops) |
+| `createPaymentTransaction` | Build unsigned TX — periodic yield only (bullet uses Soroban Settlement) |
 | `processSignedPayment` | Submit periodic TX directly + call `_recordPayments()` |
 | `_recordPayments(prisma, offer, breakdown, opts)` | DRY helper: creates InterestPayment + FeeLog records (shared by periodic + bullet) |
 | `checkOverduePayments` | Late fees (0.1%/day) + 10-day grace → default + CompanyPenalty |
 
-**Bullet Maturity Flow:**
-1. `createPaymentTransaction` with `isBullet` → caps at 49 investors/batch, adds `setOptions` guard + `clawback` ops per investor
-2. Submit → `multiSigTransactionService.create()` with `maturity_clawback` type, `batch_pending` status
-3. Last batch uses `prisma.$transaction()` to atomically create TX + flip all batches to `pending`
-4. Admin signs in Freighter → `processEffects` calls `_recordPayments()` + closes offer
+**Bullet Maturity Flow (Soroban Settlement):**
+1. Daily cron `processBulletPayments()` scans for `maturityDate ≤ today` and flips offer to `status: 'matured'`, notifies company users
+2. Company initiates settlement: `prepare-deposit` → calculates total owed (principal + interest + spread)
+3. Company submits USDC deposit to settlement contract via `submit-deposit`
+4. Admin executes settlement: `SorobanSettlementService.executeFullSettlement()` → atomic USDC distribution + token burn
+5. Offer transitions to `status: 'closed'`
 
-> ⚠️ **Trading Lockout:** Tokens must NOT be unlocked before maturity. On-chain balances must match investment records for clawback to work.
+> ⚠️ **Legacy Pipeline Removed:** The classic `maturity_clawback` multi-batch pipeline (49-investor caps, `setOptions` guard, `batch_pending` status) was fully decommissioned in Apr 2026. All bullet maturity payments now use the Soroban MaturitySettlement contract.
 
 ---
 

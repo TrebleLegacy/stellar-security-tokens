@@ -18,7 +18,7 @@ const round7 = v => Math.round(v * 10_000_000) / 10_000_000;
  * This is an extracted, testable version of the production code.
  */
 function simulateBatchSplit(allInvestors, coveredWallets = new Set()) {
-  // Filter already-covered investors (existing batch_pending wallets)
+  // Filter already-covered investors (wallets processed in previous batches)
   let remaining = allInvestors.filter(b => !coveredWallets.has(b.investorWallet));
 
   // Cap at MAX_INVESTORS_PER_BATCH
