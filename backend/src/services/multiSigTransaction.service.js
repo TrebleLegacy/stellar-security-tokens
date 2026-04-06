@@ -71,17 +71,13 @@ export class MultiSigTransactionService {
 
         log.info(`Created pending TX #${tx.id} (${operationType}) - requires ${thresholdRequired} of ${requiredSigners.length} signatures`);
 
-        // Skip Pusher broadcast for batch_pending TXs (company still signing batches)
-        // The broadcast happens in CompanyPaymentService.processSignedPayment() when all batches are ready.
-        if (tx.status !== 'batch_pending') {
-            const { broadcast } = await import('../config/pusher.js');
-            broadcast('admin-governance', 'new-proposal', {
-                id: tx.id,
-                operationType,
-                description,
-                initiatorId
-            });
-        }
+        const { broadcast } = await import('../config/pusher.js');
+        broadcast('admin-governance', 'new-proposal', {
+            id: tx.id,
+            operationType,
+            description,
+            initiatorId
+        });
 
         return tx;
     }
@@ -835,23 +831,7 @@ export class MultiSigTransactionService {
                     log.debug(`Clawback disabled on-chain for ${metadata.investorPublicKey} / ${metadata.assetCode}`);
                     break;
 
-                case 'maturity_clawback': {
-                    // ⛔ LEGACY PIPELINE DISABLED (Mar 2026)
-                    // Bullet maturity payments now use SorobanSettlementService.
-                    // If this case fires, a pre-migration TX reached 'executed' status — that's a zombie.
-                    log.error(`⛔ LEGACY maturity_clawback TX #${tx.id} reached processEffects. ` +
-                        `This pipeline is disabled. Maturity uses Soroban settlement. ` +
-                        `Marking as failed to prevent silent data corruption.`);
-                    
-                    const AlertService = (await import('./alert.service.js')).default;
-                    AlertService.error('Legacy maturity_clawback TX executed — zombie detected', {
-                        txId: tx.id,
-                        txHash,
-                        offerId: metadata?.offerId,
-                    }).catch(() => {});
-                    
-                    throw new Error(`Legacy maturity_clawback pipeline is disabled. TX #${tx.id} must not execute. Use Soroban settlement.`);
-                }
+
 
                 case 'sale_deploy': {
                     // Step 1 complete: contract deployed on-chain.
@@ -1211,11 +1191,7 @@ export class MultiSigTransactionService {
                     }
                     break;
 
-                case 'maturity_clawback':
-                    // ⛔ LEGACY PIPELINE DISABLED — rejection is a non-event since this path is dead.
-                    log.warn(`Legacy maturity_clawback TX #${tx.id} rejected. Pipeline disabled — no cleanup needed. ` +
-                        `Reason: ${reason}`);
-                    break;
+
 
                 default:
                     log.debug(`No rejection hooks for ${operationType}`);
