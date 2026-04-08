@@ -41,7 +41,7 @@ Pages → Hooks (useOffer, usePasskey, ...) → API modules (offersApi, ...) →
 ### Authentication Libraries
 | Library | File | Used By | Purpose |
 |---------|------|---------|---------|
-| PasskeyKit | `lib/passkey.ts` (204L) | Investor + Company | Discoverable login, wallet deploy, TX signing |
+| SmartAccountKit | `lib/passkey.ts` | Investor + Company | Discoverable login, wallet deploy, TX signing |
 | Freighter API | `lib/freighter.ts` (209L) | Admin | Browser extension wallet, SEP-10 challenge signing |
 | Ledger WebUSB | `lib/ledger.ts` (277L) | Admin (recovery) | Hardware wallet TX signing via BIP44 |
 | Pusher | `lib/pusher.ts` (47L) | All | Real-time notifications (when configured) |
@@ -82,7 +82,7 @@ All modules export typed object literals wrapping Axios calls.
 
 | Hook | Purpose |
 |------|---------|
-| `usePasskey` | Init PasskeyKit, discoverable login, register wallet |
+| `usePasskey` | Init SmartAccountKit, discoverable login, register wallet |
 | `usePasskeys` | List/add/remove passkey credentials (security settings) |
 | `useFreighter` | Connect Freighter, sign transactions |
 | `useLedger` | Connect Ledger, sign transactions |

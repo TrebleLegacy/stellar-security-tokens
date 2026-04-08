@@ -39,7 +39,7 @@
 | POST | `/api/investors/register` | investorRoutes | Complete reg with passkey |
 | POST | `/api/investors/verify-email` | investorRoutes | Legacy email verify |
 | POST | `/api/investors/resend-verification` | investorRoutes | Legacy resend |
-| GET | `/api/investors/passkey/config` | investorRoutes | Passkey-kit client config |
+| GET | `/api/investors/passkey/config` | investorRoutes | SmartAccountKit client config |
 | GET | `/api/investments/fee-schedule` | investmentRoutes | Current fee schedule |
 | POST | `/api/companies/initiate-registration` | companyRoutes | Company reg step 1 |
 | POST | `/api/companies/verify-email-code` | companyRoutes | Company reg step 2 |

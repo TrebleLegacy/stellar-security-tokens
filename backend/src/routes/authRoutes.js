@@ -44,7 +44,7 @@ function detectUserTypeFromReferer(referer) {
  * /api/auth/config:
  *   get:
  *     summary: Passkey configuration
- *     description: Returns configuration for client-side PasskeyKit
+ *     description: Returns configuration for client-side SmartAccountKit
  *     tags: [Auth]
  *     responses:
  *       200:
