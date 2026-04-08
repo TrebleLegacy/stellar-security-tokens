@@ -132,6 +132,11 @@ export class PasskeyWalletService {
       networkPassphrase: getNetworkPassphrase(),
       accountWasmHash: process.env.ACCOUNT_WASM_HASH,
       webauthnVerifierAddress: process.env.WEBAUTHN_VERIFIER_ADDRESS,
+      // rpId must match WEBAUTHN_RP_ID — tells the browser exactly which domain
+      // scope to use for the passkey. Without it, rp.id is undefined and the
+      // browser guesses from hostname, which can trigger the cross-device QR modal
+      // instead of Face ID / Touch ID on some devices.
+      rpId: process.env.WEBAUTHN_RP_ID || 'localhost',
       // relayerUrl is constructed by the frontend from the API base URL
     };
   }

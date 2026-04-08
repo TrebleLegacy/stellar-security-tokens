@@ -52,6 +52,28 @@ export class PasskeyClient {
             // which lets Safari skip biometric → UV bit = 0 → on-chain verifier
             // rejects with Error(Contract, #3117) = VerifiedBitNotSet.
             const { startRegistration, startAuthentication } = await import('@simplewebauthn/browser');
+
+            // CRITICAL: Force platform authenticator during registration.
+            // The SDK generates its own options internally and may not include
+            // authenticatorAttachment: 'platform', causing iOS/Android to show
+            // the cross-device QR code / security key modal. We intercept here
+            // and inject the correct selection before the WebAuthn call fires.
+            const wrappedStartRegistration: typeof startRegistration = (opts) => {
+                if (opts.optionsJSON) {
+                    opts.optionsJSON.authenticatorSelection = {
+                        ...opts.optionsJSON.authenticatorSelection,
+                        authenticatorAttachment: 'platform',
+                        residentKey: 'required',
+                        userVerification: 'required',
+                    };
+                }
+                return startRegistration(opts);
+            };
+
+            // CRITICAL: Override startAuthentication to force userVerification: "required".
+            // The OZ smart-account-kit hardcodes "preferred" in signAuthEntry(),
+            // which lets Safari skip biometric → UV bit = 0 → on-chain verifier
+            // rejects with Error(Contract, #3117) = VerifiedBitNotSet.
             const wrappedStartAuthentication: typeof startAuthentication = (opts) => {
                 if (opts.optionsJSON) {
                     opts.optionsJSON.userVerification = 'required';
@@ -64,12 +86,17 @@ export class PasskeyClient {
                 networkPassphrase: config.networkPassphrase,
                 accountWasmHash: config.accountWasmHash,
                 webauthnVerifierAddress: config.webauthnVerifierAddress,
+                // CRITICAL: rpId tells the browser which domain scope to use.
+                // Without it, rp.id is undefined and the browser guesses from
+                // hostname — causing some devices to show the QR code modal
+                // instead of Face ID / Touch ID.
+                rpId: config.rpId,
                 // Use backend as relay proxy for fee-sponsored submissions
                 relayerUrl: `${this.baseUrl}/wallets/relay`,
                 // Give 5 minutes for the passkey signing flow.
                 timeoutInSeconds: 300,
-                // Custom WebAuthn adapter forces UV=required
-                webAuthn: { startRegistration, startAuthentication: wrappedStartAuthentication },
+                // Both adapters patched: registration forces platform, auth forces UV=required
+                webAuthn: { startRegistration: wrappedStartRegistration, startAuthentication: wrappedStartAuthentication },
             });
         } catch (error) {
             console.error('Failed to initialize SmartAccountKit:', error);
