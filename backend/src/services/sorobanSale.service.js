@@ -648,38 +648,69 @@ export class SorobanSaleService {
         // because ops is a signer on the issuer account with sufficient weight
         tx.sign(opsKeypair);
 
-        // Submit and poll
-        try {
-            const rpcServer = new rpc.Server(getSorobanRpcUrl());
-            const result = await rpcServer.sendTransaction(tx);
+        // Submit and poll (with retry for testnet flakiness)
+        const maxAttempts = 2;
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                const rpcServer = new rpc.Server(getSorobanRpcUrl());
 
-            let status = result.status;
-            let txResult = result;
-            if (status === 'PENDING') {
-                const maxWait = 30_000;
-                const interval = 2_000;
-                let waited = 0;
-                while (waited < maxWait) {
-                    await new Promise(r => setTimeout(r, interval));
-                    waited += interval;
-                    txResult = await rpcServer.getTransaction(result.hash);
-                    if (txResult.status !== 'NOT_FOUND') {
-                        status = txResult.status;
-                        break;
+                // Re-prepare TX on retry (fresh sequence number)
+                let submittable = tx;
+                if (attempt > 1) {
+                    log.info(`[authorizeBuyerOnSac] Retry ${attempt}/${maxAttempts} — rebuilding TX...`);
+                    const freshAccount = await rpcServer.getAccount(issuerPublicKey);
+                    let freshTx = new TransactionBuilder(freshAccount, {
+                        fee: '1000000',
+                        networkPassphrase: getNetworkPassphrase(),
+                    })
+                        .addOperation(op)
+                        .setTimeout(300)
+                        .build();
+                    freshTx = await StellarService.prepareSorobanTransaction(freshTx);
+                    freshTx.sign(opsKeypair);
+                    submittable = freshTx;
+                }
+
+                const result = await rpcServer.sendTransaction(submittable);
+
+                let status = result.status;
+                let txResult = result;
+                if (status === 'PENDING') {
+                    const maxWait = 60_000;
+                    const interval = 3_000;
+                    let waited = 0;
+                    while (waited < maxWait) {
+                        await new Promise(r => setTimeout(r, interval));
+                        waited += interval;
+                        txResult = await rpcServer.getTransaction(result.hash);
+                        if (txResult.status !== 'NOT_FOUND') {
+                            status = txResult.status;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (status === 'SUCCESS') {
-                log.info(`[authorizeBuyerOnSac] ✅ Authorized ${targetAddress.slice(0, 8)}… on SAC ${sacContractId.slice(0, 8)}… (tx: ${result.hash})`);
-                return { success: true, txHash: result.hash };
-            } else {
-                log.error(`[authorizeBuyerOnSac] TX status: ${status} for ${targetAddress.slice(0, 8)}…`);
-                throw new Error(`SAC authorization TX failed with status: ${status}`);
+                if (status === 'SUCCESS') {
+                    log.info(`[authorizeBuyerOnSac] ✅ Authorized ${targetAddress.slice(0, 8)}… on SAC ${sacContractId.slice(0, 8)}… (tx: ${result.hash})`);
+                    return { success: true, txHash: result.hash };
+                } else {
+                    log.error(`[authorizeBuyerOnSac] TX status: ${status} for ${targetAddress.slice(0, 8)}…`);
+                    if (attempt < maxAttempts) {
+                        log.info(`[authorizeBuyerOnSac] Will retry...`);
+                        await new Promise(r => setTimeout(r, 5000));
+                        continue;
+                    }
+                    throw new Error(`SAC authorization TX failed with status: ${status}`);
+                }
+            } catch (submitErr) {
+                if (attempt < maxAttempts && !submitErr.message.includes('SAC authorization TX failed')) {
+                    log.warn(`[authorizeBuyerOnSac] Attempt ${attempt} error: ${submitErr.message}. Retrying...`);
+                    await new Promise(r => setTimeout(r, 5000));
+                    continue;
+                }
+                log.error(`[authorizeBuyerOnSac] Submit failed: ${submitErr.message}`);
+                throw new Error(`Failed to authorize on SAC: ${submitErr.message}`);
             }
-        } catch (submitErr) {
-            log.error(`[authorizeBuyerOnSac] Submit failed: ${submitErr.message}`);
-            throw new Error(`Failed to authorize on SAC: ${submitErr.message}`);
         }
     }
 
