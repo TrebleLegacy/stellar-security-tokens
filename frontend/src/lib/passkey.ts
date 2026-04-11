@@ -118,13 +118,17 @@ export class PasskeyClient {
                 throw new Error('Failed to get login challenge');
             }
 
-            const { challenge } = await challengeResponse.json();
+            const { challenge, rpId } = await challengeResponse.json();
 
             // 2. Trigger WebAuthn with empty allowCredentials
             // This prompts the browser to show all discoverable credentials for this RP
+            // CRITICAL: rpId must match the value used during registration ('radox.net').
+            // Without it, the browser defaults to the current hostname ('app.radox.net')
+            // and won't find any credentials registered under the parent domain.
             const credential = await navigator.credentials.get({
                 publicKey: {
                     challenge: Uint8Array.from(atob(challenge), c => c.charCodeAt(0)),
+                    rpId,
                     allowCredentials: [], // Empty = show all discoverable credentials
                     timeout: 60000,
                     userVerification: 'required',

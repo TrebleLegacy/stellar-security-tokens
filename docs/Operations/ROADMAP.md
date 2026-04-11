@@ -10,7 +10,7 @@
 - [x] **Fixed Processing Fee** — $5 additive fee per trade via Soroban v6 contract
 - [x] **Yield Spread Model** — `investorRate` vs `annualInterestRate`, spread → treasury
 - [x] **FeeLog recording** — all fee events logged to `FeeLog` table via `companyPayment.service.js` and `multiSigTransaction.service.js`
-- [x] **Admin fee dashboard** — `GET /fee-logs` endpoint + `investmentMetrics.service.js` revenue aggregation
+- [ ] **Admin fee dashboard** — `GET /fee-logs` endpoint + `investmentMetrics.service.js` revenue aggregation
 - [ ] **SorobanEventIndexer → FeeLog** — wire on-chain trade fee events to FeeLog for redundancy (currently DB-only recording is sufficient)
 
 ---
