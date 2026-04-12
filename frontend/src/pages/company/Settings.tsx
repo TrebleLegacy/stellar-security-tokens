@@ -304,7 +304,7 @@ export function Settings() {
                                     size="sm"
                                     className="border-white/10 hover:bg-white/5 shrink-0"
                                     onClick={() => {
-                                        navigator.clipboard.writeText(company.stellarContractId);
+                                        navigator.clipboard.writeText(company.stellarContractId!);
                                         setCopied(true);
                                         setTimeout(() => setCopied(false), 2000);
                                     }}

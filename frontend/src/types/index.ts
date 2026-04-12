@@ -23,6 +23,8 @@ export interface Company {
   status: 'pending' | 'approved' | 'suspended' | 'rejected';
   kyc_status: 'pending' | 'approved' | 'rejected';
   kyc_documents: Record<string, any>;
+  stellarContractId?: string;
+  stellar_contract_id?: string;
   created_at: string;
   updated_at: string;
 }
