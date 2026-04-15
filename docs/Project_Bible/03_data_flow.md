@@ -153,3 +153,54 @@ Investor              CEX/Exchange         Treasury         Backend          Sma
                     │ (holds tokens)│
                     └─────────────┘
 ```
+
+## Yield Payment Flow (YieldDistributor)
+
+```
+ ┌─────────┐  1. GET /payments/:offerId    ┌─────────┐
+ │ Company │ ────────────────────────────> │ Backend │
+ │ Portal  │                               │         │
+ │         │  2. POST /payments/:offerId/  │         │
+ │         │     prepare                   │         │
+ │         │ ────────────────────────────> │         │ ── buildMultiBatchXdrs()
+ │         │ <──── batchXDRs[] + jobId     │         │ ── YieldPaymentJob.create()
+ │         │                               │         │
+ │  3. Sign each XDR (passkey)             │         │
+ │     Sequential: batch 1 → 2 → N         │         │
+ │         │                               │         │
+ │         │  4. POST /payments/:offerId/  │         │
+ │         │     submit { signedXDRs[] }   │         │
+ │         │ ────────────────────────────> │         │ ── acquireLock(offerId)
+ │         │                               │         │ ── submitBatches() [3x retry]
+ │         │                               │         │ ── _recordPayments() [DB]
+ │         │                               │         │ ── releaseLock()
+ │         │ <──── { success | partial }   │         │ ── YieldPaymentJob.update()
+ └─────────┘                               └────┬────┘
+                                                │
+                                    ┌───────────▼──────────┐
+                                    │ YieldDistributor     │
+                                    │ Contract (Soroban)   │
+                                    │                      │
+                                    │ distribute(          │
+                                    │   payer,             │
+                                    │   token,             │
+                                    │   recipients[],      │
+                                    │   amounts[],         │
+                                    │   fee_recipient,     │
+                                    │   fee_amount         │
+                                    │ )                    │
+                                    │                      │
+                                    │ SAC.transfer() ×N    │
+                                    │ + 1 fee transfer     │
+                                    └──────────────────────┘
+```
+
+### Failure Recovery
+
+| Failure Point | What Happens |
+|---|---|
+| User closes tab mid-signing | `beforeunload` warning. Signed XDRs lost — re-prepare is safe (new sequence numbers) |
+| Network error during submit | 3x retry with exponential backoff. If still fails → `partial_failure` |
+| TX confirmed, DB record fails | `PAYMENT_RECORD_FAILURE` alert. `YieldPaymentReconciler` catches in 5-min sweep |
+| Server crash mid-submit | `YieldPaymentJob` stays in `submitting`. Reconciler fixes after 10 min |
+| Admin retry needed | `POST /admin/yield-jobs/:id/retry` → re-prepare only failed investors |

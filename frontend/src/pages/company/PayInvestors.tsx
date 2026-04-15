@@ -169,9 +169,29 @@ export function PayInvestors() {
         settlementContractId: string | null;
     } | null>(null);
 
+    // Partial failure tracking
+    const [partialResult, setPartialResult] = useState<{
+        completedBatches: number;
+        failedBatches: number;
+        investorsPaid: number;
+        totalInvestors: number;
+    } | null>(null);
+
     useEffect(() => {
         if (offerId) loadPaymentDetails();
     }, [offerId]);
+
+    // Prevent navigation during signing/submission
+    useEffect(() => {
+        if (submitting || depositSubmitting) {
+            const handler = (e: BeforeUnloadEvent) => {
+                e.preventDefault();
+                e.returnValue = '';
+            };
+            window.addEventListener('beforeunload', handler);
+            return () => window.removeEventListener('beforeunload', handler);
+        }
+    }, [submitting, depositSubmitting]);
 
     const loadPaymentDetails = async () => {
         try {
@@ -189,6 +209,27 @@ export function PayInvestors() {
                         }
                     } catch { /* silent — settlement status is non-critical */ }
 
+                }
+
+                // For periodic offers: check if there's an active yield payment job (recovery on refresh)
+                if (!('totalPayout' in response.data)) {
+                    try {
+                        const jobRes = await companyPaymentsApi.getYieldJobStatus(parseInt(offerId!));
+                        if (jobRes.success && jobRes.data) {
+                            const { status } = jobRes.data;
+                            if (status === 'confirmed') {
+                                setSuccess(true);
+                            } else if (status === 'partial_failure') {
+                                setPartialResult({
+                                    completedBatches: jobRes.data.batchProgress.completed,
+                                    failedBatches: jobRes.data.batchProgress.total - jobRes.data.batchProgress.completed,
+                                    investorsPaid: 0, // Unknown from status alone
+                                    totalInvestors: (response.data as PaymentDetails)?.investorCount || 0,
+                                });
+                            }
+                            // 'prepared' or 'submitting' — show a warning but allow re-prepare
+                        }
+                    } catch { /* silent — job status is non-critical */ }
                 }
             } else {
                 setError('Failed to load payment details');
@@ -239,7 +280,16 @@ export function PayInvestors() {
                 setBatchProgress(null);
 
                 const response = await companyPaymentsApi.submitBatchPayment(parseInt(offerId!), signedXDRs);
-                if (response.success) {
+                if (response.data?.partial) {
+                    // Partial failure — some batches confirmed, some failed
+                    setPartialResult({
+                        completedBatches: response.data.completedBatches ?? 0,
+                        failedBatches: response.data.failedBatches ?? 0,
+                        investorsPaid: response.data.investorsPaid ?? 0,
+                        totalInvestors: paymentDetails?.investorCount || 0,
+                    });
+                    setPreparedTx(null);
+                } else if (response.success) {
                     setSuccess(true);
                     setPreparedTx(null);
                 } else {
@@ -361,6 +411,40 @@ export function PayInvestors() {
                             All investors have been paid successfully.
                         </p>
                         <Button onClick={() => navigate('/company/offers')} className="bg-primary hover:bg-primary/90 text-primary-foreground btn-glow">
+                            Back to Offers
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    // ── Partial failure (some batches succeeded, some failed) ──
+    if (partialResult) {
+        return (
+            <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+                <Card className="glass-panel border-amber-500/20 bg-amber-500/5">
+                    <CardContent className="p-8 text-center">
+                        <AlertTriangle className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold text-white mb-2 font-heading">Partial Payment</h2>
+                        <p className="text-muted-foreground mb-4">
+                            {partialResult.investorsPaid} of {partialResult.totalInvestors} investors paid successfully.
+                        </p>
+                        <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto mb-6">
+                            <div className="p-3 bg-emerald-500/10 rounded-lg">
+                                <p className="text-xs text-emerald-400/80">Completed</p>
+                                <p className="text-xl font-bold text-emerald-400">{partialResult.completedBatches} batch{partialResult.completedBatches !== 1 ? 'es' : ''}</p>
+                            </div>
+                            <div className="p-3 bg-red-500/10 rounded-lg">
+                                <p className="text-xs text-red-400/80">Failed</p>
+                                <p className="text-xl font-bold text-red-400">{partialResult.failedBatches} batch{partialResult.failedBatches !== 1 ? 'es' : ''}</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-6">
+                            Admin has been notified and will retry the remaining investors.
+                            No action needed from you.
+                        </p>
+                        <Button onClick={() => navigate('/company/offers')} variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
                             Back to Offers
                         </Button>
                     </CardContent>

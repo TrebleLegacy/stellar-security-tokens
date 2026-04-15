@@ -83,6 +83,29 @@ export class MaintenanceService {
             });
         }
 
+        // 4. Get all Offers with Soroban Settlement Contracts
+        const settlementOffers = await prisma.offer.findMany({
+            where: { sorobanSettlementContractId: { not: null } },
+            select: { id: true, assetCode: true, sorobanSettlementContractId: true }
+        });
+
+        for (const offer of settlementOffers) {
+            contractsToCheck.push({
+                id: offer.sorobanSettlementContractId,
+                name: `Settlement (Offer #${offer.id} — ${offer.assetCode})`,
+                type: 'settlement'
+            });
+        }
+
+        // 5. YieldDistributor contract (singleton — from env)
+        if (process.env.YIELD_DISTRIBUTOR_CONTRACT_ID) {
+            contractsToCheck.push({
+                id: process.env.YIELD_DISTRIBUTOR_CONTRACT_ID,
+                name: 'YieldDistributor',
+                type: 'yield_distributor'
+            });
+        }
+
         log.info(`Found ${contractsToCheck.length} contracts to audit.`);
 
         let successCount = 0;

@@ -154,3 +154,55 @@ JS: fixedFee = BigInt(processingFee * 10_000_000) = 50_000_000n (stroops)
 
 ## Test Coverage (75 snapshots)
 Happy path, edge cases (overflow, zero caps, double-create), buyer cap enforcement (independent per buyer), admin transfer chain, emergency drain, pause/resume, supply exhaustion, blocklist, deadline, **additive fixed fee** (5 tests: zero fee, non-zero fee, fee overflow, fee-only trade, fee treasury balance). All tests verify company receives 100% of `buy_token_amount` and treasury receives `fixed_fee`.
+
+---
+
+# YieldDistributor Contract v2
+
+> **Soroban (Rust, `#[no_std]`)** | Added: 2026-04-15
+> File: `contracts/yield_distributor/src/lib.rs` — ~350 lines | 35 test snapshots
+
+## Overview
+
+Batched yield distribution contract. Company calls `distribute()` to pay up to 30 investors in a single Soroban TX via `SAC.transfer()` sub-invocations. Platform fee sent to treasury in the same atomic TX.
+
+**Stateful-minimal**: stores admin address + paused flag only. No token deposits. One passkey signature = one batch of transfers.
+
+## Public Functions (7)
+
+| Function | Auth | Risk | Purpose |
+|----------|------|------|---------|
+| `initialize` | Deployer | Setup | Set admin address (once) |
+| `distribute` | Payer | Core | Batch SAC.transfer() to N recipients + fee |
+| `pause` | Admin | Medium | Block distribute() calls |
+| `resume` | Admin | Medium | Unblock distribute() calls |
+| `set_admin` | Admin | High | Transfer admin to new address |
+| `upgrade` | Admin | Critical | Replace contract WASM |
+| `extend_ttl` | Public | Safe | Extend instance + code TTL |
+
+## Error Codes (11)
+
+| Code | Name | Trigger |
+|------|------|---------|
+| 1 | EmptyBatch | recipients array empty |
+| 2 | BatchTooLarge | > 30 recipients |
+| 3 | InvalidAmount | amount ≤ 0 |
+| 4 | Overflow | i128 arithmetic overflow |
+| 5 | MismatchedArrays | recipients.len() ≠ amounts.len() |
+| 6 | FeeTooHigh | fee > 20% of total batch |
+| 7 | AlreadyInitialized | initialize() called twice |
+| 8 | NotInitialized | distribute() before initialize() |
+| 9 | ContractPaused | distribute() while paused |
+| 10 | DuplicateRecipient | same address appears twice in batch |
+| 11 | SelfTransfer | payer pays themselves |
+
+## Backend Integration
+
+- `YieldDistributorService` — builds multi-batch XDRs, submits with retry, Redis locking
+- `companyPayment.service.js` — routes Soroban (C...) wallets through YieldDistributor
+- `YieldPaymentReconciler` — cron (5 min) fixes stuck jobs
+- `MaintenanceService` — extends contract TTL daily
+- `.env`: `YIELD_DISTRIBUTOR_CONTRACT_ID=CBEW2KJA...`
+
+## Test Coverage (35 snapshots)
+Happy path (single + multi-recipient), all error codes, admin operations (pause/resume/set_admin), upgrade flow, TTL extension, batch size boundary (30 = ok, 31 = error), duplicate recipient detection, self-transfer prevention, fee cap (20%), empty batch rejection.

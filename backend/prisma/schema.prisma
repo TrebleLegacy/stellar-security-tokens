@@ -413,6 +413,7 @@ model Offer {
   interestPayments InterestPayment[]
   investments      Investment[]
   reminders        PaymentReminder[]
+  yieldPaymentJobs YieldPaymentJob[]
 
   @@index([companyId])
   @@index([status])
@@ -763,4 +764,31 @@ model RefreshToken {
   @@index([userId, userType])
   @@index([expiresAt])
   @@map("refresh_tokens")
+}
+
+// ============================================
+// SOROBAN: Yield Distribution Job Tracking
+// ============================================
+
+model YieldPaymentJob {
+  id             String    @id @default(uuid())
+  offerId        Int       @map("offer_id")
+  companyId      Int       @map("company_id")
+  status         String    @db.VarChar(30) // prepared | submitting | confirmed | partial_failure | failed
+  batchCount     Int       @map("batch_count")
+  totalInvestors Int       @map("total_investors")
+  totalAmount    Decimal   @map("total_amount") @db.Decimal(20, 7)
+  totalFee       Decimal   @map("total_fee") @db.Decimal(20, 7)
+  txHashes       String?   @map("tx_hashes") @db.Text
+  error          String?   @db.Text
+  metadata       Json?                                     // full batch details for reconciliation
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp
+  completedAt    DateTime? @map("completed_at") @db.Timestamp
+
+  offer          Offer     @relation(fields: [offerId], references: [id])
+
+  @@index([offerId])
+  @@index([status])
+  @@index([companyId])
+  @@map("yield_payment_jobs")
 }

@@ -718,6 +718,171 @@ router.get('/investors', authenticateToken, requirePlatformAdmin, PlatformAdminC
 router.get('/treasury/balances', authenticateToken, requirePlatformAdmin, TreasuryController.getBalances);
 router.get('/maintenance/ttl-stats', authenticateToken, requirePlatformAdmin, PlatformAdminController.getTTLStats);
 
+// ============ Yield Payment Job Management ============
+
+/**
+ * GET /api/platform-admins/yield-jobs
+ * List all yield payment jobs (filterable by status)
+ */
+router.get('/yield-jobs', authenticateToken, requirePlatformAdmin, async (req, res) => {
+    try {
+        const { status, offerId, limit = 50, offset = 0 } = req.query;
+        const where = {};
+        if (status) where.status = status;
+        if (offerId) where.offerId = parseInt(offerId);
+
+        const [jobs, total] = await Promise.all([
+            prisma.yieldPaymentJob.findMany({
+                where,
+                include: {
+                    offer: { select: { id: true, assetCode: true, offerName: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+                take: parseInt(limit),
+                skip: parseInt(offset),
+            }),
+            prisma.yieldPaymentJob.count({ where }),
+        ]);
+
+        res.json({ success: true, data: jobs, total });
+    } catch (error) {
+        log.error('[YieldJobs] List error:', error);
+        throw error;
+    }
+});
+
+/**
+ * GET /api/platform-admins/yield-jobs/:jobId
+ * Get full yield job detail with per-batch results
+ */
+router.get('/yield-jobs/:jobId', authenticateToken, requirePlatformAdmin, async (req, res) => {
+    try {
+        const job = await prisma.yieldPaymentJob.findUnique({
+            where: { id: req.params.jobId },
+            include: {
+                offer: {
+                    select: {
+                        id: true, assetCode: true, offerName: true,
+                        annualInterestRate: true, investorRate: true,
+                        companyId: true,
+                    },
+                },
+            },
+        });
+
+        if (!job) {
+            return res.status(404).json({ success: false, error: 'Yield job not found' });
+        }
+
+        res.json({ success: true, data: job });
+    } catch (error) {
+        log.error('[YieldJobs] Detail error:', error);
+        throw error;
+    }
+});
+
+/**
+ * POST /api/platform-admins/yield-jobs/:jobId/retry
+ * Retry failed batches from a yield payment job.
+ * Re-prepares XDRs for only unpaid investors, returns them for the company to re-sign.
+ */
+router.post('/yield-jobs/:jobId/retry', authenticateToken, requirePlatformAdmin, async (req, res) => {
+    try {
+        const job = await prisma.yieldPaymentJob.findUnique({
+            where: { id: req.params.jobId },
+            include: { offer: true },
+        });
+
+        if (!job) {
+            return res.status(404).json({ success: false, error: 'Yield job not found' });
+        }
+
+        if (!['partial_failure', 'failed'].includes(job.status)) {
+            return res.status(400).json({
+                success: false,
+                error: `Cannot retry job in status '${job.status}'. Only partial_failure or failed jobs can be retried.`,
+            });
+        }
+
+        // Extract failed investor IDs from metadata
+        const batchResults = job.metadata?.batches || [];
+        const failedInvestorIds = batchResults
+            .filter(b => b.status === 'failed')
+            .flatMap(b => b.investorIds || []);
+
+        if (failedInvestorIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No failed investors found in job metadata. Manual reconciliation required.',
+            });
+        }
+
+        // Import service (avoid circular deps)
+        const { CompanyPaymentService } = await import('../services/companyPayment.service.js');
+
+        // Re-prepare for only the failed investors
+        const paymentDetails = await CompanyPaymentService.calculateOwedAmount(job.offerId);
+        const failedBreakdown = paymentDetails.breakdown.filter(b =>
+            failedInvestorIds.includes(b.investorId)
+        );
+
+        if (failedBreakdown.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Failed investors not found in current breakdown. They may have already been paid.',
+            });
+        }
+
+        const { YieldDistributorService } = await import('../services/yieldDistributor.service.js');
+
+        const annualRate = parseFloat(job.offer.annualInterestRate || 0);
+        const effectiveInvestorRate = parseFloat(job.offer.investorRate ?? job.offer.annualInterestRate ?? 0);
+        const spreadPct = Math.max(0, annualRate - effectiveInvestorRate);
+        const spreadRatio = effectiveInvestorRate > 0 ? spreadPct / effectiveInvestorRate : 0;
+
+        // Get company wallet address
+        const company = await prisma.company.findUnique({
+            where: { id: job.offer.companyId },
+            select: { stellarContractId: true },
+        });
+
+        const { batchXDRs, batchDetails } = await YieldDistributorService.buildMultiBatchXdrs(
+            company.stellarContractId,
+            failedBreakdown,
+            spreadRatio,
+        );
+
+        // Create new retry job
+        const retryJob = await prisma.yieldPaymentJob.create({
+            data: {
+                offerId: job.offerId,
+                companyId: job.companyId,
+                status: 'prepared',
+                batchCount: batchXDRs.length,
+                totalInvestors: failedBreakdown.length,
+                totalAmount: failedBreakdown.reduce((s, b) => s + b.interestOwed, 0),
+                totalFee: 0, // Calculated in batch details
+                metadata: { parentJobId: job.id, batches: batchDetails },
+            },
+        });
+
+        log.info(`[YieldJobs] Retry job ${retryJob.id} created for ${failedBreakdown.length} failed investors from job ${job.id}`);
+
+        res.json({
+            success: true,
+            data: {
+                retryJobId: retryJob.id,
+                batchXDRs,
+                batchCount: batchXDRs.length,
+                failedInvestorCount: failedBreakdown.length,
+                message: 'Send these XDRs to the company for re-signing.',
+            },
+        });
+    } catch (error) {
+        log.error('[YieldJobs] Retry error:', error);
+        throw error;
+    }
+});
 
 
 // ============ Company Management Routes ============

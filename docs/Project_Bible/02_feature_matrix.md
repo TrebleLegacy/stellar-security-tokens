@@ -54,6 +54,7 @@
 | Company offer activation | ✅ offerRoutes /activate | ✅ OfferDetails page | ✅ |
 | Cap table (investors list) | ✅ offerRoutes /investors | ✅ OfferDetails page | ✅ |
 | Dividend / Interest payments | ✅ companyPaymentRoutes | ✅ PayInvestors page | ✅ |
+| Batched yield (Soroban YieldDistributor) | ✅ YieldDistributorService (multi-batch, retry, reconciler) | ✅ PayInvestors (seq. signing, partial failure UI) | ✅ |
 | Bullet (maturity) payments | ✅ CompanyPaymentService | ✅ PayInvestors page | ✅ |
 | Payment history | ✅ companyPaymentRoutes /history | ✅ PayInvestors page | ✅ |
 | Penalties tracking | ✅ companyPaymentRoutes /penalties | ✅ PayInvestors page | ✅ |

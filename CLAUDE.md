@@ -33,6 +33,9 @@ Operational runbooks, mainnet checklist → `docs/Operations/`
 ### Bible Maintenance
 When you create new files, add new features, or significantly change existing code, update the relevant Bible artifact to reflect the change. Follow the patterns in `docs/Project_Bible/CONTRIBUTING.md` — every claim must be traceable to a specific file and line.
 
+## Development Philosophy
+**SOTA-first, always.** Even when targeting MVP, build the full-featured, production-grade solution on the first pass. Do NOT defer hardening, admin tooling, error recovery, or edge case handling as "post-MVP" — going back to retrofit costs 3-5x more than building it right. If a feature takes 1 hour to build at 80% and 1.5 hours at 100%, always spend the extra 30 minutes. The only exception is features that require external dependencies not yet available (e.g., mainnet contracts, third-party APIs).
+
 ## Code Patterns (enforce these)
 - **Backend**: ES modules, async/await, thin controllers → fat services → Prisma
 - **Frontend**: Functional components + hooks, typed props/state, `types/index.ts` interfaces

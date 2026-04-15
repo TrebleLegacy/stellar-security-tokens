@@ -149,7 +149,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### companyPayment.service.js (~850L)
+### companyPayment.service.js (~1050L)
 **Role:** Company-facing payment calculations, execution, and bullet maturity batch flow
 
 | Method | Purpose |
@@ -158,10 +158,19 @@ submit(opts) → KeyManager mode === 'multisig'
 | `calculateBulletPayment` | Principal + accrued interest at maturity |
 | `getUpcomingPayments` | All due payments for a company |
 | `processTokenSaleFees` | 1% platform fee on token sale |
-| `createPaymentTransaction` | Build unsigned TX — periodic yield only (bullet uses Soroban Settlement) |
+| `createPaymentTransaction` | Build unsigned TX — routes C-wallets through YieldDistributor, G-wallets through classic ops |
 | `processSignedPayment` | Submit periodic TX directly + call `_recordPayments()` |
+| `processSignedBatches` | Submit multi-batch YieldDistributor TXs sequentially with retry |
 | `_recordPayments(prisma, offer, breakdown, opts)` | DRY helper: creates InterestPayment + FeeLog records (shared by periodic + bullet) |
 | `checkOverduePayments` | Late fees (0.1%/day) + 10-day grace → default + CompanyPenalty |
+
+**Periodic Yield Flow (Smart Wallet — YieldDistributor):**
+1. `createPaymentTransaction()` detects C-wallet → routes to `YieldDistributorService.buildMultiBatchXdrs()`
+2. >30 investors split into batches of 30. Each batch = 1 Soroban TX
+3. DB write-through: `YieldPaymentJob` created at prepare, updated at submit
+4. Company signs each batch XDR sequentially (1 passkey prompt per batch)
+5. Backend submits signed XDRs sequentially with 3x retry + error classification
+6. Partial failures → admin notified, retry via admin endpoints
 
 **Bullet Maturity Flow (Soroban Settlement):**
 1. Daily cron `processBulletPayments()` scans for `maturityDate ≤ today` and flips offer to `status: 'matured'`, notifies company users
@@ -171,6 +180,22 @@ submit(opts) → KeyManager mode === 'multisig'
 5. Offer transitions to `status: 'closed'`
 
 > ⚠️ **Legacy Pipeline Removed:** The classic `maturity_clawback` multi-batch pipeline (49-investor caps, `setOptions` guard, `batch_pending` status) was fully decommissioned in Apr 2026. All bullet maturity payments now use the Soroban MaturitySettlement contract.
+
+---
+
+### yieldDistributor.service.js (~410L)
+**Role:** Multi-batch Soroban yield distribution via YieldDistributor contract
+
+| Method | Purpose |
+|---|---|
+| `buildMultiBatchXdrs` | Split investor list into 30-per-batch XDRs. Each calls contract `distribute()` |
+| `submitBatches` | Sequential submission with 3x retry + exponential backoff |
+| `acquireLock` / `releaseLock` | Redis-based concurrency lock (`yield_lock:{offerId}`, 15-min TTL) |
+| `classifyError` | Categorize errors: retryable (network/RPC) vs fatal (auth/contract) |
+| `extendContractTtl` | Extend contract instance TTL via `extend_ttl()` |
+
+**Calls:** `StellarService`, `KeyManager`, Redis
+**Called by:** `companyPayment.service.js`
 
 ---
 
@@ -282,9 +307,19 @@ submit(opts) → KeyManager mode === 'multisig'
 | `pending_payment` > 30 min | Auto-cancel |
 | ≥5 orphans in one cycle | Alert via AlertRouter |
 
-### maintenance.service.js (118L)
+### yieldPaymentReconciler.js (~150L)
+**Role:** Fix orphaned yield payment jobs (every 5 min)
+
+| Scenario | Action |
+|---|---|
+| TX confirmed on-chain, DB stuck in `submitting` | Fix to `confirmed` |
+| Some TXs confirmed, some not | Fix to `partial_failure` |
+| Job stale > 1 hour, no TXs | Mark `failed` |
+| ≥3 stale jobs in one cycle | Alert via AlertRouter |
+
+### maintenance.service.js (~140L)
 **Role:** Daily TTL extension sweep (03:00 UTC + startup)
-- Checks SACs, smart wallets, sale contracts
+- Checks SACs, smart wallets, sale contracts, settlement contracts, YieldDistributor
 - Extends if TTL < 50,000 ledgers (~3.5 days)
 
 ---
@@ -330,9 +365,10 @@ submit(opts) → KeyManager mode === 'multisig'
 |---|---|---|
 | Every 30s | `SorobanEventIndexer` | Poll contract events |
 | Every 5m | `SorobanReconciler` | Fix orphaned investments |
+| Every 5m | `YieldPaymentReconciler` | Fix stuck yield payment jobs |
 | Every 10m | `SorobanMetrics` | Flush latency stats |
 | Daily 01:00 | `PaymentService` | Bullet maturity check + periodic notifications |
-| Daily 03:00 | `MaintenanceService` | TTL extension sweep |
+| Daily 03:00 | `MaintenanceService` | TTL extension sweep (incl. YieldDistributor) |
 | Daily 09:00 | `PaymentReminderService` | Payment reminder emails |
 | 1st of month | `PaymentService` | Monthly interest payments |
 | 1st of Jan/Apr/Jul/Oct | `PaymentService` | Quarterly payments |

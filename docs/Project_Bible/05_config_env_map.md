@@ -64,6 +64,7 @@
 | `SALE_WASM_HASH` | When Soroban enabled | — | SorobanSaleService (deploy) |
 | `XLM_SAC_CONTRACT_ID` | ✅ | Testnet default | platformAdminRoutes (sponsor) |
 | `USDC_SAC_CONTRACT_ID` | ✅ | Testnet default | PasskeyWalletService (balances) |
+| `YIELD_DISTRIBUTOR_CONTRACT_ID` | When Soroban enabled | — | YieldDistributorService (batched yield payments) |
 | `USDC_ISSUER` | ❌ | Auto-detected from network | StellarService |
 
 ### Security

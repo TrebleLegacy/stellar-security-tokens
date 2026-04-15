@@ -72,6 +72,10 @@ export interface SubmitResult {
     transactionHash?: string;
     investorsPaid?: number;
     totalPaid?: number;
+    // Multi-batch partial failure fields
+    partial?: boolean;
+    completedBatches?: number;
+    failedBatches?: number;
 }
 
 export interface CompanyPenalty {
@@ -208,6 +212,23 @@ export const companyPaymentsApi = {
         };
     }> => {
         const response = await api.get(`/company/payments/${offerId}/settlement-status`);
+        return response.data;
+    },
+
+    /**
+     * Check if there's an active yield payment job for this offer.
+     * Used to recover state on page refresh during signing/submission.
+     */
+    getYieldJobStatus: async (offerId: number): Promise<{
+        success: boolean;
+        data: {
+            jobId: string;
+            status: string;
+            batchProgress: { completed: number; total: number };
+            txHashes: string[];
+        } | null;
+    }> => {
+        const response = await api.get(`/company/payments/${offerId}/yield-status`);
         return response.data;
     },
 };
