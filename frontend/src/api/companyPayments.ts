@@ -54,6 +54,9 @@ export interface BulletPaymentDetails {
 
 export interface PreparedTransaction {
     transactionXDR: string;
+    /** All batch XDRs for multi-batch signing (YieldDistributor) */
+    batchXDRs?: string[];
+    batchCount?: number;
     offerId: number;
     totalAmount: number;
     platformFee?: number;
@@ -117,6 +120,19 @@ export const companyPaymentsApi = {
     ): Promise<{ success: boolean; data: SubmitResult; message: string }> => {
         const response = await api.post(`/company/payments/${offerId}/submit`, {
             signedXDR,
+        });
+        return response.data;
+    },
+
+    /**
+     * Submit multiple signed batch XDRs (YieldDistributor multi-batch)
+     */
+    submitBatchPayment: async (
+        offerId: number,
+        signedXDRs: string[]
+    ): Promise<{ success: boolean; data: SubmitResult; message: string }> => {
+        const response = await api.post(`/company/payments/${offerId}/submit`, {
+            signedXDRs,
         });
         return response.data;
     },

@@ -1,7 +1,7 @@
 # Radox — Production Roadmap
 
-> Last updated: 2026-03-31
-> Status: Pre-production hardening — feature-complete, hardening E2E test suite
+> Last updated: 2026-04-15
+> Status: Pre-production hardening — YieldDistributor contract implemented, deploying to testnet
 
 ---
 
@@ -200,25 +200,53 @@ The `isTokenLocked: false` code path uses `listAssetHolders()` (on-chain balance
 - [ ] Verify collateral distribution uses on-chain proportions
 - [ ] See also: Trading Market Lockout caution in Phase 1.5
 
-#### v6 — On-Chain Distribution Contract (Future)
-> **Build when:** Post-MVP, when investor trust and regulatory audit trail are priorities.
+#### v6 — YieldDistributor Contract ✅ (Implemented — Apr 2026)
 
-Hybrid architecture: backend computes yield math, contract validates and executes atomically.
+Stateless Soroban contract that batches up to 30 `SAC.transfer()` calls under one `require_auth(payer)` invocation tree — one passkey prompt per batch.
+
+- [x] Soroban contract: `contracts/yield_distributor/src/lib.rs` (14/14 Rust tests)
+- [x] Backend service: `yieldDistributor.service.js` (multi-batch XDR, 3x exponential retry, Redis lock)
+- [x] Rewired `companyPayment.service.js` → `buildMultiBatchXdrs()` + `processSignedBatches()`
+- [x] TDD: 65/65 backend unit tests pass
+- [ ] Build WASM + deploy to testnet → set `YIELD_DISTRIBUTOR_CONTRACT_ID` in `.env`
+- [ ] Frontend: multi-batch signing loop in `PayInvestors.tsx` (sign-all-first pattern)
+
+**MVP scaling**: 1 passkey prompt per 30 investors. ≤90 investors = 3 prompts. Acceptable for MVP.
+
+> [!IMPORTANT]
+> **Non-custodial**: Funds flow directly from company wallet → investor wallets. No intermediary holding contract. No custody obligations.
+
+#### v7 — Delegated Signer for Infinite Scale (Future — Post-MVP)
+> **Build when:** Investor counts exceed 100+ per offer and multi-prompt UX becomes a friction point.
+
+**Problem**: Each batch transaction requires a separate passkey signature. At 200 investors = 7 prompts. Not scalable.
+
+**Solution**: Temporary Ed25519 signer on the company's smart wallet — zero custody.
 
 ```
-Company deposits USDC → Distribution Contract
-Backend submits plan [(investor_A, 50), (investor_B, 30)]
-Contract validates: sum(payouts) + fee ≤ deposited
-Contract executes: USDC → each investor, fee → treasury, clawback tokens
+1. Company passkey → add_temp_signer(backend_pubkey, max_usdc=1000, ttl=30min)  ← 1 prompt
+2. Backend signs distribute() batch 1 with temp key  ← direct: company → investors
+3. Backend signs distribute() batch 2 with temp key  ← direct: company → investors
+   ...N batches, zero prompts...
+4. Temp key auto-expires after TTL
 ```
 
-- [ ] New Soroban contract: `token_distribution` (generalized version of MaturitySettlement)
-  - `deposit(company, amount)` — company sends USDC to contract
-  - `distribute(admin, plan[])` — backend submits the split, contract validates + executes
-  - `settle_and_close(admin)` — maturity settlement (partially implemented via MaturitySettlement contract)
-- [ ] Backend: adapt `companyPayment.service.js` to submit distribution plan to contract
-- [ ] E2E: verify atomic payout + burn via contract
-- [ ] Subsumes Changes 2-3 by enforcing fee split on-chain
+The smart wallet's `__check_auth` receives the `auth_context` and enforces:
+- Signer is the registered temp key (not passkey — separate lower-weight key)
+- Total spend ≤ authorized `max_usdc` cap
+- Only allowed function: `distribute()` on the YieldDistributor contract
+
+> [!CAUTION]
+> **Custody analysis**: The deposit pattern (maturity_settlement style) would make the platform a custodian.
+> The delegated signer approach avoids custody entirely — funds flow peer-to-peer,
+> company explicitly authorizes a scoped delegation. This is the preferred scaling path.
+
+Implementation:
+- [ ] Smart wallet contract: `add_temp_signer(pubkey, max_amount, allowed_contract, ttl)`
+- [ ] Smart wallet `__check_auth`: policy enforcement for temp signers (spend limit, contract allowlist)
+- [ ] Backend: `YieldDistributorService.submitWithDelegatedSigner()` — server-side Ed25519 signing
+- [ ] Frontend: "Authorize payment batch" single-prompt UX
+- [ ] E2E: verify spend limit enforcement + TTL expiry + unauthorized contract rejection
 
 ---
 

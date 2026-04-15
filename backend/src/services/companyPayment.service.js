@@ -4,6 +4,7 @@
  */
 import prisma from '../config/prisma.js';
 import { StellarService } from './stellar.service.js';
+import { YieldDistributorService } from './yieldDistributor.service.js';
 import { PaymentService } from './payment.service.js';
 import { EmailService } from './email.service.js';
 import { AlertService } from './alert.service.js';
@@ -152,9 +153,10 @@ export class CompanyPaymentService {
                 };
             }
 
-            const annualRate = parseFloat(offer.annualInterestRate || 0);
+            // Use investorRate for payouts; fall back to annualRate if null (no spread)
+            const effectiveInvestorRate = parseFloat(offer.investorRate ?? offer.annualInterestRate ?? 0);
             const periodsPerYear = this.getPeriodsPerYear(offer.paymentType);
-            const periodRate = annualRate / 100 / periodsPerYear;
+            const periodRate = effectiveInvestorRate / 100 / periodsPerYear;
 
             // Calculate per-investor owed amounts based on current on-chain holdings
             const breakdown = investorsWithBalances.map(inv => {
@@ -188,7 +190,8 @@ export class CompanyPaymentService {
                 totalOwed: round7(totalOwed),
                 investorCount: breakdown.length,
                 paymentType: offer.paymentType,
-                annualInterestRate: annualRate,
+                annualInterestRate: parseFloat(offer.annualInterestRate || 0),
+                investorRate: effectiveInvestorRate,
                 periodRate: periodRate * 100,
                 nextPaymentDue: offer.nextPaymentDue,
                 lastPaymentDate: offer.lastPaymentDate,
@@ -315,11 +318,12 @@ export class CompanyPaymentService {
                 0
             );
 
-            const annualRate = parseFloat(offer.annualInterestRate || 0);
+            // Use investorRate for payouts; fall back to annualRate if null (no spread)
+            const effectiveInvestorRate = parseFloat(offer.investorRate ?? offer.annualInterestRate ?? 0);
             const offerStartDate = offer.createdAt;
             const maturityDate = new Date(offer.maturityDate);
             const yearsToMaturity = (maturityDate - offerStartDate) / (365 * 24 * 60 * 60 * 1000);
-            const totalInterest = totalTokensHeld * (annualRate / 100) * yearsToMaturity;
+            const totalInterest = totalTokensHeld * (effectiveInvestorRate / 100) * yearsToMaturity;
 
             const breakdown = investorsWithBalances.map(inv => {
                 const tokenBalance = parseFloat(inv.token_balance || 0);
@@ -480,51 +484,45 @@ export class CompanyPaymentService {
         let investorOps = [];
 
         if (hasSmartWalletInvestors) {
-            // ─── SOROBAN PATH: SAC transfer for C... addresses ─────────────
-            // Soroban limits: 1 invokeHostFunction per TX, so batch = 1 investor
-            const usdcSacId = process.env.USDC_SAC_CONTRACT_ID;
-            if (!usdcSacId) throw new Error('USDC_SAC_CONTRACT_ID not configured');
+            // ─── SOROBAN PATH: YieldDistributor multi-batch ─────────────────
+            // Uses YieldDistributor contract to batch SAC.transfer() calls.
+            // One distribute() call = one passkey signature = up to 30 investors.
+            // >30 investors → multiple batches, each signed separately.
+            const annualRate = parseFloat(offer.annualInterestRate || 0);
+            const effectiveInvestorRate = parseFloat(offer.investorRate ?? offer.annualInterestRate ?? 0);
+            const spreadPct = Math.max(0, annualRate - effectiveInvestorRate);
+            const spreadRatio = effectiveInvestorRate > 0 ? spreadPct / effectiveInvestorRate : 0;
 
-            const inv = breakdown[0]; // batch size = 1
-            const payAmount = Math.max(inv.interestOwed, 0.0000001);
-
-            if (!inv.investorWallet || payAmount <= 0) {
-                throw new Error('No valid investor wallets to pay');
-            }
-
-            // Total USDC the company sends = investor payout + platform fee
-            const totalSendAmount = payAmount + platformFee;
-
-            // Build SAC transfer: company → investor (full investor payout)
-            // Platform fee is handled separately via treasury transfer
-            const usdcContract = new Contract(usdcSacId);
-            const transferOp = usdcContract.call(
-                'transfer',
-                new Address(companyWalletAddress).toScVal(),
-                new Address(inv.investorWallet).toScVal(),
-                nativeToScVal(BigInt(Math.round(payAmount * 10_000_000)), { type: 'i128' })
+            const { batchXDRs, batchDetails } = await YieldDistributorService.buildMultiBatchXdrs(
+                companyWalletAddress,
+                breakdown,
+                spreadRatio,
             );
 
-            investorOps = [transferOp];
+            const validInvestorCount = breakdown.filter(b => b.investorWallet && b.interestOwed > 0).length;
 
-            // Build Soroban TX sourced from operations keypair
-            const opsKeypair = keyManager.getOperationsKeypair();
-            const networkPassphrase = getNetworkPassphrase();
-            const rpcServer = new rpc.Server(getSorobanRpcUrl());
-            const sourceAccount = await rpcServer.getAccount(opsKeypair.publicKey());
+            log.info('YieldDistributor multi-batch XDRs prepared', {
+                offerId,
+                batchCount: batchXDRs.length,
+                investorCount: validInvestorCount,
+                totalAmount,
+                platformFee,
+            });
 
-            let tx = new TransactionBuilder(sourceAccount, {
-                fee: BASE_FEE,
-                networkPassphrase,
-            })
-                .addOperation(transferOp)
-                .setTimeout(180)
-                .build();
-
-            // Simulate & prepare
-            log.info(`[CompanyPayment] Simulating SAC transfer: ${payAmount} USDC → ${inv.investorWallet.slice(0, 12)}…`);
-            tx = await StellarService.prepareSorobanTransaction(tx);
-            transaction = tx;
+            return {
+                transactionXDR: batchXDRs[0],        // backward compat: first/only XDR
+                batchXDRs,                            // all batch XDRs
+                batchCount: batchXDRs.length,
+                batchDetails,
+                offerId,
+                isBullet: false,
+                totalAmount,
+                platformFee,
+                netToInvestors,
+                investorCount: validInvestorCount,
+                breakdown,
+                expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            };
         } else {
             // ─── CLASSIC PATH: Operation.payment for G... addresses ────────
             const operations = [];
@@ -554,8 +552,6 @@ export class CompanyPaymentService {
                 throw new Error('No valid investor wallets to pay');
             }
 
-
-
             // Create unsigned classic transaction
             transaction = await StellarService.buildUnsignedTransaction(
                 companyWalletAddress,
@@ -572,7 +568,7 @@ export class CompanyPaymentService {
             platformFee,
             netToInvestors,
             investorCount: investorOps.length,
-            txType: hasSmartWalletInvestors ? 'soroban_sac' : 'classic',
+            txType: hasSmartWalletInvestors ? 'soroban_yield_distributor' : 'classic',
         });
 
         return {
@@ -585,7 +581,7 @@ export class CompanyPaymentService {
             investorCount: investorOps.length,
             breakdown,
             batchInfo: null,
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 min frontend display expiry
+            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
         };
     }
 
@@ -659,6 +655,95 @@ export class CompanyPaymentService {
             AlertService.error('Payment submission failed', { offerId, error: error.message }).catch(() => {});
             throw error;
         }
+    }
+
+    /**
+     * Process signed multi-batch payment XDRs (YieldDistributor path).
+     *
+     * Submits each batch sequentially with retry. Tracks partial failures.
+     * On R1 (DB failure after on-chain success), creates CRITICAL alert.
+     *
+     * @param {string[]} signedXDRs - Signed batch transaction XDRs
+     * @param {number} offerId - Offer ID
+     * @param {Array} batchDetails - Batch metadata from createPaymentTransaction
+     * @returns {Promise<Object>} Submission results
+     */
+    static async processSignedBatches(signedXDRs, offerId, batchDetails) {
+        const offer = await prisma.offer.findUnique({ where: { id: offerId } });
+
+        if (offer.paymentType === 'bullet') {
+            throw new Error('Bullet maturity payments must use the Soroban Settlement flow.');
+        }
+
+        if (!signedXDRs || signedXDRs.length === 0) {
+            throw new Error('No signed XDRs provided');
+        }
+
+        // Submit all batches with retry
+        const submitResult = await YieldDistributorService.submitBatches(signedXDRs, batchDetails);
+
+        // Record payments for confirmed batches
+        if (submitResult.completedBatches > 0) {
+            try {
+                const annualRate = parseFloat(offer.annualInterestRate || 0);
+                const effectiveInvestorRate = parseFloat(offer.investorRate ?? offer.annualInterestRate ?? 0);
+                const spreadPct = Math.max(0, annualRate - effectiveInvestorRate);
+
+                const paymentDetails = await this.calculateOwedAmount(offerId);
+                await this._recordPayments(
+                    offer,
+                    paymentDetails.breakdown,
+                    submitResult.txHashes.join(','),
+                    spreadPct,
+                    false
+                );
+
+                // Update offer payment status
+                await prisma.offer.update({
+                    where: { id: offerId },
+                    data: {
+                        lastPaymentDate: new Date(),
+                        paymentDueStatus: submitResult.success ? 'current' : 'overdue',
+                        nextPaymentDue: submitResult.success ? this.calculateNextPaymentDate(offer) : undefined,
+                    }
+                });
+
+                log.info('Multi-batch payment recorded', {
+                    offerId,
+                    investorsPaid: submitResult.investorsPaid,
+                    totalPaid: submitResult.totalPaid,
+                    txHashes: submitResult.txHashes,
+                });
+            } catch (dbError) {
+                // R1: DB failure after on-chain success — CRITICAL
+                log.error('CRITICAL: Payment confirmed on-chain but DB record failed', {
+                    offerId,
+                    txHashes: submitResult.txHashes,
+                    investorsPaid: submitResult.investorsPaid,
+                    error: dbError.message,
+                });
+                AlertService.critical('PAYMENT_RECORD_FAILURE', {
+                    type: 'PAYMENT_RECORD_FAILURE',
+                    offerId,
+                    txHashes: submitResult.txHashes,
+                    investorCount: submitResult.investorsPaid,
+                    message: 'Yield payments confirmed on-chain but database record failed. Manual reconciliation required.',
+                    error: dbError.message,
+                }).catch(() => {});
+
+                // Return success=true with warning (money is safe)
+                return {
+                    ...submitResult,
+                    warning: 'PAYMENT_RECORD_FAILURE',
+                    warningMessage: 'Payments confirmed on-chain but database record failed. Admin will reconcile.',
+                };
+            }
+        }
+
+        // Release concurrency lock
+        await YieldDistributorService.releaseLock(offerId);
+
+        return submitResult;
     }
 
     /**
