@@ -93,15 +93,85 @@ router.post('/:offerId/prepare', authenticateToken, requireCompanyUser, async (r
 });
 
 /**
+ * GET /api/company/payments/:offerId/yield-status
+ * Check if there's an active yield payment job for this offer.
+ * Used by frontend to recover state on page refresh.
+ */
+router.get('/:offerId/yield-status', authenticateToken, requireCompanyUser, async (req, res) => {
+    const { offerId } = req.params;
+    const { companyId } = req.user;
+
+    // Verify offer belongs to company
+    const offer = await prisma.offer.findFirst({
+        where: { id: parseInt(offerId), companyId }
+    });
+
+    if (!offer) {
+        return res.status(404).json({ success: false, error: 'Offer not found' });
+    }
+
+    // Find the most recent non-terminal job
+    const activeJob = await prisma.yieldPaymentJob.findFirst({
+        where: {
+            offerId: parseInt(offerId),
+            status: { in: ['prepared', 'submitting'] },
+        },
+        orderBy: { createdAt: 'desc' },
+    });
+
+    if (!activeJob) {
+        // Also check for recent completed/partial jobs (within last 30 min)
+        const recentJob = await prisma.yieldPaymentJob.findFirst({
+            where: {
+                offerId: parseInt(offerId),
+                status: { in: ['confirmed', 'partial_failure', 'failed'] },
+                completedAt: { gte: new Date(Date.now() - 30 * 60 * 1000) },
+            },
+            orderBy: { completedAt: 'desc' },
+        });
+
+        if (recentJob) {
+            return res.json({
+                success: true,
+                data: {
+                    jobId: recentJob.id,
+                    status: recentJob.status,
+                    batchProgress: {
+                        completed: recentJob.status === 'confirmed' ? recentJob.batchCount : 0,
+                        total: recentJob.batchCount,
+                    },
+                    txHashes: recentJob.txHashes ? recentJob.txHashes.split(',') : [],
+                },
+            });
+        }
+
+        return res.json({ success: true, data: null });
+    }
+
+    res.json({
+        success: true,
+        data: {
+            jobId: activeJob.id,
+            status: activeJob.status,
+            batchProgress: {
+                completed: 0, // Can't know exact progress without Redis
+                total: activeJob.batchCount,
+            },
+            txHashes: [],
+        },
+    });
+});
+
+/**
  * POST /api/company/payments/:offerId/submit
  * Submit a signed payment transaction
  */
 router.post('/:offerId/submit', authenticateToken, requireCompanyUser, async (req, res) => {
     const { offerId } = req.params;
-    const { signedXDR } = req.body;
+    const { signedXDR, signedXDRs } = req.body;
     const { companyId } = req.user;
 
-    if (!signedXDR) {
+    if (!signedXDR && (!signedXDRs || signedXDRs.length === 0)) {
         return res.status(400).json({
             success: false,
             error: 'Signed transaction XDR is required'
@@ -120,10 +190,20 @@ router.post('/:offerId/submit', authenticateToken, requireCompanyUser, async (re
         });
     }
 
-    const result = await CompanyPaymentService.processSignedPayment(
-        signedXDR,
-        parseInt(offerId)
-    );
+    let result;
+    if (signedXDRs && signedXDRs.length > 0) {
+        // Multi-batch YieldDistributor path
+        result = await CompanyPaymentService.processSignedBatches(
+            signedXDRs,
+            parseInt(offerId)
+        );
+    } else {
+        // Single TX (classic or 1-batch Soroban)
+        result = await CompanyPaymentService.processSignedPayment(
+            signedXDR,
+            parseInt(offerId)
+        );
+    }
 
     res.json({
         success: true,

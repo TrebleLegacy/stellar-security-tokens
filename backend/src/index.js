@@ -236,6 +236,13 @@ app.listen(PORT, async () => {
       console.error('Failed to start Soroban reconciler:', error.message);
     }
     try {
+      const { YieldPaymentReconciler } = await import('./services/yieldPaymentReconciler.js');
+      YieldPaymentReconciler.start();
+      console.log('Yield payment reconciler enabled - checking stale yield jobs every 5 min');
+    } catch (error) {
+      console.error('Failed to start yield payment reconciler:', error.message);
+    }
+    try {
       const { SorobanMetrics } = await import('./services/sorobanMetrics.service.js');
       SorobanMetrics.start();
       console.log('Soroban metrics enabled - flushing to DB every 10 min');
@@ -264,9 +271,11 @@ const gracefulShutdown = async (signal) => {
       const { SorobanEventIndexer } = await import('./services/sorobanEventIndexer.js');
       const { SorobanReconciler } = await import('./services/sorobanReconciler.js');
       const { SorobanMetrics } = await import('./services/sorobanMetrics.service.js');
+      const { YieldPaymentReconciler } = await import('./services/yieldPaymentReconciler.js');
       SorobanEventIndexer.stop?.();
       SorobanReconciler.stop?.();
       SorobanMetrics.stop?.(); // Final flush to DB
+      YieldPaymentReconciler.stop?.();
       console.log('Soroban services stopped.');
     }
   } catch (err) {

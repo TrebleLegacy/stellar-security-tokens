@@ -1,15 +1,16 @@
 /**
- * YieldDistributorService — Backend wrapper for the YieldDistributor Soroban contract.
+ * YieldDistributorService — Backend wrapper for the YieldDistributor Soroban contract (v2).
  *
  * Handles: building multi-batch distribute() XDRs, submitting with retry,
  * error classification, Redis job tracking, and concurrency locking.
  *
- * Contract is STATELESS — no deploy, no initialize, no deposit.
- * Single entry point: distribute(payer, token, recipients, amounts, fee_recipient, fee_amount)
+ * Contract is STATEFUL-MINIMAL — stores admin + paused flag only.
+ * Entry points: initialize, distribute, upgrade, pause, resume, set_admin, extend_ttl
  *
  * Contract error codes (mirrors DistributeError enum in lib.rs):
  *   1=EmptyBatch, 2=BatchTooLarge, 3=InvalidAmount, 4=Overflow,
- *   5=MismatchedArrays, 6=FeeTooHigh
+ *   5=MismatchedArrays, 6=FeeTooHigh, 7=AlreadyInitialized,
+ *   8=NotInitialized, 9=ContractPaused, 10=DuplicateRecipient, 11=SelfTransfer
  */
 import {
     Contract,
@@ -363,6 +364,45 @@ export class YieldDistributorService {
         const id = process.env.USDC_SAC_CONTRACT_ID;
         if (!id) throw new Error('USDC_SAC_CONTRACT_ID not configured');
         return id;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // TTL Management
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Extend the contract instance TTL to prevent expiry.
+     * Anyone can call extend_ttl() — no admin auth required.
+     * Should be called on a 24-hour cron.
+     */
+    static async extendContractTtl() {
+        try {
+            const contractId = this.getContractId();
+            const contract = new Contract(contractId);
+
+            const opsKeypair = keyManager.getOperationsKeypair();
+            const networkPassphrase = getNetworkPassphrase();
+            const rpcServer = new rpc.Server(getSorobanRpcUrl());
+            const sourceAccount = await rpcServer.getAccount(opsKeypair.publicKey());
+
+            let tx = new TransactionBuilder(sourceAccount, {
+                fee: BASE_FEE,
+                networkPassphrase,
+            })
+                .addOperation(contract.call('extend_ttl'))
+                .setTimeout(300)
+                .build();
+
+            tx = await StellarService.prepareSorobanTransaction(tx);
+            tx.sign(opsKeypair);
+
+            const result = await StellarService.submitTransaction(tx.toXDR('base64'));
+            log.info('Contract TTL extended', { contractId, success: result.success });
+            return result;
+        } catch (err) {
+            log.error('Failed to extend contract TTL', { error: err.message });
+            throw err;
+        }
     }
 }
 

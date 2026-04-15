@@ -509,11 +509,33 @@ export class CompanyPaymentService {
                 platformFee,
             });
 
+            // Persist job to DB (write-through: Redis = hot path, DB = cold persistence)
+            const jobId = crypto.randomUUID();
+            try {
+                await prisma.yieldPaymentJob.create({
+                    data: {
+                        id: jobId,
+                        offerId,
+                        companyId: offer.companyId,
+                        status: 'prepared',
+                        batchCount: batchXDRs.length,
+                        totalInvestors: validInvestorCount,
+                        totalAmount,
+                        totalFee: platformFee,
+                        metadata: { batches: batchDetails },
+                    },
+                });
+            } catch (dbErr) {
+                // Non-fatal: Redis lock is the primary guard. Log and continue.
+                log.warn('Failed to persist YieldPaymentJob (non-fatal)', { offerId, error: dbErr.message });
+            }
+
             return {
                 transactionXDR: batchXDRs[0],        // backward compat: first/only XDR
                 batchXDRs,                            // all batch XDRs
                 batchCount: batchXDRs.length,
                 batchDetails,
+                jobId,                                // flows to frontend → submit
                 offerId,
                 isBullet: false,
                 totalAmount,
@@ -668,7 +690,7 @@ export class CompanyPaymentService {
      * @param {Array} batchDetails - Batch metadata from createPaymentTransaction
      * @returns {Promise<Object>} Submission results
      */
-    static async processSignedBatches(signedXDRs, offerId, batchDetails) {
+    static async processSignedBatches(signedXDRs, offerId, batchDetails = null) {
         const offer = await prisma.offer.findUnique({ where: { id: offerId } });
 
         if (offer.paymentType === 'bullet') {
@@ -679,8 +701,18 @@ export class CompanyPaymentService {
             throw new Error('No signed XDRs provided');
         }
 
+        // Build dummy batchDetails if not provided (route path — details were at prepare time)
+        const effectiveBatchDetails = batchDetails || signedXDRs.map((_, i) => ({
+            batchIndex: i,
+            investorCount: 0,
+            totalAmount: 0,
+            fee: 0,
+            investorIds: [],
+            status: 'pending',
+        }));
+
         // Submit all batches with retry
-        const submitResult = await YieldDistributorService.submitBatches(signedXDRs, batchDetails);
+        const submitResult = await YieldDistributorService.submitBatches(signedXDRs, effectiveBatchDetails);
 
         // Record payments for confirmed batches
         if (submitResult.completedBatches > 0) {
@@ -742,6 +774,34 @@ export class CompanyPaymentService {
 
         // Release concurrency lock
         await YieldDistributorService.releaseLock(offerId);
+
+        // Write-through: update job status in DB
+        try {
+            // Find the most recent prepared/submitting job for this offer
+            const activeJob = await prisma.yieldPaymentJob.findFirst({
+                where: { offerId, status: { in: ['prepared', 'submitting'] } },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (activeJob) {
+                const finalStatus = submitResult.success ? 'confirmed'
+                    : submitResult.partial ? 'partial_failure'
+                    : 'failed';
+                await prisma.yieldPaymentJob.update({
+                    where: { id: activeJob.id },
+                    data: {
+                        status: finalStatus,
+                        txHashes: submitResult.txHashes?.join(',') || null,
+                        error: submitResult.partial
+                            ? JSON.stringify(submitResult.results?.filter(r => r.status === 'failed'))
+                            : null,
+                        completedAt: new Date(),
+                        metadata: { batches: submitResult.results || [] },
+                    },
+                });
+            }
+        } catch (jobUpdateErr) {
+            log.warn('Failed to update YieldPaymentJob (non-fatal)', { offerId, error: jobUpdateErr.message });
+        }
 
         return submitResult;
     }
