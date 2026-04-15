@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge';
 import {
     ArrowLeft, Calendar, FileText, TrendingUp, Loader2, AlertCircle,
     DollarSign, ExternalLink, ShieldCheck, Clock, Building2,
-    Hash, CheckCircle2, Copy, ChevronDown,
+    Hash, CheckCircle2, Copy, ChevronDown, Info,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useInvestmentFees } from '@/hooks/useInvestmentFees';
 
 /* ─── Labels ─── */
 const PAYMENT_LABELS: Record<string, string> = {
@@ -99,6 +100,7 @@ export function OfferDetails() {
     const navigate = useNavigate();
     const { offer, loading, error } = useOffer(id);
     const [tokenDetailsOpen, setTokenDetailsOpen] = useState(false);
+    const { processingFee } = useInvestmentFees();
 
     if (loading) {
         return (
@@ -268,6 +270,12 @@ export function OfferDetails() {
                         <p className="text-xs text-center text-muted-foreground/50 mt-2">
                             Settlement via USDC on Stellar Network
                         </p>
+                        {processingFee > 0 && (
+                            <p className="text-xs text-center text-muted-foreground/50 mt-1 flex items-center justify-center gap-1">
+                                <Info className="w-3 h-3" />
+                                A ${processingFee} USDC processing fee applies per transaction
+                            </p>
+                        )}
                     </>
                 )}
             </div>

@@ -1,0 +1,369 @@
+/**
+ * YieldDistributorService — Backend wrapper for the YieldDistributor Soroban contract.
+ *
+ * Handles: building multi-batch distribute() XDRs, submitting with retry,
+ * error classification, Redis job tracking, and concurrency locking.
+ *
+ * Contract is STATELESS — no deploy, no initialize, no deposit.
+ * Single entry point: distribute(payer, token, recipients, amounts, fee_recipient, fee_amount)
+ *
+ * Contract error codes (mirrors DistributeError enum in lib.rs):
+ *   1=EmptyBatch, 2=BatchTooLarge, 3=InvalidAmount, 4=Overflow,
+ *   5=MismatchedArrays, 6=FeeTooHigh
+ */
+import {
+    Contract,
+    Address,
+    TransactionBuilder,
+    nativeToScVal,
+    xdr,
+    rpc,
+    BASE_FEE,
+} from '@stellar/stellar-sdk';
+import {
+    getNetworkPassphrase,
+    getSorobanRpcUrl,
+} from '../config/stellar.js';
+import { StellarService } from './stellar.service.js';
+import { keyManager } from './KeyManager.js';
+import { getRedisClient } from '../config/redis.js';
+import { AlertService } from './alert.service.js';
+import logger from '../utils/logger.js';
+
+const log = logger.scope('YieldDistributor');
+
+// ─── Constants ──────────────────────────────────────────
+const MAX_BATCH_SIZE = 30;
+const LOCK_TTL_SECONDS = 1800; // 30 minutes
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 3000;
+
+// Contract error codes
+const DISTRIBUTE_ERRORS = {
+    1: { code: 'EmptyBatch', message: 'Empty batch — no investors to pay' },
+    2: { code: 'BatchTooLarge', message: `Batch exceeds ${MAX_BATCH_SIZE} investors` },
+    3: { code: 'InvalidAmount', message: 'Invalid amount (negative or zero)' },
+    4: { code: 'Overflow', message: 'Arithmetic overflow' },
+    5: { code: 'MismatchedArrays', message: 'Recipients/amounts array length mismatch' },
+    6: { code: 'FeeTooHigh', message: 'Fee exceeds 20% safety cap' },
+};
+
+/** Convert USDC amount (float) to stroops (i128 ScVal) */
+const usdcToStroops = (amount) =>
+    nativeToScVal(BigInt(Math.round(amount * 10_000_000)), { type: 'i128' });
+
+/** Round to Stellar USDC precision (7 decimal places) */
+const round7 = (v) => Math.round(v * 10_000_000) / 10_000_000;
+
+export class YieldDistributorService {
+
+    // ═══════════════════════════════════════════════════════════════
+    // Build XDRs
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Build a single distribute() invocation XDR for one batch.
+     *
+     * @param {string} payerAddress - Company C... or G... address
+     * @param {Array<{investorWallet: string, interestOwed: number}>} investors - Batch slice
+     * @param {number} feeAmount - Platform fee for this batch (USDC float)
+     * @returns {Promise<string>} Prepared Soroban TX XDR (base64)
+     */
+    static async buildDistributeXdr(payerAddress, investors, feeAmount) {
+        const contractId = this.getContractId();
+        const usdcSacId = this.getUsdcSacId();
+        const treasuryAddress = keyManager.getTreasuryPublicKey();
+
+        const contract = new Contract(contractId);
+
+        // Build Soroban Vec<Address> for recipients
+        const recipientScVals = investors.map(inv =>
+            new Address(inv.investorWallet).toScVal()
+        );
+        const recipientsVec = xdr.ScVal.scvVec(recipientScVals);
+
+        // Build Soroban Vec<i128> for amounts
+        const amountScVals = investors.map(inv => {
+            const stroops = BigInt(Math.round(Math.max(inv.interestOwed, 0.0000001) * 10_000_000));
+            return nativeToScVal(stroops, { type: 'i128' });
+        });
+        const amountsVec = xdr.ScVal.scvVec(amountScVals);
+
+        // Fee in stroops
+        const feeStroops = BigInt(Math.round(feeAmount * 10_000_000));
+
+        const distributeCall = contract.call(
+            'distribute',
+            new Address(payerAddress).toScVal(),           // payer
+            new Address(usdcSacId).toScVal(),              // token (USDC SAC)
+            recipientsVec,                                  // recipients
+            amountsVec,                                     // amounts
+            new Address(treasuryAddress).toScVal(),         // fee_recipient
+            nativeToScVal(feeStroops, { type: 'i128' }),   // fee_amount
+        );
+
+        // Use operations keypair as TX source (pays gas)
+        const opsKeypair = keyManager.getOperationsKeypair();
+        const networkPassphrase = getNetworkPassphrase();
+        const rpcServer = new rpc.Server(getSorobanRpcUrl());
+        const sourceAccount = await rpcServer.getAccount(opsKeypair.publicKey());
+
+        let tx = new TransactionBuilder(sourceAccount, {
+            fee: BASE_FEE,
+            networkPassphrase,
+        })
+            .addOperation(distributeCall)
+            .setTimeout(300)
+            .build();
+
+        // Simulate & prepare (adds resource footprint, auth entries)
+        tx = await StellarService.prepareSorobanTransaction(tx);
+
+        return tx.toXDR('base64');
+    }
+
+    /**
+     * Build multi-batch XDRs for all investors.
+     * Splits breakdown into batches of MAX_BATCH_SIZE, builds one XDR per batch.
+     *
+     * @param {string} payerAddress - Company wallet address
+     * @param {Array} breakdown - Full investor breakdown from calculateOwedAmount
+     * @param {number} spreadRatio - Fee ratio (spreadPct / investorRate)
+     * @returns {Promise<{batchXDRs: string[], batchDetails: Array}>}
+     */
+    static async buildMultiBatchXdrs(payerAddress, breakdown, spreadRatio) {
+        // Filter to valid investors only
+        const validInvestors = breakdown.filter(b =>
+            b.investorWallet && b.interestOwed > 0
+        );
+
+        if (validInvestors.length === 0) {
+            throw new Error('No valid investor wallets to pay');
+        }
+
+        // Split into batches
+        const batches = [];
+        for (let i = 0; i < validInvestors.length; i += MAX_BATCH_SIZE) {
+            batches.push(validInvestors.slice(i, i + MAX_BATCH_SIZE));
+        }
+
+        log.info(`Building ${batches.length} batch XDRs for ${validInvestors.length} investors`);
+
+        const batchXDRs = [];
+        const batchDetails = [];
+
+        for (let i = 0; i < batches.length; i++) {
+            const batch = batches[i];
+
+            // Fee per batch = sum of per-investor fees for this batch
+            const batchGross = batch.reduce((s, inv) => s + inv.interestOwed, 0);
+            const batchFee = round7(batchGross * spreadRatio);
+
+            const xdrStr = await this.buildDistributeXdr(payerAddress, batch, batchFee);
+
+            batchXDRs.push(xdrStr);
+            batchDetails.push({
+                batchIndex: i,
+                investorCount: batch.length,
+                totalAmount: round7(batchGross),
+                fee: batchFee,
+                investorIds: batch.map(b => b.investorId),
+                status: 'pending',
+            });
+        }
+
+        return { batchXDRs, batchDetails };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Submit with Retry
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Submit a single signed batch XDR with auto-retry for retryable errors.
+     *
+     * @param {string} signedXdr - Signed transaction XDR
+     * @returns {Promise<{status: string, txHash?: string, error?: string}>}
+     */
+    static async submitSingleBatch(signedXdr) {
+        let lastError;
+
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const result = await StellarService.submitTransaction(signedXdr);
+
+                if (result.success) {
+                    return { status: 'confirmed', txHash: result.transactionHash };
+                }
+
+                throw new Error(result.error || 'Transaction failed');
+            } catch (err) {
+                const classified = this.classifyError(err);
+
+                // tx_already_applied = idempotent success
+                if (classified.type === 'ALREADY_APPLIED') {
+                    log.info('tx_already_applied — marking as confirmed (idempotent)');
+                    return { status: 'confirmed', txHash: 'already_applied' };
+                }
+
+                // Fatal error — no point retrying
+                if (!classified.retryable) {
+                    return { status: 'failed', error: `${classified.type}: ${err.message}` };
+                }
+
+                // Retryable — wait and retry with same signed XDR
+                lastError = err;
+                if (attempt < MAX_RETRIES) {
+                    const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+                    log.warn(`Retry ${attempt + 1}/${MAX_RETRIES} after ${delay}ms: ${classified.type}`);
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        }
+
+        return { status: 'failed', error: `MAX_RETRIES_EXCEEDED: ${lastError?.message}` };
+    }
+
+    /**
+     * Submit all signed batch XDRs sequentially.
+     * Continues through failures (each batch is independent).
+     *
+     * @param {string[]} signedXDRs - Signed batch XDRs
+     * @param {Array} batchDetails - Batch metadata from buildMultiBatchXdrs
+     * @returns {Promise<Object>} Submission results with partial failure tracking
+     */
+    static async submitBatches(signedXDRs, batchDetails) {
+        const results = [];
+
+        for (let i = 0; i < signedXDRs.length; i++) {
+            log.info(`Submitting batch ${i + 1}/${signedXDRs.length}`);
+
+            const result = await this.submitSingleBatch(signedXDRs[i]);
+
+            results.push({
+                batch: i,
+                status: result.status,
+                txHash: result.txHash || null,
+                error: result.error || null,
+                investorsPaid: result.status === 'confirmed' ? batchDetails[i].investorCount : 0,
+                batchAmount: result.status === 'confirmed' ? batchDetails[i].totalAmount : 0,
+                investorIds: batchDetails[i].investorIds,
+            });
+        }
+
+        const confirmedBatches = results.filter(r => r.status === 'confirmed');
+        const failedBatches = results.filter(r => r.status === 'failed');
+        const anyConfirmed = confirmedBatches.length > 0;
+        const anyFailed = failedBatches.length > 0;
+
+        return {
+            success: anyConfirmed && !anyFailed,
+            partial: anyConfirmed && anyFailed,
+            completedBatches: confirmedBatches.length,
+            failedBatches: failedBatches.length,
+            totalBatches: results.length,
+            results,
+            investorsPaid: confirmedBatches.reduce((s, r) => s + r.investorsPaid, 0),
+            totalPaid: round7(confirmedBatches.reduce((s, r) => s + r.batchAmount, 0)),
+            txHashes: confirmedBatches.map(r => r.txHash).filter(Boolean),
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Error Classification
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Classify a Soroban/Stellar error as retryable or fatal.
+     * @param {Error} error
+     * @returns {{retryable: boolean, type: string, success?: boolean}}
+     */
+    static classifyError(error) {
+        const msg = error?.message || '';
+
+        // RETRYABLE — same signed XDR can be re-submitted safely
+        if (msg.includes('timeout') || msg.includes('ETIMEDOUT'))
+            return { retryable: true, type: 'NETWORK_TIMEOUT' };
+        if (msg.includes('503') || msg.includes('429'))
+            return { retryable: true, type: 'RPC_OVERLOADED' };
+        if (msg.includes('PENDING'))
+            return { retryable: true, type: 'TX_PENDING' };
+
+        // IDEMPOTENT — TX already succeeded (safe to mark as success)
+        if (msg.includes('tx_already_applied'))
+            return { retryable: false, type: 'ALREADY_APPLIED', success: true };
+
+        // FATAL — do NOT retry (would fail again or double-pay)
+        if (msg.includes('tx_bad_auth'))
+            return { retryable: false, type: 'AUTH_EXPIRED' };
+        if (msg.includes('tx_bad_seq'))
+            return { retryable: false, type: 'SEQ_STALE' };
+        if (msg.includes('tx_insufficient_balance'))
+            return { retryable: false, type: 'INSUFFICIENT_BALANCE' };
+        if (msg.includes('Error(Contract'))
+            return { retryable: false, type: 'CONTRACT_ERROR' };
+
+        // UNKNOWN — don't retry (fail safe)
+        return { retryable: false, type: 'UNKNOWN' };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Concurrency Lock (Redis)
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Acquire a Redis lock for an offer. Prevents concurrent prepare() calls.
+     * @param {number} offerId
+     * @param {string} jobId
+     * @returns {Promise<boolean>} true if lock acquired, false if already locked
+     */
+    static async acquireLock(offerId, jobId) {
+        try {
+            const client = await getRedisClient();
+            if (!client) return true; // No Redis → skip locking (graceful degradation)
+
+            const lockKey = `yield_lock:${offerId}`;
+            const existing = await client.get(lockKey);
+            if (existing) return false; // Already locked
+
+            await client.setEx(lockKey, LOCK_TTL_SECONDS, jobId);
+            return true;
+        } catch (err) {
+            log.warn('Redis lock acquisition failed (proceeding without lock)', { offerId, error: err.message });
+            return true; // Fail open — better to double-prepare than to block payments
+        }
+    }
+
+    /**
+     * Release the Redis lock for an offer.
+     * @param {number} offerId
+     */
+    static async releaseLock(offerId) {
+        try {
+            const client = await getRedisClient();
+            if (!client) return;
+
+            await client.del(`yield_lock:${offerId}`);
+        } catch (err) {
+            log.warn('Redis lock release failed (TTL will auto-expire)', { offerId, error: err.message });
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Config helpers
+    // ═══════════════════════════════════════════════════════════════
+
+    static getContractId() {
+        const id = process.env.YIELD_DISTRIBUTOR_CONTRACT_ID;
+        if (!id) throw new Error('YIELD_DISTRIBUTOR_CONTRACT_ID not configured');
+        return id;
+    }
+
+    static getUsdcSacId() {
+        const id = process.env.USDC_SAC_CONTRACT_ID;
+        if (!id) throw new Error('USDC_SAC_CONTRACT_ID not configured');
+        return id;
+    }
+}
+
+export default YieldDistributorService;

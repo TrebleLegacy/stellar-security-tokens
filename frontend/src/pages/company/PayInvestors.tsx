@@ -143,7 +143,10 @@ export function PayInvestors() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
     const [paymentDetails, setPaymentDetails] = useState<PaymentDetails | BulletPaymentDetails | null>(null);
-    const [preparedTx, setPreparedTx] = useState<{ transactionXDR: string; expiresAt: string } | null>(null);
+    const [preparedTx, setPreparedTx] = useState<{ transactionXDR: string; batchXDRs?: string[]; batchCount?: number; expiresAt: string } | null>(null);
+
+    // Multi-batch signing progress
+    const [batchProgress, setBatchProgress] = useState<{ current: number; total: number } | null>(null);
 
 
 
@@ -221,15 +224,40 @@ export function PayInvestors() {
         try {
             setSubmitting(true);
             setError(null);
-            const signedXDR = await signTransaction(preparedTx.transactionXDR);
-            const response = await companyPaymentsApi.submitPayment(parseInt(offerId!), signedXDR);
-            if (response.success) {
-                setSuccess(true);
-                setPreparedTx(null);
+
+            const batches = preparedTx.batchXDRs || [preparedTx.transactionXDR];
+            const isMultiBatch = batches.length > 1;
+
+            if (isMultiBatch) {
+                // ─── Multi-batch: sign each XDR sequentially ─────────
+                const signedXDRs: string[] = [];
+                for (let i = 0; i < batches.length; i++) {
+                    setBatchProgress({ current: i + 1, total: batches.length });
+                    const signed = await signTransaction(batches[i]);
+                    signedXDRs.push(signed);
+                }
+                setBatchProgress(null);
+
+                const response = await companyPaymentsApi.submitBatchPayment(parseInt(offerId!), signedXDRs);
+                if (response.success) {
+                    setSuccess(true);
+                    setPreparedTx(null);
+                } else {
+                    setError('Failed to submit batch payment');
+                }
             } else {
-                setError('Failed to submit payment');
+                // ─── Single TX (classic or 1-batch Soroban) ──────────
+                const signedXDR = await signTransaction(batches[0]);
+                const response = await companyPaymentsApi.submitPayment(parseInt(offerId!), signedXDR);
+                if (response.success) {
+                    setSuccess(true);
+                    setPreparedTx(null);
+                } else {
+                    setError('Failed to submit payment');
+                }
             }
         } catch (err: any) {
+            setBatchProgress(null);
             setError(err.message || 'Failed to sign or submit payment');
         } finally {
             setSubmitting(false);
@@ -644,13 +672,31 @@ export function PayInvestors() {
                     <div className="flex-1 space-y-3">
                         <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
                             <p className="text-warning text-sm">
-                                Transaction prepared. Sign with your passkey to complete the payment.
+                                {preparedTx.batchXDRs && preparedTx.batchXDRs.length > 1
+                                    ? `Transaction prepared — ${preparedTx.batchXDRs.length} batches. You'll sign each batch with your passkey.`
+                                    : 'Transaction prepared. Sign with your passkey to complete the payment.'
+                                }
                             </p>
                         </div>
+                        {batchProgress && (
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">Signing batch</span>
+                                    <span className="text-white font-mono">{batchProgress.current} / {batchProgress.total}</span>
+                                </div>
+                                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-primary to-emerald-500 rounded-full transition-all duration-300"
+                                        style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
                         <div className="flex gap-3">
                             <Button
                                 variant="outline"
-                                onClick={() => setPreparedTx(null)}
+                                onClick={() => { setPreparedTx(null); setBatchProgress(null); }}
+                                disabled={submitting}
                                 className="flex-1"
                             >
                                 Cancel
@@ -663,10 +709,15 @@ export function PayInvestors() {
                                 {submitting ? (
                                     <>
                                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Submitting...
+                                        {batchProgress
+                                            ? `Signing ${batchProgress.current}/${batchProgress.total}...`
+                                            : 'Submitting...'
+                                        }
                                     </>
                                 ) : (
-                                    'Sign & Submit Payment'
+                                    preparedTx.batchXDRs && preparedTx.batchXDRs.length > 1
+                                        ? `Sign & Submit (${preparedTx.batchXDRs.length} batches)`
+                                        : 'Sign & Submit Payment'
                                 )}
                             </Button>
                         </div>

@@ -80,14 +80,16 @@ export function OfferCard({ offer, onInvest }: OfferCardProps) {
                     </div>
                 </div>
 
-                {/* APY — hero metric, prominent */}
-                {offer.annual_interest_rate && (
+                {/* APY — hero metric, prominent (investor_rate = what investor receives) */}
+                {(offer.investor_rate ?? offer.annual_interest_rate) && (
                     <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Percent className="w-4 h-4 text-emerald-400" />
                             APY
                         </div>
-                        <span className="text-lg font-bold text-emerald-400">{offer.annual_interest_rate}%</span>
+                        <span className="text-lg font-bold text-emerald-400">
+                            {parseFloat((offer.investor_rate ?? offer.annual_interest_rate)!.toString())}%
+                        </span>
                     </div>
                 )}
 
