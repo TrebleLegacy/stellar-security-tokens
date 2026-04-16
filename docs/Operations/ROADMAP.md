@@ -11,6 +11,7 @@
 - [x] **Yield Spread Model** — `investorRate` vs `annualInterestRate`, spread → treasury
 - [x] **FeeLog recording** — all fee events logged to `FeeLog` table via `companyPayment.service.js` and `multiSigTransaction.service.js`
 - [ ] **Admin fee dashboard** — `GET /fee-logs` endpoint + `investmentMetrics.service.js` revenue aggregation
+- [ ] **XLM fee tracker** — admin dashboard widget showing per-TX sponsorship cost (stroops), cumulative XLM spent on fee-bumps, and ops wallet balance burn rate
 - [ ] **SorobanEventIndexer → FeeLog** — wire on-chain trade fee events to FeeLog for redundancy (currently DB-only recording is sufficient)
 
 ---
