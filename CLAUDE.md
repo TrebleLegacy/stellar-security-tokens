@@ -46,7 +46,7 @@ When you create new files, add new features, or significantly change existing co
 No generic aesthetics. No default Tailwind. No cookie-cutter cards. Distinctive typography, cohesive color via CSS custom properties, micro-animations on interactions, gradients and layered shadows for atmosphere. Full spec: `.agent/workflows/frontend-design.md`
 
 ## Stellar Documentation
-Stellar docs are available via the **Obsidian MCP tool** — no local folder. Use it to look up SDK methods, transaction operations, or protocol details. Never hallucinate Stellar SDK methods — always verify.
+Stellar docs are available via the **docker-gateway filesystem MCP** at `/Users/pedrosaragossy/Workspace/Stellar Docs`. Use it to look up SDK methods, transaction operations, or protocol details. Never hallucinate Stellar SDK methods — always verify.
 
 ## Browser Testing — HARD RULES
 
