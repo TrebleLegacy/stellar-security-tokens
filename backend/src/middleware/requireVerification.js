@@ -10,7 +10,7 @@ export const requireEmailVerified = (req, res, next) => {
             code: 'EMAIL_NOT_VERIFIED',
             action: {
                 message: 'Please verify your email address to proceed',
-                endpoint: '/api/investors/verify-email',
+                endpoint: '/api/investors/verify-email-code',
             },
         });
     }

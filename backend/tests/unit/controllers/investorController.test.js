@@ -7,7 +7,6 @@ describe('InvestorController', () => {
 
     // Core passkey registration flow
     assert.ok(investorController.registerInvestorWithPasskey, 'registerInvestorWithPasskey should be exported');
-    assert.ok(investorController.verifyEmail, 'verifyEmail should be exported');
     assert.ok(investorController.getInvestorPortfolio, 'getInvestorPortfolio should be exported');
     assert.ok(investorController.initiateDeposit, 'initiateDeposit should be exported');
     assert.ok(investorController.getInvestorDeposits, 'getInvestorDeposits should be exported');

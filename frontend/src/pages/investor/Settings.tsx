@@ -7,7 +7,7 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter
 } from '@/components/ui/dialog';
 import {
-    Loader2, User, Mail, Check, Copy, CheckCircle2,
+    Loader2, User, Check, Copy, CheckCircle2,
     ShieldCheck, ExternalLink, Plus, KeyRound, AlertTriangle
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -22,8 +22,6 @@ type BackupSigner = {
 export function Settings() {
     const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [resending, setResending] = useState(false);
-    const [resendMessage, setResendMessage] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
 
     // Backup signer state
@@ -113,21 +111,7 @@ export function Settings() {
         fetchSigners();
     }, [fetchSigners]);
 
-    const handleResendVerification = async () => {
-        if (!user?.email) return;
 
-        setResending(true);
-        setResendMessage(null);
-
-        try {
-            await api.post('/investors/resend-verification', { email: user.email });
-            setResendMessage('Verification email sent! Check your inbox.');
-        } catch (err: any) {
-            setResendMessage(err.message || 'Failed to send verification email');
-        } finally {
-            setResending(false);
-        }
-    };
 
     const handleAddBackupSigner = async () => {
         const pubKey = signerInput.trim();
@@ -264,50 +248,6 @@ export function Settings() {
                 </CardContent>
             </Card>
 
-            {/* Email Verification */}
-            <Card className="glass-panel rounded-2xl animate-fade-in-up animate-delay-2">
-                <CardHeader>
-                    <CardTitle className="text-xl flex items-center gap-2">
-                        <Mail className="w-5 h-5 text-[hsl(43_45%_55%)]" />
-                        Email Verification
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm text-muted-foreground">Status</p>
-                            <span className={`inline-flex items-center gap-1 text-sm ${user?.emailVerified ? 'text-[hsl(160_60%_40%)]' : 'text-[hsl(35_90%_50%)]'
-                                }`}>
-                                {user?.emailVerified ? (
-                                    <>
-                                        <Check className="w-4 h-4" />
-                                        Verified
-                                    </>
-                                ) : 'Pending verification'}
-                            </span>
-                        </div>
-                        {!user?.emailVerified && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleResendVerification}
-                                disabled={resending}
-                                className="rounded-xl"
-                            >
-                                {resending ? (
-                                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                                ) : null}
-                                Resend Email
-                            </Button>
-                        )}
-                    </div>
-                    {resendMessage && (
-                        <p className={`text-sm ${resendMessage.includes('sent') ? 'text-[hsl(160_60%_40%)]' : 'text-red-400'}`}>
-                            {resendMessage}
-                        </p>
-                    )}
-                </CardContent>
-            </Card>
 
             {/* Wallet Recovery */}
             <Card className="glass-panel rounded-2xl animate-fade-in-up animate-delay-4">

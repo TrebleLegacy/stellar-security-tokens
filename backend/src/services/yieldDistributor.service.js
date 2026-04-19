@@ -28,7 +28,6 @@ import {
 import { StellarService } from './stellar.service.js';
 import { keyManager } from './KeyManager.js';
 import { getRedisClient } from '../config/redis.js';
-import { AlertService } from './alert.service.js';
 import logger from '../utils/logger.js';
 
 const log = logger.scope('YieldDistributor');
