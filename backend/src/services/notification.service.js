@@ -1,5 +1,4 @@
 import prisma from '../config/prisma.js';
-import { AlertService } from './alert.service.js';
 import logger from '../utils/logger.js';
 const log = logger.scope('NotificationService');
 

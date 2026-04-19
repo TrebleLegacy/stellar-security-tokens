@@ -12,8 +12,6 @@ import {
   resendVerificationCode,
   // Passkey Wallet Registration Flow
   registerInvestorWithPasskey,
-  verifyEmail,
-  resendVerificationEmail,
   getPasskeyConfig,
   getInvestorPortfolio,
 
@@ -180,64 +178,6 @@ router.post('/register', [
   body('contractId').notEmpty().withMessage('Contract ID is required'),
   validate,
 ], registerInvestorWithPasskey);
-
-/**
- * @swagger
- * /api/investors/verify-email:
- *   post:
- *     summary: Verificar email
- *     description: Confirma email com token recebido por email
- *     tags: [Investors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - token
- *             properties:
- *               token:
- *                 type: string
- *     responses:
- *       200:
- *         description: Email verificado com sucesso
- *       400:
- *         description: Token inválido ou expirado
- */
-// Step 2: Verify email
-router.post('/verify-email', [
-  body('token').notEmpty().withMessage('Verification token is required'),
-  validate,
-], verifyEmail);
-
-/**
- * @swagger
- * /api/investors/resend-verification:
- *   post:
- *     summary: Reenviar email de verificação
- *     tags: [Investors]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - email
- *             properties:
- *               email:
- *                 type: string
- *                 format: email
- *     responses:
- *       200:
- *         description: Email reenviado
- */
-// Resend verification email
-router.post('/resend-verification', [
-  body('email').isEmail().withMessage('Valid email is required'),
-  validate,
-], resendVerificationEmail);
 
 
 

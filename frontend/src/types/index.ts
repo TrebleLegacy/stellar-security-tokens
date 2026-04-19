@@ -6,7 +6,6 @@ export interface Investor {
   document: string;
   stellar_contract_id?: string;
   kyc_status: 'pending' | 'approved' | 'rejected';
-  password_hash?: string;
   last_login?: string;
   created_at: string;
   updated_at: string;
@@ -136,33 +135,6 @@ export interface Investment {
   updated_at: string;
 }
 
-export interface TokenDistribution {
-  id: number;
-  investor_id: number;
-  asset_code: string;
-  amount: string;
-  transaction_hash: string;
-  usdc_payment_hash?: string;
-  offer_id?: number;
-  memo?: string;
-  created_at: string;
-}
-
-export interface InterestPayment {
-  id: number;
-  investor_id: number;
-  asset_code: string;
-  token_balance: string;
-  interest_rate: string;
-  interest_amount: string;
-  usdc_amount: string;
-  transaction_hash: string;
-  payment_date: string;
-  status: 'pending' | 'completed' | 'failed';
-  offer_id?: number;
-  email_sent: boolean;
-  created_at: string;
-}
 
 // API Response Types
 export interface ApiResponse<T = any> {
@@ -176,54 +148,5 @@ export interface ApiResponse<T = any> {
     offset: number;
     count?: number;
   };
-}
-
-export interface LoginResponse {
-  token: string;
-  investor?: Investor;
-  company?: Company;
-  companyUser?: CompanyUser;
-  platformAdmin?: PlatformAdmin;
-  role: 'investor' | 'company' | 'admin';
-}
-
-// Form Types
-export interface RegisterInvestorForm {
-  name: string;
-  email: string;
-  document: string;
-  password: string;
-  confirmPassword: string;
-}
-
-export interface RegisterCompanyForm {
-  name: string;
-  cnpj: string;
-  email: string;
-  legal_representative: string;
-  address?: string;
-  phone?: string;
-}
-
-export interface CreateOfferForm {
-  asset_code: string;
-  offer_name: string;
-  description: string;
-  total_supply: string;
-  annual_interest_rate?: number;
-  offer_type: 'collateral' | 'sale';
-  offer_rules: Record<string, any>;
-  legal_documents: {
-    contract?: File;
-    terms?: File;
-    prospectus?: File;
-    kyc?: File;
-    other?: File[];
-  };
-}
-
-export interface InvestmentForm {
-  offer_id: number;
-  usdc_amount: string;
 }
 
