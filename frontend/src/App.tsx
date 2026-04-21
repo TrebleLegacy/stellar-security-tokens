@@ -6,6 +6,7 @@ import { Register } from './pages/auth/Register';
 import { CompanyRegister } from './pages/auth/CompanyRegister';
 import { CompanyPendingApproval } from './pages/auth/CompanyPendingApproval';
 import { RegistrationSuccess } from './pages/auth/RegistrationSuccess';
+import { BrowserGate } from './components/BrowserGate';
 
 import { DashboardLayout } from './layouts/DashboardLayout';
 
@@ -62,9 +63,9 @@ function App() {
       {isDevTools && <Suspense><DevTimeTool /></Suspense>}
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/company/register" element={<CompanyRegister />} />
+          <Route path="/login" element={<BrowserGate><Login /></BrowserGate>} />
+          <Route path="/register" element={<BrowserGate><Register /></BrowserGate>} />
+          <Route path="/company/register" element={<BrowserGate><CompanyRegister /></BrowserGate>} />
           <Route path="/company/pending-approval" element={<CompanyPendingApproval />} />
           <Route path="/registration-success" element={<RegistrationSuccess />} />
 

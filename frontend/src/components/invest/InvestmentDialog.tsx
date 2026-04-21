@@ -36,7 +36,7 @@ interface InvestmentDialogProps {
 
 type DialogStep = 'form' | 'signing' | 'submitting' | 'confirming' | 'success' | 'error';
 
-const MAX_SILENT_RETRIES = 2;
+const MAX_SILENT_RETRIES = 5;
 
 interface PurchaseDetails {
     usdcAmount: number;
@@ -52,6 +52,16 @@ const QUICK_AMOUNTS = [100, 500, 1000, 5000];
 // Detect timeout-style errors for user-friendly messaging
 function isTimeoutError(msg: string): boolean {
     return /timeout|timed out|ETIMEDOUT|exceeded/i.test(msg);
+}
+
+// Detect network congestion / fee contention errors (retryable)
+function isCongestionError(msg: string): boolean {
+    return /insufficient_fee|tx_insufficient_fee|high demand|E-4091|congestion/i.test(msg);
+}
+
+// Any retryable submission error (timeout OR congestion)
+function isRetryableError(msg: string): boolean {
+    return isTimeoutError(msg) || isCongestionError(msg);
 }
 
 // ─── STEPPER STEPS ───
@@ -281,16 +291,19 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                     const retryInfo = { signedXdr, investmentContext: result.investmentContext };
                     setPendingRetry(retryInfo);
 
-                    // Submit with silent auto-retry on timeout
+                    // Submit with silent auto-retry on timeout or network congestion
                     const attemptSubmit = async (attempt: number): Promise<any> => {
                         try {
                             return await submitSignedTx(retryInfo.signedXdr, retryInfo.investmentContext);
                         } catch (submitErr: any) {
                             const errMsg = submitErr.message || '';
-                            if (isTimeoutError(errMsg) && attempt < MAX_SILENT_RETRIES) {
-                                console.warn(`[Investment] Attempt ${attempt + 1} timed out, retrying silently...`);
+                            if (isRetryableError(errMsg) && attempt < MAX_SILENT_RETRIES) {
+                                const reason = isCongestionError(errMsg) ? 'network busy' : 'timed out';
+                                console.warn(`[Investment] Attempt ${attempt + 1} ${reason}, retrying silently...`);
                                 setRetryCount(attempt + 1);
                                 setIsExtendedWait(true);
+                                // Backoff before retry: 2s, 4s, 8s, 15s, 15s (capped)
+                                await new Promise(r => setTimeout(r, Math.min(2000 * Math.pow(2, attempt), 15_000)));
                                 return attemptSubmit(attempt + 1);
                             }
                             throw submitErr;
@@ -388,16 +401,38 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                     title: 'Authorize with biometric',
                     subtitle: 'Use Face ID or fingerprint to confirm this transaction.',
                 };
-            case 'submitting':
-                return isExtendedWait
-                    ? {
-                        title: 'Taking a little longer than usual',
-                        subtitle: `We're still processing — hang tight, we're almost there. (attempt ${retryCount + 1})`,
-                    }
-                    : {
+            case 'submitting': {
+                if (!isExtendedWait) {
+                    return {
                         title: 'Processing your investment',
                         subtitle: 'Your transaction is being securely submitted to the blockchain.',
                     };
+                }
+                // Rotating messages to keep the UI feeling alive during retries
+                const waitMessages = [
+                    {
+                        title: 'Fitting your transaction into blockchain traffic',
+                        subtitle: 'The network is a little busy. We\'re working on it — almost there.',
+                    },
+                    {
+                        title: 'Still working on it',
+                        subtitle: 'Finding the best slot for your transaction. No funds leave your wallet until confirmed.',
+                    },
+                    {
+                        title: 'Hang tight — we\'re getting there',
+                        subtitle: 'The blockchain is processing other transactions ahead of yours. This is normal during peak times.',
+                    },
+                    {
+                        title: 'Your transaction is in the queue',
+                        subtitle: 'If it doesn\'t go through, just hit retry. Your wallet is untouched until full success.',
+                    },
+                    {
+                        title: 'Almost there',
+                        subtitle: 'We\'re still trying. Your funds are completely safe — nothing moves without confirmation.',
+                    },
+                ];
+                return waitMessages[Math.min(retryCount, waitMessages.length - 1)];
+            }
             case 'confirming':
                 return {
                     title: 'Almost there!',
@@ -630,15 +665,17 @@ export function InvestmentDialog({ offer, trigger }: InvestmentDialogProps) {
                             </div>
                             <div className="space-y-1">
                                 <p className="font-semibold text-white">
-                                    {submissionError && isTimeoutError(submissionError)
+                                    {submissionError && (isTimeoutError(submissionError) || isCongestionError(submissionError))
                                         ? 'The network is busy'
                                         : 'Something went wrong'
                                     }
                                 </p>
                                 <p className="text-sm text-slate-400 max-w-xs mx-auto">
-                                    {submissionError && isTimeoutError(submissionError)
-                                        ? 'Your transaction took longer than expected. This happens occasionally and your funds have not been charged.'
-                                        : 'We couldn\'t complete your transaction. No funds were deducted from your wallet.'
+                                    {submissionError && isCongestionError(submissionError)
+                                        ? 'Multiple transactions are competing for space on the blockchain. Please wait a moment and try again.'
+                                        : submissionError && isTimeoutError(submissionError)
+                                            ? 'Your transaction took longer than expected. This happens occasionally and your funds have not been charged.'
+                                            : 'We couldn\'t complete your transaction. No funds were deducted from your wallet.'
                                     }
                                 </p>
                             </div>

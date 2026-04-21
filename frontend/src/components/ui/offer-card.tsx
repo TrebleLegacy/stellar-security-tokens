@@ -1,8 +1,7 @@
 
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, Percent, ShieldCheck, DollarSign, Clock } from "lucide-react";
+import { Calendar, Percent, ShieldCheck, DollarSign, Clock, Landmark, TrendingUp } from "lucide-react";
 import type { Offer } from "@/hooks/useOffers";
 
 interface OfferCardProps {
@@ -18,42 +17,67 @@ const PAYMENT_LABELS: Record<string, string> = {
     bullet: 'Bullet',
 };
 
+// Accent palettes per offer type
+const TYPE_THEME = {
+    collateral: {
+        label: 'Debt (CR)',
+        icon: Landmark,
+        badge: 'bg-blue-500/15 text-blue-400 border-blue-500/25',
+        accent: 'text-blue-400',
+        accentBg: 'bg-blue-500/10 border-blue-500/15',
+        glow: 'hover:border-blue-500/25 hover:shadow-blue-500/5',
+        button: 'bg-blue-600 hover:bg-blue-500',
+        apyColor: 'text-blue-400',
+    },
+    sale: {
+        label: 'Equity',
+        icon: TrendingUp,
+        badge: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/25',
+        accent: 'text-emerald-400',
+        accentBg: 'bg-emerald-500/10 border-emerald-500/15',
+        glow: 'hover:border-emerald-500/25 hover:shadow-emerald-500/5',
+        button: 'bg-emerald-600 hover:bg-emerald-500',
+        apyColor: 'text-emerald-400',
+    },
+} as const;
+
 export function OfferCard({ offer, onInvest }: OfferCardProps) {
     const unitPrice = offer.unit_price || 1;
     const totalRaise = (offer.total_supply || 0) * unitPrice;
     const paymentLabel = PAYMENT_LABELS[offer.payment_type || ''] || offer.payment_type || '—';
+    const theme = TYPE_THEME[offer.offer_type as keyof typeof TYPE_THEME] || TYPE_THEME.sale;
+    const TypeIcon = theme.icon;
 
     return (
-        <Card className="glass-panel border-white/5 bg-white/[0.04] hover:bg-white/[0.08] transition-all duration-300 group hover:scale-[1.02] hover:border-[hsl(43_45%_55%/0.25)] hover:shadow-lg hover:shadow-[hsl(43_45%_55%/0.05)]">
+        <Card className={`flex flex-col h-full glass-panel border-white/5 bg-white/[0.04] hover:bg-white/[0.06] transition-all duration-300 group hover:scale-[1.02] hover:shadow-lg ${theme.glow}`}>
             <CardHeader className="pb-3">
-                {/* HIG Visual Hierarchy: type badge + hero metric at top */}
+                {/* Type badge + LTV */}
                 <div className="flex justify-between items-start">
-                    <Badge variant={offer.offer_type === 'collateral' ? 'default' : 'secondary'}>
-                        {offer.offer_type === 'collateral' ? 'Debt (CR)' : 'Equity'}
-                    </Badge>
-                    <div className="flex items-center gap-1.5">
-                        {offer.collateral_ltv && (
-                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                                LTV {Number(offer.collateral_ltv).toFixed(0)}%
-                            </span>
-                        )}
-                    </div>
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${theme.badge}`}>
+                        <TypeIcon className="w-3 h-3" />
+                        {theme.label}
+                    </span>
+                    {offer.collateral_ltv && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                            LTV {Number(offer.collateral_ltv).toFixed(0)}%
+                        </span>
+                    )}
                 </div>
 
-                {/* Offer name — semibold, large (HIG Typography hierarchy) */}
+                {/* Offer name */}
                 <CardTitle className="text-xl mt-2">{offer.offer_name}</CardTitle>
 
-                {/* Company name — muted, regular weight */}
+                {/* Company name */}
                 <div className="flex items-center gap-1.5 text-xs text-[hsl(43_45%_55%)] font-medium">
                     <span>{offer.company?.name || 'Issuer'}</span>
                 </div>
             </CardHeader>
 
-            <CardContent className="space-y-4">
-                {/* Financial data grid — HIG: group related items */}
+            {/* flex-grow pushes footer to bottom — cards align regardless of content */}
+            <CardContent className="space-y-4 flex-1 flex flex-col">
+                {/* Financial data grid */}
                 <div className="grid grid-cols-3 gap-2">
-                    {/* Unit Price */}
                     <div className="p-2.5 bg-black/20 rounded-lg text-center">
                         <div className="text-[11px] text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
                             <DollarSign className="w-3 h-3" />
@@ -61,7 +85,6 @@ export function OfferCard({ offer, onInvest }: OfferCardProps) {
                         </div>
                         <span className="text-sm font-semibold text-white">${unitPrice}</span>
                     </div>
-                    {/* Total Raise */}
                     <div className="p-2.5 bg-black/20 rounded-lg text-center">
                         <div className="text-[11px] text-muted-foreground mb-0.5">
                             Raise
@@ -70,7 +93,6 @@ export function OfferCard({ offer, onInvest }: OfferCardProps) {
                             ${totalRaise >= 1000 ? `${(totalRaise / 1000).toFixed(0)}K` : totalRaise.toLocaleString()}
                         </span>
                     </div>
-                    {/* Payment Type */}
                     <div className="p-2.5 bg-black/20 rounded-lg text-center">
                         <div className="text-[11px] text-muted-foreground flex items-center justify-center gap-1 mb-0.5">
                             <Clock className="w-3 h-3" />
@@ -80,34 +102,38 @@ export function OfferCard({ offer, onInvest }: OfferCardProps) {
                     </div>
                 </div>
 
-                {/* APY — hero metric, prominent (investor_rate = what investor receives) */}
+                {/* APY — hero metric, color-coded by type */}
                 {(offer.investor_rate ?? offer.annual_interest_rate) && (
-                    <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                    <div className={`flex items-center justify-between p-3 rounded-lg border ${theme.accentBg}`}>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Percent className="w-4 h-4 text-emerald-400" />
+                            <Percent className={`w-4 h-4 ${theme.apyColor}`} />
                             APY
                         </div>
-                        <span className="text-lg font-bold text-emerald-400">
+                        <span className={`text-lg font-bold ${theme.apyColor}`}>
                             {parseFloat((offer.investor_rate ?? offer.annual_interest_rate)!.toString())}%
                         </span>
                     </div>
                 )}
 
-                {/* Maturity — secondary detail */}
-                {offer.maturity_date && (
-                    <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
-                            Maturity
-                        </div>
-                        <span>{new Date(offer.maturity_date).toLocaleDateString()}</span>
-                    </div>
-                )}
+                {/* Maturity — always rendered, takes space even when empty */}
+                <div className="flex items-center justify-between text-sm mt-auto">
+                    {offer.maturity_date ? (
+                        <>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Calendar className="w-4 h-4" />
+                                Maturity
+                            </div>
+                            <span>{new Date(offer.maturity_date).toLocaleDateString()}</span>
+                        </>
+                    ) : (
+                        <div className="h-5" /> /* spacer for alignment */
+                    )}
+                </div>
             </CardContent>
 
             <CardFooter>
                 <Button
-                    className="w-full bg-[hsl(160_60%_40%)] hover:bg-[hsl(160_60%_35%)] text-white shadow-sm"
+                    className={`w-full text-white shadow-sm ${theme.button}`}
                     onClick={() => onInvest(offer.id)}
                 >
                     View Details

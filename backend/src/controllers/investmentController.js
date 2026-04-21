@@ -587,16 +587,25 @@ export const submitInvestmentTx = async (req, res, next) => {
       }
     }
 
-    // Rebuild TX with opsKeypair as source (fee-payer pattern from Stellar docs)
-    // We need a fresh source account with current sequence number
-    const opsAccount = await rpcServer.getAccount(opsKeypair.publicKey());
+    // ─── CHANNEL ACCOUNT SELECTION (concurrent TX isolation) ───
+    // Each concurrent request gets its own channel account as TX source.
+    // This prevents tx_insufficient_fee errors when multiple investors
+    // purchase simultaneously — each TX has a unique source+sequence,
+    // so Horizon treats them as independent (not replacement) TXs.
+    // Soroban auth uses ENVELOPE_TYPE_SOROBAN_AUTHORIZATION (independent
+    // of TX body hash), so passkey signatures remain valid.
+    const { keyManager } = await import('../services/KeyManager.js');
+    const channelKeypair = keyManager.getNextChannelKeypair();
+    const channelAccount = await rpcServer.getAccount(channelKeypair.publicKey());
+
+    log.info(`[Investment] Using channel account ${channelKeypair.publicKey().slice(0, 8)}… as TX source`);
 
     // Use BASE_FEE (not signedTx.fee) — the signed TX carries a 5× boosted fee
     // from boostResources (rough frontend estimate). assembleTransaction picks
     // max(existingFee, simMinResourceFee), so passing the inflated fee would
     // leak the boost into the final TX. BASE_FEE lets the Enforcing Mode
     // simulation set the correct fee.
-    const rebuiltTx = new TransactionBuilder(opsAccount, {
+    const rebuiltTx = new TransactionBuilder(channelAccount, {
       fee: BASE_FEE,
       networkPassphrase,
     })
@@ -655,8 +664,8 @@ export const submitInvestmentTx = async (req, res, next) => {
       }
     } catch (_) {}
 
-    // Sign with operations account (TX source)
-    tx.sign(opsKeypair);
+    // Sign with channel account (TX source)
+    tx.sign(channelKeypair);
 
     log.info(`[Investment] Submitting passkey-signed TX for investor #${resolvedInvestorId}${resolvedInvestorId !== parseInt(investorId, 10) ? ` (initiated by #${investorId})` : ''}, offer #${offerId}...`);
     const metricsStart = Date.now();
