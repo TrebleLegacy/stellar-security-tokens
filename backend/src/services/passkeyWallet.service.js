@@ -300,22 +300,6 @@ export class PasskeyWalletService {
         throw new Error('The network is experiencing high demand right now. Please wait a moment and try again. (E-4091)');
       }
 
-      const feeBumpFee = Math.max(parseInt(BASE_FEE) * 2, innerFee + parseInt(BASE_FEE));
-
-      const feeBumpTx = TransactionBuilder.buildFeeBumpTransaction(
-        channelKeypair.publicKey(),
-        feeBumpFee.toString(),
-        innerTx,
-        networkPassphrase
-      );
-
-      // 3. Sign the outer Fee Bump Transaction with channel account
-      feeBumpTx.sign(channelKeypair);
-
-      // 4. Submit directly to Horizon
-      log.info('Submitting self-sponsored fee bump to Horizon...');
-      log.debug(`Fee bump source: ${feeBumpTx.feeSource}`);
-
       // RUNTIME FIX: Ensure URL doesn't have /transactions (SDK appends it)
       let targetServer = stellarServer;
       try {
@@ -332,15 +316,74 @@ export class PasskeyWalletService {
         log.error('Error checking URL:', urlErr);
       }
 
-      const result = await targetServer.submitTransaction(feeBumpTx);
+      // Retry with escalating fees and backoff to handle concurrent TX contention.
+      // With channel account rotation in investmentController, a retry after a brief
+      // wait should land on a free channel. Keep retrying — it will eventually go through.
+      const MAX_RETRIES = 6;
+      let lastError;
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const feeMultiplier = Math.pow(2, Math.min(attempt + 1, 4)); // 2, 4, 8, 16, 16, 16, 16
+        const feeBumpFee = Math.max(
+          parseInt(BASE_FEE) * feeMultiplier,
+          innerFee + parseInt(BASE_FEE) * feeMultiplier
+        );
 
-      return {
-        success: true,
-        hash: result.hash,
-        ledger: result.ledger,
-        sponsored: true
-      };
-    } catch (error) {
+        // Safety: never exceed our cap even with retries
+        if (feeBumpFee > MAX_SPONSORED_FEE_STROOPS) {
+          log.warn(`[Sponsorship] Fee escalation hit cap at attempt ${attempt}: ${feeBumpFee} > ${MAX_SPONSORED_FEE_STROOPS}`);
+          break;
+        }
+
+        const feeBumpTx = TransactionBuilder.buildFeeBumpTransaction(
+          channelKeypair.publicKey(),
+          feeBumpFee.toString(),
+          innerTx,
+          networkPassphrase
+        );
+
+        feeBumpTx.sign(channelKeypair);
+
+        if (attempt > 0) {
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s (capped)
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 16_000);
+          log.info(`[Sponsorship] Retry ${attempt}/${MAX_RETRIES} in ${backoffMs}ms with fee ${feeBumpFee} stroops (${(feeBumpFee / 10_000_000).toFixed(4)} XLM)`);
+          await new Promise(r => setTimeout(r, backoffMs));
+        } else {
+          log.info(`Submitting self-sponsored fee bump to Horizon (fee: ${feeBumpFee} stroops)...`);
+        }
+        log.debug(`Fee bump source: ${feeBumpTx.feeSource}`);
+
+        try {
+          const result = await targetServer.submitTransaction(feeBumpTx);
+
+          if (attempt > 0) {
+            log.info(`[Sponsorship] Succeeded on retry ${attempt}/${MAX_RETRIES}`);
+          }
+
+          return {
+            success: true,
+            hash: result.hash,
+            ledger: result.ledger,
+            sponsored: true,
+          };
+        } catch (submitErr) {
+          lastError = submitErr;
+          // Check if this is tx_insufficient_fee — retryable
+          const resultCodes = submitErr.response?.data?.extras?.result_codes
+            || submitErr.response?.extras?.result_codes;
+          const isFeeError = resultCodes?.transaction === 'tx_insufficient_fee';
+
+          if (isFeeError && attempt < MAX_RETRIES) {
+            log.warn(`[Sponsorship] tx_insufficient_fee at attempt ${attempt}, will retry with backoff...`);
+            continue;
+          }
+          // Not a fee error or out of retries — break to error handling
+          break;
+        }
+      }
+
+      // All retries exhausted or non-fee error — fall through to detailed error logging
+      const error = lastError;
       log.error('Self-sponsorship failed:');
 
       // Extract detailed error info from Horizon/SDK response
