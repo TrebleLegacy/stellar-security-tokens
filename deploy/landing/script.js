@@ -60,7 +60,7 @@
         { title: 'On-Chain Transparency', desc: 'All transactions verifiable on the Stellar blockchain.' },
         { title: 'Smart Wallet Technology', desc: 'Passkey-based wallets — no seed phrases, no complexity.' }
       ]},
-      whitelist: { title: 'Join the Waiting List', sub: 'Be among the first to access the platform.', name: 'Name', role: 'I am a...', roleOptions: ['Investor', 'Company', 'Partner / VC', 'Other'], submit: 'Join the Waiting List', success: "You're on the waiting list! We'll be in touch." },
+      whitelist: { title: 'Join the Waiting List', sub: 'Be among the first to access the platform.', name: 'Name', role: 'I am a...', roleOptions: ['Individual', 'Company', 'Partner / VC', 'Other'], submit: 'Join the Waiting List', success: "You're on the waiting list! We'll be in touch." },
       footer: { tagline: 'Tokenization infrastructure for real-world assets', platform: 'Platform', legal: 'Legal', connect: 'Connect', terms: 'Terms of Service', privacy: 'Privacy Policy', risk: 'Risk Disclaimer', disclaimer: 'Radox is not a broker-dealer or investment advisor. Securities offered through the platform are subject to applicable regulatory requirements. Past performance does not guarantee future results.' },
       ticker: { asset: 'Asset', type: 'Type', yield: 'Yield', volume: 'Volume', disclaimer: 'Simulated data for illustration purposes' }
     },
@@ -114,7 +114,7 @@
         { title: 'Transparência On-Chain', desc: 'Todas as transações verificáveis na blockchain Stellar.' },
         { title: 'Tecnologia de Carteira Inteligente', desc: 'Carteiras baseadas em passkey — sem seed phrases, sem complexidade.' }
       ]},
-      whitelist: { title: 'Entre na Lista de Espera', sub: 'Esteja entre os primeiros a acessar a plataforma.', name: 'Nome', role: 'Eu sou...', roleOptions: ['Investidor', 'Empresa', 'Parceiro / VC', 'Outro'], submit: 'Entrar na Lista de Espera', success: 'Você está na lista de espera! Entraremos em contato.' },
+      whitelist: { title: 'Entre na Lista de Espera', sub: 'Esteja entre os primeiros a acessar a plataforma.', name: 'Nome', role: 'Eu sou...', roleOptions: ['Pessoa Física', 'Empresa', 'Parceiro / VC', 'Outro'], submit: 'Entrar na Lista de Espera', success: 'Você está na lista de espera! Entraremos em contato.' },
       footer: { tagline: 'Infraestrutura de tokenização para ativos reais', platform: 'Plataforma', legal: 'Legal', connect: 'Conecte-se', terms: 'Termos de Serviço', privacy: 'Política de Privacidade', risk: 'Aviso de Risco', disclaimer: 'Radox não é corretora de valores nem consultora de investimentos. Os valores mobiliários oferecidos através da plataforma estão sujeitos aos requisitos regulatórios aplicáveis. Rentabilidade passada não garante resultados futuros.' },
       ticker: { asset: 'Ativo', type: 'Tipo', yield: 'Rendimento', volume: 'Volume', disclaimer: 'Dados simulados para fins ilustrativos' }
     }
@@ -408,6 +408,9 @@
     if (!form) return;
     const loadedAt = Date.now();
 
+    // ── Google Sheets webhook (replace URL after Apps Script deploy) ──
+    const SHEETS_WEBHOOK = 'https://script.google.com/macros/s/AKfycbzk9S9f4cu-1XwaTz7-YD30BT8V2pPlMAaq28kd1DheLP04eZ2d1unMpaNpIimCDSh4Dg/exec';
+
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       // Bot protection
@@ -418,19 +421,45 @@
       const email = form.querySelector('[name="email"]').value.trim().slice(0, 255);
       const whatsapp = form.querySelector('[name="whatsapp"]').value.trim().slice(0, 30);
       const role = form.querySelector('[name="role"]').value.trim().slice(0, 50);
-
-      const message = encodeURIComponent(
-        `New Waiting List Signup:\n\nName: ${name}\nEmail: ${email}\nWhatsApp: ${whatsapp}\nRole: ${role}`
-      );
-      window.open(`https://wa.me/5521994028261?text=${message}`, '_blank');
-
-      const mailBody = encodeURIComponent(`Name: ${name}\nEmail: ${email}\nWhatsApp: ${whatsapp}\nRole: ${role}`);
-      const mailSubject = encodeURIComponent('New Waiting List Signup - Radox');
-      window.location.href = `mailto:pedro@radox.net?subject=${mailSubject}&body=${mailBody}`;
-
-      // Show success
       const tr = TR[currentLang];
-      form.outerHTML = `<div class="success glass-card">${tr.whitelist.success}</div>`;
+
+      // Dedup — already submitted
+      if (localStorage.getItem('radox_wl_' + email)) {
+        form.outerHTML = `<div class="success glass-card">${tr.whitelist.success}</div>`;
+        return;
+      }
+
+      // Loading state
+      const btn = form.querySelector('[type="submit"]');
+      const btnText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '...';
+      btn.style.opacity = '0.6';
+
+      // 1. Save to Google Sheets (primary — persistent storage)
+      const payload = { name, email, whatsapp, role, lang: currentLang, ts: new Date().toISOString() };
+      const sheetsReady = SHEETS_WEBHOOK !== 'GOOGLE_APPS_SCRIPT_URL_HERE';
+
+      const save = sheetsReady
+        ? fetch(SHEETS_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(payload) })
+        : Promise.resolve();
+
+      save
+        .then(() => {
+          // 2. WhatsApp notification — only for high-touch leads (Company / VC)
+          if (role === 'Company' || role === 'Empresa' || role.includes('VC') || role.includes('Partner') || role.includes('Parceiro')) {
+            const msg = encodeURIComponent(`Radox Waitlist:\n${name}\n${email}\n${whatsapp}\n${role}`);
+            window.open(`https://wa.me/5521994028261?text=${msg}`, '_blank');
+          }
+
+          localStorage.setItem('radox_wl_' + email, '1');
+          form.outerHTML = `<div class="success glass-card">${tr.whitelist.success}</div>`;
+        })
+        .catch(() => {
+          btn.disabled = false;
+          btn.textContent = btnText;
+          btn.style.opacity = '1';
+        });
     });
   }
 
