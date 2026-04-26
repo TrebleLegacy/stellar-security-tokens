@@ -383,6 +383,10 @@ model Offer {
   lastPaymentDate     DateTime?   @map("last_payment_date")
   paymentDueStatus    PaymentDueStatus @default(current) @map("payment_due_status")
 
+  // Atomic counter: incremented once per successful payment round.
+  // Source of truth for maturity progress. Never derived from dates or records.
+  periodicPaymentsCompleted  Int  @default(0)  @map("periodic_payments_completed")
+
   // Token Lifecycle: Locked = AUTH_REQUIRED set on Issuer, all transfers require platform approval
   // When unlocked, the token is freely tradable on DEXes and on-chain balance becomes source of truth
   isTokenLocked       Boolean   @default(true) @map("is_token_locked")

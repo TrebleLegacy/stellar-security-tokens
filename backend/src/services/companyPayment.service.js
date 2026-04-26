@@ -55,15 +55,6 @@ export class CompanyPaymentService {
                     where: { status: 'distributed' },
                     include: { investor: true }
                 },
-                interestPayments: {
-                    orderBy: { paymentDate: 'desc' },
-                    take: 1
-                },
-                _count: {
-                    select: {
-                        interestPayments: { where: { status: 'completed' } }
-                    }
-                }
             }
         });
 
@@ -71,10 +62,30 @@ export class CompanyPaymentService {
             throw new Error(`Offer ${offerId} not found`);
         }
 
+        // ─── MATURITY METADATA (computed BEFORE routing) ─── F-10, F-14
+        const totalExpectedPayments = this.computeTotalExpectedPayments(offer);
+        const paymentsMade = offer.periodicPaymentsCompleted;  // F-14: atomic counter
+        const maturityReached = totalExpectedPayments !== null && paymentsMade >= totalExpectedPayments;
+        const isLastPeriod = totalExpectedPayments !== null
+            && !maturityReached
+            && paymentsMade >= totalExpectedPayments - 1;
+
+        const scheduleMetadata = {
+            totalExpectedPayments,
+            paymentsMade,
+            maturityReached,
+            isLastPeriod,
+            maturityDate: offer.maturityDate,
+            offerCreatedAt: offer.createdAt,
+        };
+
+
+
         // For unlocked tokens, use on-chain balances instead of DB investment records
         // This ensures accurate interest calculations when tokens have been traded on DEXes
+        // F-10: On-chain path gets schedule metadata
         if (offer.isTokenLocked === false) {
-            return this._calculateOwedAmountOnChain(offer);
+            return { ...await this._calculateOwedAmountOnChain(offer), ...scheduleMetadata };
         }
 
         // Calculate total tokens distributed (USDC invested)
@@ -83,6 +94,7 @@ export class CompanyPaymentService {
             0
         );
 
+        // F-15: Zero-investment early return includes metadata
         if (totalInvested === 0) {
             return {
                 offerId,
@@ -91,7 +103,8 @@ export class CompanyPaymentService {
                 paymentType: offer.paymentType,
                 nextPaymentDue: offer.nextPaymentDue,
                 breakdown: [],
-                balanceSource: 'database'
+                balanceSource: 'database',
+                ...scheduleMetadata,
             };
         }
 
@@ -131,11 +144,9 @@ export class CompanyPaymentService {
             nextPaymentDue: offer.nextPaymentDue,
             lastPaymentDate: offer.lastPaymentDate,
             paymentDueStatus: offer.paymentDueStatus,
-            maturityDate: offer.maturityDate,
-            offerCreatedAt: offer.createdAt,
-            paymentsMade: offer._count?.interestPayments ?? 0,
             balanceSource: 'database',
-            breakdown
+            breakdown,
+            ...scheduleMetadata,
         };
     }
 
@@ -464,6 +475,15 @@ export class CompanyPaymentService {
         if (paymentDetails.totalOwed === 0) {
             throw new Error('No payment owed for this offer');
         }
+
+        // ─── MATURITY GUARD (prepare-time) ─── F-02, F-13
+        if (paymentDetails.maturityReached) {
+            const err = new Error('PAYMENT_SCHEDULE_COMPLETE');
+            err.code = 'E_MATURITY_REACHED';
+            err.httpStatus = 409;
+            throw err;
+        }
+
         totalAmount = paymentDetails.totalOwed;
         feeBase = paymentDetails.totalOwed;      // periodic totalOwed IS interest
         breakdown = paymentDetails.breakdown;
@@ -640,18 +660,42 @@ export class CompanyPaymentService {
             const effectiveInvestorRate = parseFloat(offer.investorRate ?? offer.annualInterestRate ?? 0);
             const spreadPct = Math.max(0, annualRate - effectiveInvestorRate);
 
+            // ─── MATURITY GUARD (submit-time re-check) ─── F-02
+            const preCheckDetails = await this.calculateOwedAmount(offerId);
+            if (preCheckDetails.maturityReached) {
+                const err = new Error('PAYMENT_SCHEDULE_COMPLETE');
+                err.code = 'E_MATURITY_REACHED';
+                err.httpStatus = 409;
+                throw err;
+            }
+
             // ─── PERIODIC: direct submit to Stellar ─────────────
             const result = await StellarService.submitTransaction(signedXDR);
 
             if (result.success) {
-                // Update offer payment status
-                await prisma.offer.update({
+                const nowDate = new Date();
+                // F-24: Use FRESH lastPaymentDate so nextPaymentDue points to the
+                // NEXT upcoming payment, not the one we just completed
+                const updatedOffer = { ...offer, lastPaymentDate: nowDate };
+
+                // Update offer payment status — F-14: ATOMIC counter increment
+                const dbOffer = await prisma.offer.update({
                     where: { id: offerId },
                     data: {
-                        lastPaymentDate: new Date(),
+                        lastPaymentDate: nowDate,
                         paymentDueStatus: 'current',
-                        nextPaymentDue: this.calculateNextPaymentDate(offer),
+                        nextPaymentDue: this.calculateNextPaymentDate(updatedOffer),  // F-24
+                        periodicPaymentsCompleted: { increment: 1 },  // F-14: ATOMIC
                     }
+                });
+
+                // Change 12: Structured logging — production observability
+                log.info('PAYMENT_COUNTER_INCREMENT', {
+                    offerId,
+                    newCount: dbOffer.periodicPaymentsCompleted,
+                    totalExpected: this.computeTotalExpectedPayments(offer),
+                    maturityReached: dbOffer.periodicPaymentsCompleted >= this.computeTotalExpectedPayments(offer),
+                    txHash: result.transactionHash,
                 });
 
                 // Record payments via shared helper
@@ -710,6 +754,15 @@ export class CompanyPaymentService {
             throw new Error('No signed XDRs provided');
         }
 
+        // ─── MATURITY GUARD (batch submit-time) ─── F-02
+        const preCheckDetails = await this.calculateOwedAmount(offerId);
+        if (preCheckDetails.maturityReached) {
+            const err = new Error('PAYMENT_SCHEDULE_COMPLETE');
+            err.code = 'E_MATURITY_REACHED';
+            err.httpStatus = 409;
+            throw err;
+        }
+
         // Build dummy batchDetails if not provided (route path — details were at prepare time)
         const effectiveBatchDetails = batchDetails || signedXDRs.map((_, i) => ({
             batchIndex: i,
@@ -739,15 +792,33 @@ export class CompanyPaymentService {
                     false
                 );
 
-                // Update offer payment status
-                await prisma.offer.update({
+                // Update offer payment status — F-24: fresh lastPaymentDate, F-25: conditional increment
+                const nowDate = new Date();
+                const updatedOffer = { ...offer, lastPaymentDate: nowDate };  // F-24
+
+                const dbOffer = await prisma.offer.update({
                     where: { id: offerId },
                     data: {
-                        lastPaymentDate: new Date(),
+                        lastPaymentDate: nowDate,
                         paymentDueStatus: submitResult.success ? 'current' : 'overdue',
-                        nextPaymentDue: submitResult.success ? this.calculateNextPaymentDate(offer) : undefined,
+                        nextPaymentDue: submitResult.success
+                            ? this.calculateNextPaymentDate(updatedOffer)   // F-24: fresh offer
+                            : undefined,
+                        // F-25: ONLY increment counter if ALL batches succeeded
+                        ...(submitResult.success && { periodicPaymentsCompleted: { increment: 1 } }),
                     }
                 });
+
+                // Change 12: Structured logging
+                if (submitResult.success) {
+                    log.info('PAYMENT_COUNTER_INCREMENT', {
+                        offerId,
+                        newCount: dbOffer.periodicPaymentsCompleted,
+                        totalExpected: this.computeTotalExpectedPayments(offer),
+                        maturityReached: dbOffer.periodicPaymentsCompleted >= this.computeTotalExpectedPayments(offer),
+                        txHashes: submitResult.txHashes,
+                    });
+                }
 
                 log.info('Multi-batch payment recorded', {
                     offerId,
@@ -918,7 +989,17 @@ export class CompanyPaymentService {
             include: { company: true }
         });
 
-        for (const offer of overdueOffers) {
+        // F-20: Filter out offers that have completed all periodic payments
+        // These are awaiting principal return, NOT a missed periodic yield
+        const activeOverdueOffers = overdueOffers.filter(offer => {
+            const totalExpected = this.computeTotalExpectedPayments(offer);
+            if (totalExpected !== null && offer.periodicPaymentsCompleted >= totalExpected) {
+                return false; // All yields paid — skip overdue escalation
+            }
+            return true;
+        });
+
+        for (const offer of activeOverdueOffers) {
             const daysOverdue = Math.floor((now - new Date(offer.nextPaymentDue)) / (24 * 60 * 60 * 1000));
 
             let newStatus = offer.paymentDueStatus;
@@ -1068,6 +1149,36 @@ export class CompanyPaymentService {
             });
         }
 
+        // 3. Detect completed periodic offers awaiting principal return (F-06, F-19)
+        const completedPeriodicOffers = await prisma.offer.findMany({
+            where: {
+                status: 'active',
+                paymentType: { not: 'bullet' },
+                maturityDate: { lt: now },
+                nextPaymentDue: null,  // all periodic payments done
+                paymentDueStatus: { not: 'due' },  // F-26: skip already-flagged (idempotency)
+            },
+            include: { company: true }
+        });
+
+        for (const offer of completedPeriodicOffers) {
+            const totalExpected = this.computeTotalExpectedPayments(offer);
+            if (totalExpected !== null && offer.periodicPaymentsCompleted >= totalExpected) {
+                // F-19: DON'T set status='matured'
+                // F-20: DON'T set nextPaymentDue (would trigger false default)
+                await prisma.offer.update({
+                    where: { id: offer.id },
+                    data: {
+                        paymentDueStatus: 'due',  // Non-punitive, admin visibility
+                        // nextPaymentDue stays null — Section 1 won't pick this up
+                    }
+                });
+                log.info(`PERIODIC SETTLEMENT DUE: Offer ${offer.id} — all ${totalExpected} yields paid. Principal return needed.`);
+            }
+        }
+
+        results.periodicMaturities = completedPeriodicOffers.length;
+
         return results;
     }
 
@@ -1084,32 +1195,78 @@ export class CompanyPaymentService {
         }
     }
 
+    // ─── F-12, F-16: Safe date arithmetic for period advancement ───
+    static _advanceByPeriod(date, paymentType, paymentDay) {
+        const next = new Date(date);
+        next.setUTCDate(1);                    // F-12: prevent month overflow
+        switch (paymentType) {
+            case 'monthly':     next.setUTCMonth(next.getUTCMonth() + 1); break;
+            case 'quarterly':   next.setUTCMonth(next.getUTCMonth() + 3); break;
+            case 'semi_annual': next.setUTCMonth(next.getUTCMonth() + 6); break;
+            case 'annual':      next.setUTCFullYear(next.getUTCFullYear() + 1); break;
+            default: throw new Error(`Unknown paymentType: ${paymentType}`); // F-22
+        }
+        next.setUTCDate(Math.min(paymentDay || 1, 28));
+        next.setUTCHours(0, 0, 0, 0);         // F-16: eliminate time-of-day sensitivity
+        return next;
+    }
+
+    // ─── F-08, F-04, F-05, F-16: Deterministic date-walking for total expected payments ───
+    static computeTotalExpectedPayments(offer) {
+        if (!offer.maturityDate) return null;           // perpetual — no limit
+        if (offer.paymentType === 'bullet') return 0;   // bullet uses settlement, not periodic
+
+        const maturity = new Date(offer.maturityDate);
+        maturity.setUTCHours(23, 59, 59, 999);          // F-16: end of maturity day
+
+        const startDate = new Date(offer.createdAt);
+        startDate.setUTCHours(0, 0, 0, 0);              // F-16: normalize
+
+        if (maturity <= startDate) return 0;             // F-05: invalid state guard
+
+        let count = 0;
+        let date = new Date(startDate);
+        while (count < 1200) {                           // F-04: iteration cap (100yrs monthly)
+            date = this._advanceByPeriod(date, offer.paymentType, offer.paymentDay);
+            if (date > maturity) break;                  // F-08: STRICT > (not >=)
+            count++;
+        }
+
+        // Change 12: Structured logging for computed values
+        log.debug('TOTAL_PAYMENTS_COMPUTED', {
+            offerId: offer.id,
+            paymentType: offer.paymentType,
+            createdAt: offer.createdAt,
+            maturityDate: offer.maturityDate,
+            result: count,
+        });
+
+        return count;                                    // F-08: NO +1
+    }
+
     static calculateNextPaymentDate(offer) {
         if (offer.paymentType === 'bullet') {
             return offer.maturityDate;
         }
 
         const lastPayment = offer.lastPaymentDate || offer.createdAt;
-        const nextDate = new Date(lastPayment);
+        // F-17+F-18: reuse _advanceByPeriod (UTC-normalized, no code duplication)
+        const nextDate = this._advanceByPeriod(lastPayment, offer.paymentType, offer.paymentDay);
 
-        switch (offer.paymentType) {
-            case 'monthly':
-                nextDate.setMonth(nextDate.getMonth() + 1);
-                break;
-            case 'quarterly':
-                nextDate.setMonth(nextDate.getMonth() + 3);
-                break;
-            case 'semi_annual':
-                nextDate.setMonth(nextDate.getMonth() + 6);
-                break;
-            case 'annual':
-                nextDate.setFullYear(nextDate.getFullYear() + 1);
-                break;
+        if (offer.maturityDate) {
+            const maturityEnd = new Date(offer.maturityDate);
+            maturityEnd.setUTCHours(23, 59, 59, 999);  // F-17: same normalization as computeTotal
+            if (nextDate > maturityEnd) {
+                // Change 12: Structured logging for maturity boundary hits
+                log.info('MATURITY_BOUNDARY_HIT', {
+                    offerId: offer.id,
+                    lastPaymentDate: offer.lastPaymentDate,
+                    maturityDate: offer.maturityDate,
+                    nextComputedDate: nextDate?.toISOString(),
+                });
+                return null;    // F-08: STRICT >
+            }
         }
-
-        // Set to payment day
-        nextDate.setDate(Math.min(offer.paymentDay, 28));
-
         return nextDate;
     }
 }

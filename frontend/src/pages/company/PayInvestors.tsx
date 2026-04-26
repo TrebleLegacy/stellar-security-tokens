@@ -288,7 +288,13 @@ export function PayInvestors() {
                 setError('Failed to prepare payment');
             }
         } catch (err: any) {
-            setError(err.message || 'Failed to prepare payment');
+            // Change 11b: Handle E_MATURITY_REACHED error code
+            const msg = err?.response?.data?.error || err.message || 'Failed to prepare payment';
+            if (msg.includes('PAYMENT_SCHEDULE_COMPLETE') || msg.includes('E_MATURITY_REACHED')) {
+                setError('All yield payments are complete. Use Settlement to return principal.');
+            } else {
+                setError(msg);
+            }
         } finally {
             setSubmitting(false);
         }
@@ -540,27 +546,20 @@ export function PayInvestors() {
             {/* Payment Schedule Progress */}
             {paymentDetails && !isBulletPayment && (() => {
                 const details = paymentDetails as PaymentDetails;
+                // Change 8: Server-authoritative data — DELETE client-side Math.ceil
                 const paymentsMade = (details as any).paymentsMade ?? 0;
+                const totalExpected = (details as any).totalExpectedPayments;
+                const isLastPeriod = (details as any).isLastPeriod;
+                const maturityReached = (details as any).maturityReached;
                 const maturityDate = (details as any).maturityDate;
-                const offerCreatedAt = (details as any).offerCreatedAt;
 
-                // Calculate total expected payments from dates + frequency
-                const periodsPerYear = details.paymentType === 'monthly' ? 12
-                    : details.paymentType === 'quarterly' ? 4
-                    : details.paymentType === 'semi_annual' ? 2
-                    : details.paymentType === 'annual' ? 1 : 12;
-
-                let totalExpected = 0;
-                if (maturityDate && offerCreatedAt) {
-                    const start = new Date(offerCreatedAt);
-                    const end = new Date(maturityDate);
-                    const diffMs = end.getTime() - start.getTime();
-                    const diffYears = diffMs / (1000 * 60 * 60 * 24 * 365.25);
-                    totalExpected = Math.ceil(diffYears * periodsPerYear);
-                }
-
-                const remaining = Math.max(0, totalExpected - paymentsMade);
-                const progressPct = totalExpected > 0 ? Math.min(100, (paymentsMade / totalExpected) * 100) : 0;
+                // Perpetual offers: totalExpected === null
+                const isPerpetual = totalExpected === null;
+                const isOverpaid = !isPerpetual && paymentsMade > totalExpected;
+                const remaining = isPerpetual ? null : Math.max(0, totalExpected - paymentsMade);
+                const progressPct = !isPerpetual && totalExpected > 0
+                    ? Math.min(100, (paymentsMade / totalExpected) * 100)
+                    : 0;
 
                 return (
                     <Card className="glass-panel border-white/5 bg-white/5 animate-fade-in-up">
@@ -571,8 +570,50 @@ export function PayInvestors() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {/* Change 9: Last-period warning */}
+                            {isLastPeriod && !maturityReached && (
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                                    <p className="text-sm text-amber-300">
+                                        This is your <strong>final yield payment</strong>. After payment, initiate Maturity Settlement to return principal and close this offer.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Change 10: Maturity-reached block */}
+                            {maturityReached && (
+                                <div className={`p-3 rounded-lg flex items-start gap-2 ${
+                                    details.paymentType === 'bullet'
+                                        ? 'bg-red-500/10 border border-red-500/20'
+                                        : 'bg-emerald-500/10 border border-emerald-500/20'
+                                }`}>
+                                    <CheckCircle className={`w-4 h-4 mt-0.5 shrink-0 ${
+                                        details.paymentType === 'bullet' ? 'text-red-400' : 'text-emerald-400'
+                                    }`} />
+                                    <div className="text-sm">
+                                        <p className={details.paymentType === 'bullet' ? 'text-red-300' : 'text-emerald-300'}>
+                                            All {totalExpected} yield payments complete.
+                                            {maturityDate && ` Maturity reached on ${new Date(maturityDate).toLocaleDateString()}.`}
+                                        </p>
+                                        <p className="text-muted-foreground mt-1">
+                                            Go to Contracts → Settlement to return principal and burn tokens.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Change 11: Overpaid warning */}
+                            {isOverpaid && (
+                                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                                    <p className="text-sm text-amber-300">
+                                        More payments recorded ({paymentsMade}) than expected ({totalExpected}). Contact admin for reconciliation.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Progress bar */}
-                            {totalExpected > 0 && (
+                            {!isPerpetual && totalExpected > 0 && (
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">
@@ -590,6 +631,14 @@ export function PayInvestors() {
                                         <span>{remaining} remaining</span>
                                         <span className="capitalize">{details.paymentType}</span>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Perpetual indicator */}
+                            {isPerpetual && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <TrendingUp className="w-4 h-4" />
+                                    <span>Ongoing — no maturity date set ({paymentsMade} payments made)</span>
                                 </div>
                             )}
 
@@ -892,7 +941,12 @@ export function PayInvestors() {
                         </Button>
                     )
                 ) : !preparedTx ? (
-                    /* ── Periodic: prepare button ── */
+                    /* ── Periodic: prepare button (hidden when maturity reached) ── */
+                    (() => {
+                        const mr = (paymentDetails as any)?.maturityReached;
+                        const op = (paymentDetails as any)?.paymentsMade > (paymentDetails as any)?.totalExpectedPayments;
+                        if (mr || op) return null; // Change 10/11: Block payment
+                        return (
                     <Button
                         onClick={handlePreparePayment}
                         disabled={submitting || totalOwed === 0}
@@ -910,6 +964,8 @@ export function PayInvestors() {
                             </>
                         )}
                     </Button>
+                        );
+                    })()
                 ) : (
                     /* ── Periodic: sign & submit ── */
                     <div className="flex-1 space-y-4">
