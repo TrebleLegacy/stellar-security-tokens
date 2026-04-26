@@ -400,10 +400,10 @@ export class YieldDistributorService {
             if (!client) return true; // No Redis → skip locking (graceful degradation)
 
             const lockKey = `yield_lock:${offerId}`;
-            const existing = await client.get(lockKey);
-            if (existing) return false; // Already locked
-
-            await client.setEx(lockKey, LOCK_TTL_SECONDS, jobId);
+            // F-03: Atomic SETNX — prevents TOCTOU race where two requests
+            // both read null and both acquire the lock
+            const result = await client.set(lockKey, jobId, { NX: true, EX: LOCK_TTL_SECONDS });
+            if (!result) return false; // Already locked
             return true;
         } catch (err) {
             log.warn('Redis lock acquisition failed (proceeding without lock)', { offerId, error: err.message });
