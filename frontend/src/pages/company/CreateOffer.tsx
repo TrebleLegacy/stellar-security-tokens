@@ -2,9 +2,17 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, ArrowRight, Check, FileText, Upload, Loader2, Landmark, TrendingUp, X, AlertTriangle, Calendar, Eye, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileText, Upload, Loader2, Landmark, TrendingUp, X, AlertTriangle, Calendar, Eye, Trash2, Building2 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { offersApi } from "@/api/offers";
+
+interface AssetMetadata {
+    propertyType?: 'house' | 'apartment' | 'townhouse' | 'land' | 'commercial';
+    sizeM2?: string;
+    rooms?: string;
+    bedrooms?: string;
+    yearBuilt?: string;
+}
 
 interface OfferFormData {
     offer_name: string;
@@ -18,9 +26,16 @@ interface OfferFormData {
     max_investment: string;
     payment_type: 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'bullet';
     payment_day: string;
-    payment_count: string; // Number of payment periods until maturity (non-bullet)
-    maturity_date: string; // Required for bullet payments, derived for periodic
-    // Legal documents will be handled separately via IPFS
+    payment_count: string;
+    maturity_date: string;
+    // Phase 2: Asset Intelligence
+    rental_yield_rate: string;
+    value_growth_rate: string;
+    latitude: string;
+    longitude: string;
+    location_address: string;
+    asset_metadata: AssetMetadata;
+    // Legal documents
     legal_documents: {
         contract?: { name: string; file?: File };
         terms?: { name: string; file?: File };
@@ -42,6 +57,12 @@ const initialFormData: OfferFormData = {
     payment_day: '1',
     payment_count: '12',
     maturity_date: '',
+    rental_yield_rate: '',
+    value_growth_rate: '',
+    latitude: '',
+    longitude: '',
+    location_address: '',
+    asset_metadata: {},
     legal_documents: {},
 };
 
@@ -153,9 +174,9 @@ export function CreateOffer() {
 
     // Total steps is 5: Step 1 is SelectOfferType page, Steps 2-5 are here.
     // Step 5 (displayStep) = Review & Submit. The confirmation screen after is not a numbered step.
-    const totalSteps = 5;
+    const totalSteps = 6;
     const displayStep = step + 1;
-    const isSuccess = step === 5;
+    const isSuccess = step === 6;
 
     const updateFormData = (updates: Partial<OfferFormData>) => {
         setFormData(prev => ({ ...prev, ...updates }));
@@ -209,6 +230,13 @@ export function CreateOffer() {
                     min_investment: formData.min_investment ? Number(formData.min_investment) : undefined,
                     max_investment: formData.max_investment ? Number(formData.max_investment) : undefined,
                 },
+                // Phase 2: Asset Intelligence
+                rental_yield_rate: formData.rental_yield_rate ? parseFloat(formData.rental_yield_rate) : undefined,
+                value_growth_rate: formData.value_growth_rate ? parseFloat(formData.value_growth_rate) : undefined,
+                latitude: formData.latitude ? parseFloat(formData.latitude) : undefined,
+                longitude: formData.longitude ? parseFloat(formData.longitude) : undefined,
+                location_address: formData.location_address || undefined,
+                asset_metadata: Object.keys(formData.asset_metadata).length > 0 ? formData.asset_metadata : undefined,
                 legal_documents: {}, // Metadata is optional, relying on file fields
                 contract: formData.legal_documents.contract?.file,
                 terms: formData.legal_documents.terms?.file,
@@ -219,7 +247,7 @@ export function CreateOffer() {
                 // Clear draft from storage on success
                 sessionStorage.removeItem(STORAGE_KEY);
                 // Move to confirmation step (step 5 internal = displayStep 6)
-                setStep(5);
+                setStep(6);
             } else {
                 setError(response.error || 'Failed to create offer');
             }
@@ -256,11 +284,8 @@ export function CreateOffer() {
             case 1:
                 return formData.offer_name && formData.asset_code && formData.description;
             case 2: {
-                // Target raise required
                 if (!formData.total_supply) return false;
-                // Both offer types need a rate (interest for collateral, dividend for sale)
                 if (!formData.annual_interest_rate) return false;
-                // ALL collateral (debt) offers require a future maturity date
                 if (formData.offer_type === 'collateral') {
                     if (formData.payment_type === 'bullet') {
                         if (!formData.maturity_date) return false;
@@ -269,15 +294,16 @@ export function CreateOffer() {
                         if (!formData.payment_count || parseInt(formData.payment_count) < 1) return false;
                     }
                 }
-                // max_investment must be >= min_investment when both set
                 if (formData.max_investment && formData.min_investment &&
                     parseFloat(formData.max_investment) < parseFloat(formData.min_investment)) return false;
                 return true;
             }
             case 3:
-                return true; // Documents are optional for now
+                return true; // Asset Details — optional during beta
             case 4:
-                return true;
+                return true; // Documents optional
+            case 5:
+                return true; // Review
             default:
                 return false;
         }
@@ -802,6 +828,190 @@ export function CreateOffer() {
                 {step === 3 && (
                     <>
                         <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-primary" />
+                                Asset Details
+                            </CardTitle>
+                            <CardDescription>Describe the underlying asset — location, type, and characteristics</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Yield Decomposition */}
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium text-white">Yield Breakdown (optional)</label>
+                                <p className="text-xs text-muted-foreground -mt-1">
+                                    How the yield is distributed between rental income and value growth
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs text-muted-foreground">Rental Income (%)</label>
+                                        <div className="relative">
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                placeholder="8.0"
+                                                value={formData.rental_yield_rate}
+                                                onChange={(e) => updateFormData({ rental_yield_rate: e.target.value })}
+                                                className="pr-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs text-muted-foreground">Value Growth (%)</label>
+                                        <div className="relative">
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                placeholder="4.0"
+                                                value={formData.value_growth_rate}
+                                                onChange={(e) => updateFormData({ value_growth_rate: e.target.value })}
+                                                className="pr-8 glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {formData.rental_yield_rate && formData.value_growth_rate && (
+                                    <div className="px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06] text-xs text-muted-foreground">
+                                        Rental {formData.rental_yield_rate}% + Growth {formData.value_growth_rate}% ={' '}
+                                        <span className="text-emerald-400 font-medium">
+                                            {(parseFloat(formData.rental_yield_rate) + parseFloat(formData.value_growth_rate)).toFixed(1)}% total
+                                        </span>
+                                        {formData.annual_interest_rate && (
+                                            <span className="text-muted-foreground/60">
+                                                {' '}(APY: {formData.annual_interest_rate}%)
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Location */}
+                            <div className="space-y-3">
+                                <label className="text-sm font-medium text-white">Location (optional)</label>
+                                <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs text-muted-foreground">Address</label>
+                                        <Input
+                                            placeholder="Rua Example 123, São Paulo, SP"
+                                            value={formData.location_address}
+                                            onChange={(e) => updateFormData({ location_address: e.target.value })}
+                                            className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Latitude</label>
+                                            <Input
+                                                type="number"
+                                                step="0.0000001"
+                                                placeholder="-23.5505"
+                                                value={formData.latitude}
+                                                onChange={(e) => updateFormData({ latitude: e.target.value })}
+                                                className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Longitude</label>
+                                            <Input
+                                                type="number"
+                                                step="0.0000001"
+                                                placeholder="-46.6333"
+                                                value={formData.longitude}
+                                                onChange={(e) => updateFormData({ longitude: e.target.value })}
+                                                className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Property Metadata — collateral only */}
+                            {formData.offer_type === 'collateral' && (
+                                <div className="space-y-3">
+                                    <label className="text-sm font-medium text-white">Property Details (optional)</label>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Property Type</label>
+                                            <select
+                                                value={formData.asset_metadata.propertyType || ''}
+                                                onChange={(e) => updateFormData({
+                                                    asset_metadata: { ...formData.asset_metadata, propertyType: (e.target.value || undefined) as AssetMetadata['propertyType'] }
+                                                })}
+                                                className="w-full h-10 px-3 rounded-md bg-black/20 border border-white/10 focus:border-teal-500/50 focus:outline-none text-white text-sm"
+                                            >
+                                                <option value="">Select type</option>
+                                                <option value="house">House</option>
+                                                <option value="apartment">Apartment</option>
+                                                <option value="townhouse">Townhouse</option>
+                                                <option value="land">Land</option>
+                                                <option value="commercial">Commercial</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Size (m²)</label>
+                                            <Input
+                                                type="number"
+                                                placeholder="120"
+                                                value={formData.asset_metadata.sizeM2 || ''}
+                                                onChange={(e) => updateFormData({
+                                                    asset_metadata: { ...formData.asset_metadata, sizeM2: e.target.value }
+                                                })}
+                                                className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Rooms</label>
+                                            <Input
+                                                type="number"
+                                                placeholder="5"
+                                                value={formData.asset_metadata.rooms || ''}
+                                                onChange={(e) => updateFormData({
+                                                    asset_metadata: { ...formData.asset_metadata, rooms: e.target.value }
+                                                })}
+                                                className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-xs text-muted-foreground">Bedrooms</label>
+                                            <Input
+                                                type="number"
+                                                placeholder="3"
+                                                value={formData.asset_metadata.bedrooms || ''}
+                                                onChange={(e) => updateFormData({
+                                                    asset_metadata: { ...formData.asset_metadata, bedrooms: e.target.value }
+                                                })}
+                                                className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs text-muted-foreground">Year Built</label>
+                                        <Input
+                                            type="number"
+                                            placeholder="2020"
+                                            min="1900"
+                                            max={new Date().getFullYear()}
+                                            value={formData.asset_metadata.yearBuilt || ''}
+                                            onChange={(e) => updateFormData({
+                                                asset_metadata: { ...formData.asset_metadata, yearBuilt: e.target.value }
+                                            })}
+                                            className="glass-panel bg-black/20 border-white/10 focus:border-primary/50 text-foreground w-32"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            <p className="text-xs text-muted-foreground/60 pt-2">
+                                All fields on this step are optional during beta. They will be required at production launch.
+                            </p>
+                        </CardContent>
+                    </>
+                )}
+
+                {step === 4 && (
+                    <>
+                        <CardHeader>
                             <CardTitle>Legal Documents</CardTitle>
                             <CardDescription>Upload required legal documents (optional for draft)</CardDescription>
                         </CardHeader>
@@ -881,7 +1091,7 @@ export function CreateOffer() {
                     </>
                 )}
 
-                {step === 4 && (
+                {step === 5 && (
                     <>
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2">
@@ -1114,8 +1324,8 @@ export function CreateOffer() {
                     </>
                 )}
 
-                {/* Step 5 (internal) = Step 6 (display): Confirmation */}
-                {step === 5 && (
+                {/* Step 6 (internal) = Confirmation */}
+                {step === 6 && (
                     <>
                         <CardHeader className="pb-4">
                             <CardTitle className="flex items-center gap-2 text-emerald-400">
@@ -1202,7 +1412,7 @@ export function CreateOffer() {
                 )}
 
                 {/* Navigation Buttons - Hide on confirmation step */}
-                {step < 5 && (
+                {step < 6 && (
                     <div className="flex justify-between p-6 border-t border-white/5">
                         <Button
                             variant="ghost"
@@ -1214,7 +1424,7 @@ export function CreateOffer() {
                             Back
                         </Button>
 
-                        {step < 4 ? (
+                        {step < 5 ? (
                             <Button
                                 onClick={handleNext}
                                 disabled={!isStepValid()}

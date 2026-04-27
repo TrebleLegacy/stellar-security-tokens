@@ -116,6 +116,17 @@ export class OfferController {
       collateral_value: offer.collateralValue,
       collateralLTV: offer.collateralLTV,
       collateral_ltv: offer.collateralLTV,
+      // Phase 2: Asset Intelligence
+      rentalYieldRate: offer.rentalYieldRate ?? null,
+      rental_yield_rate: offer.rentalYieldRate ?? null,
+      valueGrowthRate: offer.valueGrowthRate ?? null,
+      value_growth_rate: offer.valueGrowthRate ?? null,
+      latitude: offer.latitude ?? null,
+      longitude: offer.longitude ?? null,
+      locationAddress: offer.locationAddress ?? null,
+      location_address: offer.locationAddress ?? null,
+      assetMetadata: offer.assetMetadata ?? {},
+      asset_metadata: offer.assetMetadata ?? {},
       // Formatted JSONB fields
       legalDocuments: OfferController.formatLegalDocuments(legalDocuments),
       legal_documents: OfferController.formatLegalDocuments(legalDocuments),
@@ -178,6 +189,13 @@ export class OfferController {
         collateral_description,
         collateral_value,
         collateral_ltv,
+        // Phase 2: Asset Intelligence
+        rental_yield_rate,
+        value_growth_rate,
+        latitude,
+        longitude,
+        location_address,
+        asset_metadata,
       } = req.body;
 
       // Sanitize Brazilian number format ("1.000.000,50" → "1000000.50") before parseFloat
@@ -201,6 +219,11 @@ export class OfferController {
       if (payment_frequency) payment_frequency = parseInt(payment_frequency, 10);
       if (collateral_ltv) collateral_ltv = parseFloat(sanitizeNumber(collateral_ltv));
       if (collateral_value) collateral_value = parseFloat(sanitizeNumber(collateral_value));
+      // Phase 2: sanitize new numeric fields
+      if (rental_yield_rate) rental_yield_rate = parseFloat(sanitizeNumber(rental_yield_rate));
+      if (value_growth_rate) value_growth_rate = parseFloat(sanitizeNumber(value_growth_rate));
+      if (latitude) latitude = parseFloat(sanitizeNumber(latitude));
+      if (longitude) longitude = parseFloat(sanitizeNumber(longitude));
 
       // Parse unit_price if provided
       let unit_price = 1.0;
@@ -335,6 +358,13 @@ export class OfferController {
         collateral_description,
         collateral_value,
         collateral_ltv: finalLTV,
+        // Phase 2: Asset Intelligence
+        rental_yield_rate,
+        value_growth_rate,
+        latitude,
+        longitude,
+        location_address,
+        asset_metadata: typeof asset_metadata === 'string' ? JSON.parse(asset_metadata) : (asset_metadata || {}),
       });
 
       res.status(201).json({

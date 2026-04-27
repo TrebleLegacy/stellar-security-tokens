@@ -61,6 +61,13 @@ export const offersApi = {
     terms?: File;
     prospectus?: File;
     other_docs?: File[];
+    // Phase 2: Asset Intelligence
+    rental_yield_rate?: number;
+    value_growth_rate?: number;
+    latitude?: number;
+    longitude?: number;
+    location_address?: string;
+    asset_metadata?: Record<string, any>;
   }): Promise<ApiResponse<Offer>> => {
     const formData = new FormData();
 
@@ -103,9 +110,25 @@ export const offersApi = {
     if (data.terms) formData.append('terms', data.terms);
     if (data.prospectus) formData.append('prospectus', data.prospectus);
 
-    // For now, we are not handling 'other_docs' array in specific keys, 
-    // but the backend iterates req.files. If we want generic uploads, we might need a specific structure.
-    // The backend uses file.fieldname as docType. 
+    // Phase 2: Asset Intelligence fields
+    if (data.rental_yield_rate !== undefined) {
+      formData.append('rental_yield_rate', data.rental_yield_rate.toString());
+    }
+    if (data.value_growth_rate !== undefined) {
+      formData.append('value_growth_rate', data.value_growth_rate.toString());
+    }
+    if (data.latitude !== undefined) {
+      formData.append('latitude', data.latitude.toString());
+    }
+    if (data.longitude !== undefined) {
+      formData.append('longitude', data.longitude.toString());
+    }
+    if (data.location_address) {
+      formData.append('location_address', data.location_address);
+    }
+    if (data.asset_metadata && Object.keys(data.asset_metadata).length > 0) {
+      formData.append('asset_metadata', JSON.stringify(data.asset_metadata));
+    }
 
     // Allow appending custom extra fields if needed for test
     if (data.legal_documents) {

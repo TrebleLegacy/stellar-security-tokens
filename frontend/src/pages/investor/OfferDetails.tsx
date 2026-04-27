@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import {
     ArrowLeft, Calendar, FileText, TrendingUp, Loader2, AlertCircle,
     DollarSign, ExternalLink, ShieldCheck, Clock, Building2,
-    Hash, CheckCircle2, Copy, ChevronDown, Info,
+    Hash, CheckCircle2, Copy, ChevronDown, Info, MapPin, Home, Ruler, BedDouble,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useInvestmentFees } from '@/hooks/useInvestmentFees';
@@ -139,6 +139,15 @@ export function OfferDetails() {
     const token = offer.token;
     const hasCollateral = offer.offer_type === 'collateral' && (offer.collateral_description || offer.collateral_value);
     const stellarExplorerBase = 'https://stellar.expert/explorer/testnet';
+
+    // Phase 2: Asset Intelligence
+    const assetMeta = (offer as any).asset_metadata || {};
+    const hasAssetMetadata = Object.values(assetMeta).some((v: any) => v);
+    const hasLocation = (offer as any).latitude && (offer as any).longitude;
+    const rentalYield = (offer as any).rental_yield_rate ? parseFloat((offer as any).rental_yield_rate) : null;
+    const growthYield = (offer as any).value_growth_rate ? parseFloat((offer as any).value_growth_rate) : null;
+    const hasYieldBreakdown = rentalYield !== null || growthYield !== null;
+    const PROPERTY_TYPE_LABELS: Record<string, string> = { house: 'House', apartment: 'Apartment', townhouse: 'Townhouse', land: 'Land', commercial: 'Commercial' };
 
     // Maturity cutoff
     const cutoffDate = offer.investment_cutoff_date ? new Date(offer.investment_cutoff_date) : null;
@@ -286,6 +295,62 @@ export function OfferDetails() {
                     <p className="text-muted-foreground text-[15px] leading-relaxed whitespace-pre-line">
                         {offer.description}
                     </p>
+
+                    {/* Phase 2: Property Metadata Badges */}
+                    {hasAssetMetadata && (
+                        <div className="flex flex-wrap gap-2 mt-4">
+                            {assetMeta.propertyType && (
+                                <Badge className="bg-white/[0.06] text-white/80 border border-white/10 gap-1.5">
+                                    <Home className="h-3 w-3" />
+                                    {PROPERTY_TYPE_LABELS[assetMeta.propertyType] || assetMeta.propertyType}
+                                </Badge>
+                            )}
+                            {assetMeta.sizeM2 && (
+                                <Badge className="bg-white/[0.06] text-white/80 border border-white/10 gap-1.5">
+                                    <Ruler className="h-3 w-3" />
+                                    {assetMeta.sizeM2} m²
+                                </Badge>
+                            )}
+                            {assetMeta.bedrooms && (
+                                <Badge className="bg-white/[0.06] text-white/80 border border-white/10 gap-1.5">
+                                    <BedDouble className="h-3 w-3" />
+                                    {assetMeta.bedrooms} bed{parseInt(assetMeta.bedrooms) !== 1 ? 's' : ''}
+                                </Badge>
+                            )}
+                            {assetMeta.rooms && (
+                                <Badge className="bg-white/[0.06] text-white/80 border border-white/10 gap-1.5">
+                                    {assetMeta.rooms} rooms
+                                </Badge>
+                            )}
+                            {assetMeta.yearBuilt && (
+                                <Badge className="bg-white/[0.06] text-white/80 border border-white/10 gap-1.5">
+                                    <Calendar className="h-3 w-3" />
+                                    Built {assetMeta.yearBuilt}
+                                </Badge>
+                            )}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Phase 2: Location Section */}
+            {hasLocation && (
+                <>
+                    <SectionDivider label="Location" icon={<MapPin className="h-3.5 w-3.5" />} />
+                    {(offer as any).location_address && (
+                        <p className="text-muted-foreground text-sm mb-3">
+                            <MapPin className="h-3.5 w-3.5 inline mr-1.5 text-[hsl(43_45%_55%)]" />
+                            {(offer as any).location_address}
+                        </p>
+                    )}
+                    <div className="rounded-xl overflow-hidden border border-white/10">
+                        <img
+                            src={`https://staticmap.openstreetmap.de/staticmap.php?center=${(offer as any).latitude},${(offer as any).longitude}&zoom=15&size=600x250&markers=${(offer as any).latitude},${(offer as any).longitude},red-pushpin`}
+                            alt="Asset location map"
+                            className="w-full h-auto"
+                            loading="lazy"
+                        />
+                    </div>
                 </>
             )}
 
@@ -295,6 +360,23 @@ export function OfferDetails() {
                 <div className="divide-y divide-white/8">
                     {(offer.investor_rate || offer.annual_interest_rate) && (
                         <DetailRow label="Interest Rate" value={`${parseFloat((offer.investor_rate ?? offer.annual_interest_rate ?? 0).toString())}% APY`} />
+                    )}
+                    {/* Phase 2: Yield Decomposition */}
+                    {hasYieldBreakdown && (
+                        <div className="py-2.5 space-y-1.5">
+                            {rentalYield !== null && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground text-xs pl-4">├─ Rental Income</span>
+                                    <span className="text-xs font-medium text-emerald-400">{rentalYield}%</span>
+                                </div>
+                            )}
+                            {growthYield !== null && (
+                                <div className="flex justify-between items-center">
+                                    <span className="text-muted-foreground text-xs pl-4">└─ Value Growth</span>
+                                    <span className="text-xs font-medium text-emerald-400">{growthYield}%</span>
+                                </div>
+                            )}
+                        </div>
                     )}
                     <DetailRow label="Payment Schedule" value={paymentLabel} />
                     {offer.maturity_date && (
