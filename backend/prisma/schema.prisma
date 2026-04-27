@@ -366,6 +366,20 @@ model Offer {
   // Spread (annualInterestRate - investorRate) → platform treasury revenue.
   // null = no spread (investorRate defaults to annualInterestRate).
   investorRate         Decimal?    @map("investor_rate") @db.Decimal(10, 7)
+
+  // ── Phase 2: Asset Intelligence ──
+  // Yield decomposition: investor sees where yield comes from (informational, no constraint)
+  rentalYieldRate      Decimal?    @map("rental_yield_rate") @db.Decimal(10, 7)
+  valueGrowthRate      Decimal?    @map("value_growth_rate") @db.Decimal(10, 7)
+
+  // Location (for map pin + address display)
+  latitude             Decimal?    @map("latitude") @db.Decimal(10, 7)
+  longitude            Decimal?    @map("longitude") @db.Decimal(10, 7)
+  locationAddress      String?     @map("location_address") @db.VarChar(500)
+
+  // Structured property metadata (polymorphic per asset type)
+  assetMetadata        Json?       @default("{}") @map("asset_metadata")
+
   offerType           OfferType   @map("offer_type")
   offerRules          Json        @default("{}") @map("offer_rules")
   status              OfferStatus @default(pending_review)

@@ -246,6 +246,13 @@ export class OfferService {
         collateralDescription: offerData.collateral_description,
         collateralValue: offerData.collateral_value,
         collateralLTV: offerData.collateral_ltv,
+        // Phase 2: Asset Intelligence
+        rentalYieldRate: offerData.rental_yield_rate || null,
+        valueGrowthRate: offerData.value_growth_rate || null,
+        latitude: offerData.latitude || null,
+        longitude: offerData.longitude || null,
+        locationAddress: offerData.location_address || null,
+        assetMetadata: offerData.asset_metadata || {},
         status: 'pending_review',
       },
       include: {

@@ -336,6 +336,13 @@ export class Offer {
       total_supply,
       annual_interest_rate,
       offer_rules,
+      // Phase 2: Asset Intelligence
+      rental_yield_rate,
+      value_growth_rate,
+      latitude,
+      longitude,
+      location_address,
+      asset_metadata,
     } = offerData;
 
     const updateData = {};
@@ -344,6 +351,13 @@ export class Offer {
     if (total_supply !== undefined) updateData.totalSupply = total_supply;
     if (annual_interest_rate !== undefined) updateData.annualInterestRate = annual_interest_rate;
     if (offer_rules !== undefined) updateData.offerRules = offer_rules;
+    // Phase 2: Asset Intelligence
+    if (rental_yield_rate !== undefined) updateData.rentalYieldRate = rental_yield_rate;
+    if (value_growth_rate !== undefined) updateData.valueGrowthRate = value_growth_rate;
+    if (latitude !== undefined) updateData.latitude = latitude;
+    if (longitude !== undefined) updateData.longitude = longitude;
+    if (location_address !== undefined) updateData.locationAddress = location_address;
+    if (asset_metadata !== undefined) updateData.assetMetadata = asset_metadata;
 
     if (Object.keys(updateData).length === 0) {
       return await this.findById(id);
