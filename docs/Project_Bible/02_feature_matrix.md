@@ -94,6 +94,7 @@
 | Feature | Contract | Backend Integration | Status |
 |---------|----------|-------------------|--------|
 | Token sale (atomic trade) | ✅ `trade()` | ✅ SorobanSaleService | ✅ |
+| Fixed fee collection (trade-time) | ✅ `fixed_fee` → treasury | ✅ Configurable per offer (`processingFee`) | ✅ |
 | Pause/resume | ✅ `set_active()` | ✅ contractRoutes | ✅ |
 | Price update | ✅ `updt_price()` | ✅ contractRoutes | ✅ |
 | Admin withdrawal | ✅ `withdraw()` | ✅ contractRoutes | ✅ |
@@ -124,8 +125,14 @@
 
 | Gap | Impact | Where |
 |-----|--------|-------|
-| **Fee collection not on-chain** | Platform fees are logged in DB (`feeLog`) but never collected on-chain | FeeService → only `prisma.feeLog.create` |
 | **In-memory WebAuthn challenges** | Won't scale horizontally, lost on restart | authRoutes, platformAdminRoutes |
 | **Duplicate API clients** | Maintenance burden, potential behavior divergence | `api/client.ts` (Axios) + `lib/api.ts` (fetch) |
 | **Type mismatch** | Runtime bugs from snake_case types vs camelCase responses | `types/index.ts` |
 | **platformAdminRoutes mega-file** | 1,877L with inline handlers, duplicated code | routes layer |
+
+> **Note (2026-04-28):** The "Fee collection not on-chain" gap listed in earlier versions of this
+> document has been **resolved**. Platform fees are now collected on-chain through two channels:
+> 1. **Trade-time:** `fixed_fee` deducted atomically in Soroban `trade()` → treasury (contract v6, `lib.rs:203-219`)
+> 2. **Yield distribution:** Spread (`annualInterestRate − investorRate`) collected via `Operation.payment` (classic path) or `distribute()` `fee_amount` (Soroban YieldDistributor path)
+>
+> `feeLog.create` in the DB is a **receipt** for admin reporting, not the collection mechanism.
