@@ -96,6 +96,8 @@ SIGTERM / SIGINT received
   → SorobanEventIndexer.stop()
   → SorobanReconciler.stop()
   → SorobanMetrics.stop()
+  → YieldPaymentReconciler.stop()
+  → WalletMonitorService.stop() ✅ (A-02 resolved 2026-04-29 — clearInterval implemented)
   → Close DB connections (Prisma)
   → Close Redis connections
   → process.exit(0)

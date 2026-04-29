@@ -11,7 +11,7 @@
 main.tsx → App.tsx → BrowserRouter
   ├── /login, /register, /company/register    (public auth pages)
   ├── / (DashboardLayout)                     (investor portal, 6 pages)
-  ├── /company (CompanyLayout)                (company portal, 12 pages)
+  ├── /company (CompanyLayout)                (company portal, 13 pages)
   └── /admin (AdminLayout)                    (admin portal, 13 pages)
 ```
 
@@ -44,18 +44,18 @@ Pages → Hooks (useOffer, usePasskey, ...) → API modules (offersApi, ...) →
 | SmartAccountKit | `lib/passkey.ts` | Investor + Company | Discoverable login, wallet deploy, TX signing |
 | Freighter API | `lib/freighter.ts` (209L) | Admin | Browser extension wallet, SEP-10 challenge signing |
 | Ledger WebUSB | `lib/ledger.ts` (277L) | Admin (recovery) | Hardware wallet TX signing via BIP44 |
-| Pusher | `lib/pusher.ts` (47L) | All | Real-time notifications (when configured) |
+| ~~Pusher~~ | ~~`lib/pusher.ts`~~ | — | **DELETED** (commit 7aad8c3) — WebSocket plan abandoned; `pusher-js` dep also removed |
 | Sentry | `lib/sentry.ts` (159L) | All | Error monitoring, PII scrubbing, production-only |
 
 ---
 
-## API Modules (13 files, ~1,074L)
+## API Modules (9 modules + 1 client = 10 files in `api/`)
 
 All modules export typed object literals wrapping Axios calls.
 
 | Module | Methods | Key Operations |
 |--------|---------|----------------|
-| `auth.ts` | 2 | ⚠️ Legacy email/password login (dead code since passkey migration) |
+| ~~`auth.ts`~~ | — | **DELETED** (commit 696f300) — Legacy email/password login, removed with passkey migration |
 | `investors.ts` | 8 | CRUD, portfolio, deposits, KYC status |
 | `companies.ts` | 10 | CRUD, profile, wallet status, offers |
 | `offers.ts` | 16 | Full lifecycle: create (FormData), review, issue, activate, unlock token for DEX |
@@ -63,8 +63,8 @@ All modules export typed object literals wrapping Axios calls.
 | `tokens.ts` | 7 | List, detail, freeze, unfreeze, clawback, disable-clawback, sync |
 | `platformAdmins.ts` | 18 | Freighter auth, admin CRUD, investor mgmt, sponsor wallet, analytics (6 endpoints) |
 | `wallets.ts` | 3 | System wallet statuses, TX proposals, submit signed TX |
-| `companyUsers.ts` | 5 | CRUD, status toggle |
-| `companyPayments.ts` | 6 | Upcoming, calculate, prepare XDR, submit signed, history, penalties |
+| ~~`companyUsers.ts`~~ | — | **DELETED** (commit 7aad8c3) — Password-based registration removed |
+| `companyPayments.ts` | 9+ | Upcoming, yield-status, prepare XDR, submit (polymorphic: single/batch), history, penalties, prepare-deposit, submit-deposit, settlement-status |
 | `notifications.ts` | 3 | List, mark read, mark all read |
 | `adminDefaults.ts` | 4 | List defaulted offers, details, prepare distribution, distribute collateral |
 
@@ -78,25 +78,26 @@ All modules export typed object literals wrapping Axios calls.
 
 ---
 
-## Hooks (15 files)
+## Hooks (13 files)
 
 | Hook | Purpose |
 |------|---------|
 | `usePasskey` | Init SmartAccountKit, discoverable login, register wallet |
-| `usePasskeys` | List/add/remove passkey credentials (security settings) |
+| ~~`usePasskeys`~~ | **DELETED** — passkey management merged into `securityRoutes` page logic |
 | `useFreighter` | Connect Freighter, sign transactions |
 | `useLedger` | Connect Ledger, sign transactions |
 | `useInvestment` | Purchase flow orchestration |
 | `useInvestmentFees` | Fee schedule fetching |
 | `useOffer` | Single offer data + actions |
 | `useOffers` | Offer list with filtering |
-| `usePortfolio` | Investor portfolio data |
+| ~~`usePortfolio`~~ | **DELETED** (commit 7aad8c3) — replaced by direct API calls in Portfolio page |
 | `useWalletBalance` | Wallet balance polling |
 | `useCompany` | Company profile + state |
 | `useApprovalQueue` | Admin approval workflow state |
 | `useAuthRefresh` | Auto-refresh JWT on mount |
 | `usePendingInvestments` | Admin pending investments |
-| `useRecoverySigners` | Ed25519 Ledger recovery management |
+| ~~`useRecoverySigners`~~ | **DELETED** — recovery signer management moved inline |
+| `useAdminNavigation` ⭐ | Admin tab navigation state (not previously documented) |
 
 ---
 
@@ -121,7 +122,7 @@ All modules export typed object literals wrapping Axios calls.
 | `Wallet` | `/wallet` | USDC balance, deposit, withdraw |
 | `Settings` | `/settings` | Profile + passkey management |
 
-### Company Portal (12 pages)
+### Company Portal (13 pages)
 | Page | Route | Purpose |
 |------|-------|---------|
 | `Dashboard` | `/company/dashboard` | Company overview |
@@ -131,6 +132,7 @@ All modules export typed object literals wrapping Axios calls.
 | `OfferDetails` | `/company/offers/:id` | Offer detail + cap table |
 | `Tokens` | `/company/tokens` | Token lifecycle tracking |
 | `PayInvestors` | `/company/payments/:offerId` | Dividend / Interest / Bullet payment flow |
+| `PaymentHistory` | `/company/payment-history` | ⭐ Payment history log (added post-Mar 2026, previously undocumented) |
 | `Wallet` | `/company/wallet` | Company wallet management |
 | `Documents` | `/company/documents` | Legal document management |
 | `Reports` | `/company/reports` | Financial reports |
@@ -162,15 +164,17 @@ All modules export typed object literals wrapping Axios calls.
 |-----------|---------|
 | `MobileSidebar` | Responsive mobile navigation |
 | `NotificationBell` | Real-time notification indicator |
-| `FreighterConnect` | Admin Freighter wallet connection |
+| ~~`FreighterConnect`~~ | **DELETED** (commit 7aad8c3) — unused wrapper; admin pages use `useFreighter` hook directly |
 | `LedgerConnect` | Ledger hardware wallet pairing |
 | `TokenManagementModal` | Token lifecycle action modal |
 | `InvestmentDialog` | Soroban investment purchase flow |
-| `InfoTooltip`, `TransactionLink` | Utility components |
-| `badge`, `button`, `card`, `dialog`, `dropdown-menu`, `input`, `label`, `table`, `tabs` | shadcn/ui primitives |
+| `InfoTooltip`, `TransactionLink` | Utility components (`components/ui/`) |
+| `badge`, `button`, `card`, `dialog`, `input`, `label`, `table`, `tabs` | shadcn/ui primitives (`components/ui/`) |
+| ~~`dropdown-menu`~~ | **DELETED** (commit 7aad8c3) — scaffolded, never used; dep `@radix-ui/react-dropdown-menu` also removed |
 | `offer-card` | Marketplace offer display |
 | `qrcode` | QR code for deposit address |
-| `DepositDialog`, `DepositTracker` | USDC deposit flow |
+| `DepositDialog`, `DepositTracker` | USDC deposit flow (`components/wallet/`) |
+| `RelatedEntities` | Admin related entities panel (`components/admin/`) |
 
 ---
 
@@ -179,11 +183,11 @@ All modules export typed object literals wrapping Axios calls.
 | Issue | Severity | Location |
 |-------|----------|----------|
 | **Duplicate API client**: Axios (`api/client.ts`) + fetch (`lib/api.ts`) | 🟡 Tech debt | Both files |
-| `auth.ts` API module has only legacy login (dead code) | 🟡 Dead code | `api/auth.ts` |
+| ~~`auth.ts` API module~~ | — | **DELETED** (commit 696f300) |
 | Type mismatch: `snake_case` types vs `camelCase` backend responses | 🟡 Bug source | `types/index.ts` |
 | `RegisterInvestorForm` includes `password` field — legacy from pre-passkey | 🟡 Dead code | `types/index.ts` |
 | No global state management (no Redux, Zustand, etc.) — all state in hooks | 🟢 Acceptable for scope | Architecture |
-| Pusher requires separate configuration but not necessarily active | 🟢 Info | `lib/pusher.ts` |
+| ~~Pusher requires separate configuration~~ | — | **DELETED** (commit 7aad8c3) |
 
 ---
 
@@ -196,7 +200,7 @@ All modules export typed object literals wrapping Axios calls.
 - Response sanitizer strips error details in production
 - Swagger UI at `/api-docs`
 
-### `index.js` (260L) — Startup Orchestration
+### `index.js` (≈330L) — Startup Orchestration
 - Auto-verify issuer account flags (skip in multisig mode)
 - **5 cron jobs**:
   1. Payment reminder scheduler (PaymentReminderService)
@@ -204,8 +208,11 @@ All modules export typed object literals wrapping Axios calls.
   3. MultiSig expiry checker — midnight UTC daily
   4. Database backup — 3:00 AM UTC daily
   5. Soroban TTL maintenance (MaintenanceService.init)
-- **Conditional services** (ENABLE_SOROBAN_SALE):
+- **Conditional services** (ENABLE_SOROBAN_SALE=true):
   - SorobanEventIndexer (30s interval)
   - SorobanReconciler (5min interval)
+  - YieldPaymentReconciler (5min interval) ⭐ *added Apr 2026*
   - SorobanMetrics (10min flush to DB)
-- Graceful shutdown: stops payment monitor + Soroban services on SIGTERM/SIGINT
+- **Always-on service** (regardless of ENABLE_SOROBAN_SALE):
+  - WalletMonitorService (5min interval) ⭐ *added Apr 2026*
+- Graceful shutdown (SIGTERM/SIGINT): stops PaymentMonitor + WalletMonitorService + all Soroban services

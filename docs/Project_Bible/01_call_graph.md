@@ -46,7 +46,7 @@ POST /api/auth/passkey-login/discover
 ```
 POST /api/investments/purchase
   → investmentRoutes (inline handler)
-    → SorobanSaleService.buildTradeTx
+    → SorobanSaleService.buildTradeXdr
       → sorobanServer.getAccount
       → Contract.call('trade', buyer, amount)
       → sorobanServer.simulateTransaction
@@ -55,11 +55,13 @@ POST /api/investments/purchase
     → returns { xdr, investmentId }
 
 POST /api/investments/submit-tx
-  → investmentRoutes (inline handler)
-    → SorobanSaleService.submitSignedTx
-      → sorobanServer.sendTransaction
-      → poll getTransaction (30 attempts)
-    → prisma.investment.update (status: trade_submitted)
+  → investmentController.submitInvestmentTx
+    → verifyInvestmentContext (HMAC integrity check)
+    → idempotency guard (returns existing trade_submitted investment)
+    → race-condition guard (409 on duplicate pending)
+    → server-side offer/amount re-derivation
+    → PasskeyWalletService.submitWithSponsorship (channels fee sponsorship)
+    → prisma.investment.create (status: trade_submitted)
     → (async) SorobanEventIndexer picks up → distributed
 ```
 
@@ -229,3 +231,5 @@ PUT /api/platform-admins/investors/:id/approve
 | SorobanEventIndexer | Startup (30s interval) | sorobanServer.getEvents → prisma.investment.update |
 | SorobanReconciler | Startup (5min interval) | prisma queries → sorobanServer.getTransaction |
 | SorobanMetrics | Startup (10min flush) | prisma aggregations → prisma.sorobanMetric.upsert |
+| YieldPaymentReconciler ⭐ | Startup / ENABLE_SOROBAN_SALE=true (5min interval) | prisma.yieldPaymentJob (stuck `submitting`) → YieldDistributorService.resubmit |
+| WalletMonitorService ⭐ | Startup, always (5min interval) | stellarServer.loadAccount(opsWallet) → EmailService.sendAdminAlert |

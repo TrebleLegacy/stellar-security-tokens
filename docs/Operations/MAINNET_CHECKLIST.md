@@ -35,7 +35,9 @@ Create a production `.env` file with the following changes:
 - [x] **Docker Secrets** — key stored at `/root/.secrets/operations_key` (chmod 600), mounted to container at `/run/secrets/operations_key` (tmpfs, never on disk). `KeyManager.#readOperationsSecret()` reads it automatically.
 - [ ] **Fresh keypair** — generate a new mainnet Operations key at deploy time. Never reuse testnet keys.
 - [ ] **Minimal balance** — keep only ~50 XLM (enough for ~1000 sponsored txns). Refill as needed.
-- [ ] **Account monitoring** — set up alerts on [stellar.expert](https://stellar.expert) for unexpected transactions on the Operations account.
+- [ ] **Account monitoring** — set `ADMIN_ALERT_EMAIL` in `.env.production` to receive automated balance alerts from `WalletMonitorService` (emails when XLM drops below `OPERATIONS_WALLET_WARNING_XLM` default 20 XLM or `OPERATIONS_WALLET_CRITICAL_XLM` default 5 XLM). Without `ADMIN_ALERT_EMAIL`, the monitor logs only — no email alerts.
+- [ ] **Alert thresholds** — optionally tune `OPERATIONS_WALLET_WARNING_XLM` and `OPERATIONS_WALLET_CRITICAL_XLM` (defaults: 20 and 5 XLM).
+- [ ] **External monitoring** — additionally set up alerts on [stellar.expert](https://stellar.expert) for unexpected transactions on the Operations account.
 - [ ] **Key rotation plan** — document how to rotate the Operations key if compromised (replace `/root/.secrets/operations_key`, recreate backend container).
 
 ### Smart Contracts (Smart Account Kit)
@@ -45,6 +47,8 @@ Create a production `.env` file with the following changes:
 - [ ] **`WEBAUTHN_VERIFIER_ADDRESS`**: Look up OZ's pre-deployed WebAuthn verifier address on mainnet. *(Testnet address already set.)*
 - [ ] **`ED25519_VERIFIER_ADDRESS`**: Look up OZ's pre-deployed Ed25519 verifier address on mainnet. *(Testnet address already set.)*
 - [ ] **`SALE_WASM_HASH`**: Deploy token_sale v6 WASM to Mainnet and record hash. *(Testnet hash already set — must be replaced for mainnet.)*
+- [ ] **`SETTLEMENT_WASM_HASH`** ⚠️ NEW: Deploy MaturitySettlement WASM to Mainnet and record hash. **Critical for debt offers** — if unset, `POST /api/admin/offers/:id/deploy-settlement` returns 400 at call time (not at startup). Any debt offer that matures without this set will be stuck in `matured` state with no automated recovery path. *(No testnet default — must be set before any debt offer is approved.)*
+- [ ] **`YIELD_DISTRIBUTOR_CONTRACT_ID`**: Deployed YieldDistributor contract ID on mainnet.
 
 ### Soroban Asset Contracts (SAC IDs)
 > Currently set to testnet SAC IDs — must be updated for mainnet.

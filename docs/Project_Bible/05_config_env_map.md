@@ -1,7 +1,7 @@
 # 05 — Configuration & Environment Map
 
 > Every environment variable, its purpose, required/optional status, and default value
-> Generated: 2026-03-10
+> Generated: 2026-03-10 · Updated: 2026-04-29
 
 ---
 
@@ -62,6 +62,7 @@
 | `WEBAUTHN_VERIFIER_ADDRESS` | ✅ Prod | — | PasskeyWalletService (passkey signer) |
 | `ED25519_VERIFIER_ADDRESS` | ✅ Prod | — | PasskeyWalletService (Ledger signer) |
 | `SALE_WASM_HASH` | When Soroban enabled | — | SorobanSaleService (deploy) |
+| `SETTLEMENT_WASM_HASH` | ✅ Required for debt offers ⭐ | — | SorobanSettlementService. **Kill chain:** missing value does NOT fail at startup \u2014 silently absent. Fails only when admin calls `deploy-settlement` on a matured debt offer. Offer gets stuck in `matured` state with no automated recovery. Set **before** any debt offer is approved. |
 | `XLM_SAC_CONTRACT_ID` | ✅ | Testnet default | platformAdminRoutes (sponsor) |
 | `USDC_SAC_CONTRACT_ID` | ✅ | Testnet default | PasskeyWalletService (balances) |
 | `YIELD_DISTRIBUTOR_CONTRACT_ID` | When Soroban enabled | — | YieldDistributorService (batched yield payments) |
@@ -97,9 +98,40 @@
 | Variable | Required | Default | Used By |
 |----------|----------|---------|---------|
 | `PINATA_JWT` | ❌ | — | PinataService (IPFS uploads) |
+| `PINATA_GATEWAY` | ❌ | — | PinataService (IPFS gateway URL for content retrieval) |
 | `SENTRY_DSN` | ❌ | — | Backend Sentry |
 | `FRONTEND_URL` | ✅ Prod | `http://localhost` | CORS, email links |
 | `PORT` | ❌ | `3000` | Express server |
+| `TRUSTED_API_KEY` | ❌ | — | Internal service-to-service API key |
+| `ALLOW_TEST_MODE` | ❌ | — | Enables test-mode bypasses in non-production |
+
+### Operations Wallet Monitoring ⭐ NEW (Apr 2026)
+| Variable | Required | Default | Used By |
+|----------|----------|---------|---------|
+| `ADMIN_ALERT_EMAIL` | ✅ Prod | — | WalletMonitorService (alert destination). If unset, alerts log only — no email. |
+| `OPERATIONS_WALLET_WARNING_XLM` | ❌ | `20` | WalletMonitorService (warn threshold in XLM) |
+| `OPERATIONS_WALLET_CRITICAL_XLM` | ❌ | `5` | WalletMonitorService (critical threshold in XLM) |
+
+### Alert Routing (alertRouter.service.js)
+| Variable | Required | Default | Used By |
+|----------|----------|---------|---------|
+| `ALERT_SLACK_WEBHOOK_URL` | ❌ | — | AlertRouterService — Slack notifications for critical events |
+| `ALERT_PAGERDUTY_ROUTING_KEY` | ❌ | — | AlertRouterService — PagerDuty escalation |
+
+### Operational Tunables
+| Variable | Required | Default | Used By |
+|----------|----------|---------|---------|
+| `LOG_LEVEL` | ❌ | `info` | Logging verbosity |
+| `EMAIL_VERIFICATION_EXPIRY_HOURS` | ❌ | `24` | investorRoutes email-first registration code TTL |
+| `PAYMENT_MONITOR_RECONNECT_DELAY` | ❌ | `30000` | paymentMonitor.service.js Horizon reconnect base delay (ms) |
+| `USDC_PAYMENT_WINDOW_MINUTES` | ❌ | — | Deposit relay USDC deduplication window |
+| `TREASURY_SIGNERS` | ❌ | — | JSON array of authorized treasury signers for multisig mode |
+
+### Backup Service
+| Variable | Required | Default | Used By |
+|----------|----------|---------|---------|
+| `BACKUP_DIR` | ❌ | `/backups` | backup.service.js pg_dump destination |
+| `BACKUP_RETENTION_DAYS` | ❌ | `30` | backup.service.js retention policy |
 
 ### Frontend (Vite Build-Time)
 | Variable | Required | Default | Used By |
@@ -110,8 +142,19 @@
 | `VITE_STELLAR_NETWORK_PASSPHRASE` | ❌ | — | Frontend config |
 | `VITE_SENTRY_DSN` | ❌ | — | Frontend Sentry |
 | `VITE_APP_VERSION` | ❌ | `1.0.0` | Sentry release tag |
-| `VITE_PUSHER_KEY` | ❌ | — | Pusher client |
-| `VITE_PUSHER_CLUSTER` | ❌ | — | Pusher client |
+| ~~`VITE_PUSHER_KEY`~~ | — | — | **Deleted** (commit 7aad8c3) — frontend pusher-js client removed |
+| ~~`VITE_PUSHER_CLUSTER`~~ | — | — | **Deleted** (commit 7aad8c3) |
+
+### Backend Real-time (Pusher SDK — optional)
+Backend `config/pusher.js` exists and is used by `multiSigTransaction.service.js`. Graceful no-op if unconfigured.
+| Variable | Required | Default | Used By |
+|----------|----------|---------|---------| 
+| `PUSHER_APP_ID` | ❌ | — | `config/pusher.js` — Pusher server SDK |
+| `PUSHER_KEY` | ❌ | — | `config/pusher.js` — also used as "configured" guard |
+| `PUSHER_SECRET` | ❌ | — | `config/pusher.js` |
+| `PUSHER_CLUSTER` | ❌ | — | `config/pusher.js` |
+| `PUSHER_USE_TLS` | ❌ | `false` | `config/pusher.js` |
+
 
 ### Docker Secrets (Production)
 | Secret | Path | Used By |

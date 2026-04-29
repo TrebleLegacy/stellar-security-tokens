@@ -1,7 +1,7 @@
 # Deploy Layer — Full Deep Read
 
 > Read date: 2026-03-17
-> Files: `Dockerfile` (33L), `frontend/Dockerfile` (45L), `docker-compose.yml` (154L), `docker-compose.prod.yml` (268L), `docker-compose.dev.yml` (53L), `deploy/Caddyfile` (37L), `deploy/setup-vm.sh` (77L), `deploy/bootstrap-admin.sh` (45L), `frontend/nginx.conf` (38L), `.env.production.template` (92L)
+> Files: `Dockerfile` (33L), `frontend/Dockerfile` (45L), `docker-compose.yml` (154L), `docker-compose.prod.yml` (268L), `docker-compose.dev.yml` (53L), `deploy/Caddyfile` (48L), `deploy/setup-vm.sh` (77L), `deploy/bootstrap-admin.sh` (45L), `frontend/nginx.conf` (38L), `.env.production.template` (92L)
 
 ---
 
@@ -37,6 +37,7 @@ Internal:  backend → postgres:5432 (Prisma ORM)
 | `app.radox.net` | frontend:80 | `/api/*` → backend:3000 | React SPA (investor/company/admin portals) |
 | `api.radox.net` | backend:3000 | — | API + Swagger + future mobile |
 | `www.radox.net` | 301 → `radox.net` | — | WWW redirect |
+| `dev.radox.net` ⭐ | `/.well-known/*` → backend, else redirect to `radox.net` | — | SEP-1 stellar.toml for dev issuer account |
 
 ## Security (Production)
 

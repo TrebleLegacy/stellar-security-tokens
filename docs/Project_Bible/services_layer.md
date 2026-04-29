@@ -1,12 +1,12 @@
 # Services Layer — Complete Inventory
 
-> 28 files · 12,734 lines · Read 2026-03-10
+> 31 files · ~14,900 lines · Initial read 2026-03-10 · Line counts updated 2026-04-29
 
 ---
 
 ## 1. Stellar Core
 
-### stellar.service.js (2,011L)
+### stellar.service.js (2,101L)
 **Role:** Full Stellar backbone — token issue, trust, SAC deploy, distribution, treasury ops
 
 | Method | Purpose |
@@ -29,25 +29,39 @@
 
 ---
 
-### sorobanSale.service.js (632L)
-**Role:** Soroban sale contract lifecycle wrapper
+### sorobanSale.service.js (921L)
+**Role:** Soroban sale contract lifecycle wrapper — full XDR builder suite
 
 | Method | Purpose |
 |---|---|
-| `deploySaleContract` | Upload WASM + instantiate sale contract via `initDeploy()` |
-| `buildCreateSaleXdr` | Build `create()` call XDR with sell/buy config |
-| `trade` | Execute `trade(buyer, amount)` — atomic USDC→token swap |
-| `getVersion` / `getState` / `getBalance` | Read-only contract queries |
-| `buildSetActiveXdr` | Pause/resume contract |
-| `buildSacTransferXdr` | SAC `transfer()` for depositing tokens into contract |
-| `buildSetAuthorizedXdr` | SAC `set_authorized()` for contract authorization |
+| `buildDeployXdr` | Upload WASM + instantiate sale contract (XDR only, no submit) |
+| `contractExistsOnChain` | Check if contractId exists on RPC (pre-deploy guard) |
+| `buildCreateSaleXdr` | Build `create()` call XDR with sell/buy config, deadlines, limits |
+| `buildTradeXdr` | Build `trade(buyer, amount)` XDR — unsigned, returned to frontend for passkey signing |
+| `getOffer` | Read-only: full contract state |
+| `getBalance` | Read-only: token balance in contract |
+| `getBuyerSpent` | Read-only: amount buyer has spent |
+| `isFrozen` | Read-only: freeze status of buyer |
+| `getVersion` | Read-only: contract version |
+| `buildSetActiveXdr` | Build `set_active()` — pause/resume contract |
+| `buildEmergencyDrainXdr` | Build `emergency_drain()` — full drain to admin |
+| `buildFreezeBuyerXdr` | Build `freeze_buyer()` / unfreeze |
+| `buildWithdrawXdr` | Build `withdraw()` — partial token withdrawal |
+| `buildProposeAdminXdr` | Build `propose_admin()` — 2-step admin transfer step 1 |
+| `buildAcceptAdminXdr` | Build `accept_admin()` — 2-step admin transfer step 2 |
+| `buildUpdatePriceXdr` | Build `updt_price()` |
+| `buildUpgradeXdr` | Build `upgrade()` with new WASM hash |
+| `buildSacAuthorizeXdr` | Build SAC `set_authorized()` for contract authorization |
+| `authorizeBuyerOnSac` | Convenience: authorize buyer on SAC (inline submit) |
+| `buildSacTransferXdr` | Build SAC `transfer()` for depositing tokens into contract |
+| `buildIssuerThresholdSetupXdr` | Build classic setOptions for issuer multisig threshold config |
 
 **Calls:** `StellarService`, `KeyManager`, Soroban RPC
 **Called by:** `offer.service.js`, `multiSigTransaction.service.js` (processEffects)
 
 ---
 
-### transactionManager.service.js (87L)
+### transactionManager.service.js (88L)
 **Role:** Unified routing — direct sign vs multisig queue
 
 ```
@@ -61,7 +75,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### multiSigTransaction.service.js (1,045L)
+### multiSigTransaction.service.js (1,205L)
 **Role:** Full multisig lifecycle — create → approve → submit → side-effects
 
 | Method | Purpose |
@@ -91,7 +105,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 2. Smart Wallet (Passkeys)
 
-### passkeyWallet.service.js (~950L)
+### passkeyWallet.service.js (1,185L)
 **Role:** Complete smart wallet lifecycle via `smart-account-kit` + OpenZeppelin Stellar Channels
 
 | Method | Purpose |
@@ -113,7 +127,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### webauthn.service.js (391L)
+### webauthn.service.js (390L)
 **Role:** WebAuthn CRUD across 3 user types
 
 | Method | Purpose |
@@ -127,29 +141,23 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 3. Payments & Dividends
 
-### payment.service.js (1,741L)
-**Role:** Complete dividend/interest engine
+### payment.service.js (513L)
+**Role:** Maturity/bullet cron engine (heavily pruned Apr 2026 — periodic dividend methods moved to companyPayment.service.js; cron schedule methods removed)
 
 | Method | Purpose |
 |---|---|
-| `getBalanceSource` | Locked=DB, Unlocked=on-chain |
+| `getBalanceSource` | Locked=DB, Unlocked=on-chain routing decision |
 | `getOnChainTokenBalance` | Query SAC balance via Soroban RPC |
-| `getInvestorsWithBalances` | DB-based investor+balance query |
-| `getInvestorsWithBalancesByOffer` | Offer-aware with locked/unlocked routing |
-| `calculateMonthlyInterest` | `balance × (annualRate / 12 / 100)` |
-| `createBatchUSDCPayment` | Batch USDC from distributor, 95 ops/tx, routes via TransactionManager |
-| `processMonthlyInterestPayments` | Full flow: fetch → calculate → fee deduct → batch pay → record → email |
-| `processBulletPayments` | MVP: notification-only on maturity |
-| `processAllScheduledPayments` | Daily cron: bullet maturity + periodic notifications |
-| `scheduleMonthlyPayments` | Cron: `0 0 1 * *` |
-| `scheduleQuarterlyPayments` | Cron: `0 0 1 1,4,7,10 *` |
-| `scheduleSemiAnnualPayments` | Cron: `0 0 1 1,7 *` |
+| `getInvestorsWithBalancesByOffer` | Offer-aware investor+balance query (locked/unlocked routing) |
+| `processBulletPayments` | Flip matured offers to `status: 'matured'`, notify company users |
+| `getExpiredBulletOffers` | List offers past maturityDate |
+| `processAllScheduledPayments` | Daily cron entry: calls processBulletPayments |
 
-**Fee handling:** `ConfigService.getFloat('DIVIDEND_FEE_PERCENT')` → `ConfigService.logFee({ category: 'DIVIDEND_FEE' })`
+**Removed (migrated or deleted):** `getInvestorsWithBalances`, `calculateMonthlyInterest`, `createBatchUSDCPayment`, `processMonthlyInterestPayments`, `scheduleMonthlyPayments`, `scheduleQuarterlyPayments`, `scheduleSemiAnnualPayments` — all periodic-yield logic lives in `companyPayment.service.js` + `YieldDistributorService`.
 
 ---
 
-### companyPayment.service.js (~1050L)
+### companyPayment.service.js (1,314L)
 **Role:** Company-facing payment calculations, execution, and bullet maturity batch flow
 
 | Method | Purpose |
@@ -183,7 +191,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### yieldDistributor.service.js (~410L)
+### yieldDistributor.service.js (485L)
 **Role:** Multi-batch Soroban yield distribution via YieldDistributor contract
 
 | Method | Purpose |
@@ -209,7 +217,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### paymentMonitor.service.js (351L)
+### paymentMonitor.service.js (350L)
 **Role:** Real-time Horizon payment stream (singleton)
 
 - Watches treasury account for incoming payments
@@ -220,7 +228,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### depositRelay.service.js (215L)
+### depositRelay.service.js (214L)
 **Role:** Off-chain deposit → smart wallet forwarding
 
 | Method | Purpose |
@@ -233,7 +241,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 4. Collateral & Default
 
-### collateralDistribution.service.js (353L)
+### collateralDistribution.service.js (352L)
 **Role:** Admin-triggered collateral distribution on company default
 
 | Method | Purpose |
@@ -247,7 +255,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 5. Offer Management
 
-### offer.service.js (540L)
+### offer.service.js (574L)
 **Role:** Offer CRUD + Soroban contract deployment pipeline
 
 | Method | Purpose |
@@ -322,6 +330,66 @@ submit(opts) → KeyManager mode === 'multisig'
 - Checks SACs, smart wallets, sale contracts, settlement contracts, YieldDistributor
 - Extends if TTL < 50,000 ledgers (~3.5 days)
 
+### walletMonitor.service.js (6,048B) ⭐ NEW (Apr 2026)
+**Role:** Proactive Operations hot wallet balance monitor
+
+| Method | Purpose |
+|---|---|
+| `start()` | Singleton guard: 10s startup delay → 5-min polling interval |
+| `checkOperationsBalance()` | Loads Horizon account → XLM balance → threshold comparison |
+| `_sendAlert(level, xlm)` | Non-blocking email to `ADMIN_ALERT_EMAIL` via `EmailService.sendAdminAlert()` |
+
+**Thresholds:**
+- `OPERATIONS_WALLET_WARNING_XLM` (default 20 XLM) → warn email
+- `OPERATIONS_WALLET_CRITICAL_XLM` (default 5 XLM) → critical email
+
+**Debounce logic:** Re-alerts only when severity *worsens* (ok→warn→critical). Resets on recovery above warn threshold. HTTP 404 on account = instant critical.
+
+**Calls:** `stellarServer.loadAccount()` (Horizon — NOT Soroban RPC), `KeyManager`, `EmailService`
+**Registered in:** `src/index.js:289` — `WalletMonitorService.start()`
+
+---
+
+## 7b. Soroban Maturity Settlement
+
+### sorobanSettlement.service.js (24,335B) ⭐ NEW (Apr 2026)
+**Role:** Backend wrapper for the MaturitySettlement Soroban contract
+
+| Method | Purpose |
+|---|---|
+| `getSettlementWasmHash()` | Returns `SETTLEMENT_WASM_HASH` env var (throws if missing) |
+| `deployForOffer(offerId)` | Deploy MaturitySettlement contract → stores `contractId` on offer |
+| `buildInitializeXdr(offerId)` | Build `initialize()` call XDR (after deploy TX confirmed) |
+| `buildDepositXdr(offerId, amount)` | Build company USDC→contract deposit XDR |
+| `executeFullSettlement(offerId)` | Multi-batch `settle_batch()` → pays all investors + burns tokens |
+| `buildWithdrawXdr(offerId)` | Admin leftover USDC withdrawal |
+| `getContractBalance(offerId)` | Read-only: USDC held in contract |
+| `extendTtl(offerId)` | Bump contract TTL |
+
+**Contract Error Codes:** AlreadyInitialized(1), NotInitialized(2), InvalidAmount(3), Overflow(4), EmptyBatch(5), AlreadySettled(6), BatchTooLarge(7), NoDeposit(8), DuplicateInvestor(9), PhantomInvestor(10), FeeTooHigh(11)
+
+**Lifecycle:**
+1. Admin deploys + `initialize()` at offer approval (debt offers with maturityDate only)
+2. On maturity: company submits USDC deposit → contract holds funds
+3. Admin triggers `executeFullSettlement()` → atomic USDC distribution per token balance + token burn
+4. Multi-batch (max 30 investors/batch)
+5. Admin withdraws leftover USDC if any
+
+**Admin endpoints:**
+- `POST /api/admin/offers/:id/deploy-settlement` — deploy contract
+- `POST /api/admin/offers/:id/init-settlement` — initialize contract (after deploy TX confirmed)
+- `POST /api/admin/offers/:id/settlement-deposit` — admin builds deposit XDR (alternative to company-side flow)
+- `POST /api/admin/offers/:id/settle` — execute multi-batch settlement (pays investors + burns tokens)
+- `GET /api/admin/offers/:id/settlement-status` — contract balance + state
+
+**Company endpoints:**
+- `POST /api/company/payments/:offerId/prepare-deposit` — build deposit XDR for company signature
+- `POST /api/company/payments/:offerId/submit-deposit` — submit signed deposit (notifies admins)
+- `GET /api/company/payments/:offerId/settlement-status` — check contract balance
+
+**Calls:** `StellarService`, `KeyManager`, Soroban RPC, `prisma`
+**Called by:** `offerRoutes.js`, `companyPaymentRoutes.js`, `contractController.js`
+
 ---
 
 ## 8. TOML & IPFS
@@ -366,22 +434,25 @@ submit(opts) → KeyManager mode === 'multisig'
 | Every 30s | `SorobanEventIndexer` | Poll contract events |
 | Every 5m | `SorobanReconciler` | Fix orphaned investments |
 | Every 5m | `YieldPaymentReconciler` | Fix stuck yield payment jobs |
+| Every 5m ⭐ | `WalletMonitorService` | Operations wallet XLM balance check + alert |
 | Every 10m | `SorobanMetrics` | Flush latency stats |
-| Daily 01:00 | `PaymentService` | Bullet maturity check + periodic notifications |
-| Daily 03:00 | `MaintenanceService` | TTL extension sweep (incl. YieldDistributor) |
-| Daily 09:00 | `PaymentReminderService` | Payment reminder emails |
-| 1st of month | `PaymentService` | Monthly interest payments |
-| 1st of Jan/Apr/Jul/Oct | `PaymentService` | Quarterly payments |
-| 1st of Jan/Jul | `PaymentService` | Semi-annual payments |
+| Daily 00:00 UTC | `MultiSigTransactionService` | Expire old governance proposals (`expireOldTransactions`) ⭐ UNDOCUMENTED until this audit |
+| Daily 00:30 UTC | `PaymentService` + `CompanyPaymentService` | Bullet maturity check (`processAllScheduledPayments`) + overdue payment check (`checkOverduePayments`) |
+| Daily 03:00 UTC | `MaintenanceService` | TTL extension sweep (incl. YieldDistributor + settlement contracts) |
+| Daily 03:00 UTC | `BackupService` | Full PostgreSQL dump (`fullDatabaseDump`) |
+| Daily 09:00 UTC | `PaymentReminderService` | Payment reminder emails |
+| ~~1st of month~~ | ~~`PaymentService`~~ | ~~Monthly interest payments~~ — **REMOVED** (methods deleted from payment.service.js). Monthly interest payments are **company-initiated** via `companyPaymentRoutes /payment-transaction` + frontend PayInvestors page |
+| ~~1st of Jan/Apr/Jul/Oct~~ | ~~`PaymentService`~~ | ~~Quarterly payments~~ — **REMOVED** (same reason) |
+| ~~1st of Jan/Jul~~ | ~~`PaymentService`~~ | ~~Semi-annual payments~~ — **REMOVED** (same reason) |
 
 ---
 
 ## Key Findings
 
 ### Dead Code
-- `alert.service.js` → `distributionQueueFailed()` references removed queue
-- `payment.service.js` → `getOffersByPaymentTypeAndFrequency()` uses `snake_case` field names (`payment_type`, `payment_frequency`) but Prisma schema uses `camelCase` — **will fail at runtime**
-- `payment.service.js` → `processPeriodicPayments()` constructs empty investor objects (no wallet/email) — upstream `createBatchUSDCPayment` will skip them
+- ~~`alert.service.js` → `distributionQueueFailed()`~~ — **RESOLVED**: method was already removed (confirmed Round 6)
+- ~~`payment.service.js` → `getOffersByPaymentTypeAndFrequency()`~~ — **REMOVED** with entire pruning of payment.service.js to 513L
+- ~~`payment.service.js` → `processPeriodicPayments()`~~ — **REMOVED** with pruning
 
 ### Security Notes
 - `submitWithdrawalTx` validates contract allowlist before sponsoring

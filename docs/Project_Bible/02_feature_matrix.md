@@ -1,7 +1,7 @@
 # 02 — Feature Matrix
 
 > Complete feature inventory with implementation status
-> Generated: 2026-03-10
+> Generated: 2026-03-10 · Updated: 2026-04-29
 
 ---
 
@@ -22,11 +22,11 @@
 | Discoverable passkey login | ✅ authRoutes | ✅ Login + PasskeyClient | — | ✅ |
 | Email-first registration flow | ✅ 3-step flow | ✅ Register page | — | ✅ |
 | JWT + refresh tokens | ✅ httpOnly cookies | ✅ client.ts auto-refresh | — | ✅ |
-| Freighter login (admin) | ✅ platformAdminRoutes | ✅ FreighterConnect | — | ✅ |
+| Freighter login (admin) | ✅ platformAdminRoutes | ✅ `useFreighter` hook (~~FreighterConnect~~ component **deleted** — pages use hook directly) | — | ✅ |
 | Admin passkey login | ✅ platformAdminRoutes | ✅ AdminLogin | — | ✅ |
 | Multi-device passkeys | 🔴 Routes removed | 🔴 Hooks removed | — | 🔴 REMOVED — backend used wrong auth key, needs frontend-initiated flow |
 | Ledger recovery signers | 🔴 Routes removed | 🔴 LedgerConnect orphaned | — | 🔴 REMOVED — same auth issue |
-| Legacy password login | ❌ Dead code in auth.ts | ❌ Dead code in authApi | — | Dead code |
+| Legacy password login | ❌ ~~Dead code in auth.ts~~ | ❌ ~~Dead code in authApi~~ | — | `auth.ts` **DELETED** (commit 696f300); `api/auth.ts` also deleted |
 
 ## Investor Portal
 
@@ -55,7 +55,7 @@
 | Cap table (investors list) | ✅ offerRoutes /investors | ✅ OfferDetails page | ✅ |
 | Dividend / Interest payments | ✅ companyPaymentRoutes | ✅ PayInvestors page | ✅ |
 | Batched yield (Soroban YieldDistributor) | ✅ YieldDistributorService (multi-batch, retry, reconciler) | ✅ PayInvestors (seq. signing, partial failure UI) | ✅ |
-| Bullet (maturity) payments | ✅ CompanyPaymentService | ✅ PayInvestors page | ✅ |
+| Bullet (maturity) payments — Soroban Settlement ⭐ | ✅ SorobanSettlementService + companyPaymentRoutes (prepare-deposit, submit-deposit, settlement-status) | ✅ PayInvestors maturity flow | ✅ |
 | Payment history | ✅ companyPaymentRoutes /history | ✅ PayInvestors page | ✅ |
 | Penalties tracking | ✅ companyPaymentRoutes /penalties | ✅ PayInvestors page | ✅ |
 | Company wallet | ✅ companytRoutes /wallet-status | ✅ Wallet page | ✅ |
@@ -120,15 +120,16 @@
 | Health + readiness probes | ✅ | /health + /ready (DB + Redis) |
 | Rate limiting (4 tiers) | ✅ | auth=5, api=30, strict=10, global=100 |
 | Graceful shutdown | ✅ | SIGTERM/SIGINT handlers |
+| Operations Wallet Monitor ⭐ | ✅ | WalletMonitorService — 5-min Horizon poll, warn/critical email alerts via ADMIN_ALERT_EMAIL |
 
 ## 🔴 Critical Gaps
 
 | Gap | Impact | Where |
 |-----|--------|-------|
-| **In-memory WebAuthn challenges** | Won't scale horizontally, lost on restart | authRoutes, platformAdminRoutes |
+| ~~**In-memory WebAuthn challenges**~~ | ~~Won't scale horizontally, lost on restart~~ — **RESOLVED**: all stores migrated to Redis with TTL (webauthnController, authRoutes, platformAdminRoutes) | ~~authRoutes, platformAdminRoutes~~ |
 | **Duplicate API clients** | Maintenance burden, potential behavior divergence | `api/client.ts` (Axios) + `lib/api.ts` (fetch) |
 | **Type mismatch** | Runtime bugs from snake_case types vs camelCase responses | `types/index.ts` |
-| **platformAdminRoutes mega-file** | 1,877L with inline handlers, duplicated code | routes layer |
+| **platformAdminRoutes mega-file** | 2,067L with inline handlers, duplicated code | routes layer |
 
 > **Note (2026-04-28):** The "Fee collection not on-chain" gap listed in earlier versions of this
 > document has been **resolved**. Platform fees are now collected on-chain through two channels:

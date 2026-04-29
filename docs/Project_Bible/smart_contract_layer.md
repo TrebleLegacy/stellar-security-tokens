@@ -206,3 +206,90 @@ Batched yield distribution contract. Company calls `distribute()` to pay up to 3
 
 ## Test Coverage (35 snapshots)
 Happy path (single + multi-recipient), all error codes, admin operations (pause/resume/set_admin), upgrade flow, TTL extension, batch size boundary (30 = ok, 31 = error), duplicate recipient detection, self-transfer prevention, fee cap (20%), empty batch rejection.
+
+---
+
+# MaturitySettlement Contract
+
+> **Soroban (Rust, `#[no_std]`)** | Added: 2026-04-29
+> Wrapper service: `services/sorobanSettlement.service.js` (579L)
+> WASM hash: configured via `SETTLEMENT_WASM_HASH` env var (no testnet default)
+
+## Overview
+
+Handles bullet-maturity debt payments. On maturity, the company deposits USDC into the contract; the admin then calls `settle_batch()` which atomically pays each investor their principal + accrued interest and **burns all their tokens**. Multi-batch: up to 30 investors per TX.
+
+**Stateful with deposits**: unlike YieldDistributor, this contract holds USDC between deploy and settlement.
+
+## Lifecycle (5 steps)
+
+```
+1. Admin:   deploy_settlement   → contract deployed, contractId saved to DB
+2. Admin:   initialize()        → sets token SAC, USDC SAC, treasury, max_fee_bps
+3. Company: deposit USDC        → company signs TX moving USDC into contract
+4. Admin:   settle_batch() × N  → contract pays investors + burns tokens (≤30/batch)
+5. Admin:   withdraw()          → recover any leftover USDC after all batches
+```
+
+> ⚠️ `initialize()` must be called AFTER the deploy TX is **confirmed on-chain**. The simulate step requires the contract to exist.
+
+## Public Functions (9)
+
+| Function | Auth | Risk | Purpose |
+|----------|------|------|---------|
+| `initialize` | Deployer (issuer key) | Setup | Set token SAC, USDC SAC, treasury, max_fee_bps (once) |
+| `deposit` | Company wallet | Core | Transfer USDC from company into contract |
+| `settle_batch` | Admin (issuer key) | Critical | Pay ≤30 investors + burn ALL their tokens atomically |
+| `withdraw` | Admin | High | Recover leftover USDC after settlement completes |
+| `get_balance` | Public | Read | Current USDC balance held by contract |
+| `get_offer_token` | Public | Read | Token SAC address |
+| `extend_ttl` | Public | Safe | Extend contract TTL |
+| `version` | Public | Read | Contract version |
+| `emergency_withdraw` | Admin | Critical | Emergency drain (all USDC out, no burns) |
+
+## Error Codes (8)
+
+| Code | Name | Trigger |
+|------|------|---------|
+| 1 | AlreadyInitialized | `initialize()` called twice |
+| 2 | NotInitialized | `settle_batch()` before `initialize()` |
+| 3 | InsufficientDeposit | `settle_batch()` before `deposit()` |
+| 5 | EmptyBatch | Investor array empty |
+| 6 | AlreadySettled | Investor already paid in previous batch |
+| 7 | BatchTooLarge | > 30 investors per batch |
+| 8 | NoDeposit | No USDC in contract when `settle_batch()` called |
+| 10 | PhantomInvestor | Investor address not in offer's investor list |
+
+## Storage Layout
+
+| Key | Storage Type | Purpose |
+|-----|-------------|---------|
+| `DataKey::Config` | Instance | token_sac, usdc_sac, treasury, max_fee_bps |
+| `DataKey::Settled(addr)` | Persistent | Per-investor settled flag (prevents double-pay) |
+
+## Backend Integration
+
+### Service: `SorobanSettlementService` (10 static methods)
+
+| Method | Returns | Purpose |
+|--------|---------|---------|
+| `deployForOffer(offerId)` | `{ contractId, deployXdr }` | Build deploy TX, save contractId to DB |
+| `buildInitializeXdr(offerId, maxFeeBps)` | `{ xdr }` | Build initialize TX |
+| `buildDepositXdr(offerId, amount)` | `{ xdr }` | Company-side deposit TX |
+| `buildSettleBatchXdr(offerId, investors, totalFee)` | `{ xdr }` | Single batch TX |
+| `executeFullSettlement(offerId)` | `{ batches[], totalInvestors }` | Splits all investors into batches of 30, returns all XDRs |
+| `buildWithdrawXdr(offerId, token, amount, dest)` | `{ xdr }` | Post-settlement leftover recovery |
+| `getContractBalance(offerId)` | `{ balance }` | Read USDC balance |
+| `getSettlementWasmHash()` | `string` | Read `SETTLEMENT_WASM_HASH` env (throws if unset) |
+| `parseContractError(error)` | `{ code, message }` | Map Soroban error codes to human messages |
+| `_precomputeContractId(issuer, salt)` | `string` | Deterministic contract address before deploy TX confirms |
+
+### offerType constraint
+Only available for `offerType: 'collateral'` (Prisma enum value for debt/fixed-income offers) with a `maturityDate` set. Equity offers (`offerType: 'sale'`) cannot use MaturitySettlement.
+
+### Env vars
+- `SETTLEMENT_WASM_HASH` — **required** before any debt offer is approved. Lazy validation — missing value does NOT fail at startup. *(See `05_config_env_map.md` for kill chain.)*
+- `USDC_SAC_CONTRACT_ID` — shared with YieldDistributor
+
+### Cron integration
+`payment.service.js:processBulletPayments()` (daily 01:00) marks offers as `status: 'matured'` and notifies company users. The actual on-chain settlement is triggered manually by admin via the settlement endpoints — it does NOT run automatically on maturity date.

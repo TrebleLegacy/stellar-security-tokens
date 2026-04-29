@@ -1,6 +1,6 @@
 # Routes Layer — Full Deep Read
 
-> **15 files · 5,828 lines** | Read date: 2026-03-10
+> **15 files · 6,888 lines** | Read date: 2026-03-10 | Line counts updated 2026-04-29
 > Path: `backend/src/routes/`
 
 ---
@@ -9,21 +9,21 @@
 
 | # | File | Lines | Mounts At | Auth Used |
 |---|------|-------|-----------|-----------|
-| 1 | `investorRoutes.js` | 521 | `/api/investors` | public (reg), `authenticateToken`, `requireInvestor`, `requireOwnData` |
+| 1 | `investorRoutes.js` | 463 | `/api/investors` | public (reg), `authenticateToken`, `requireInvestor`, `requireOwnData` |
 | 2 | `investmentRoutes.js` | 114 | `/api/investments` | `authenticateToken` |
-| 3 | `offerRoutes.js` | ~530 | mixed: `/api/companies/offers`, `/api/offers`, `/api/admin/offers` | `requireCompanyUser`, `requirePlatformAdmin`, `optionalAuth`, `requireRole` |
+| 3 | `offerRoutes.js` | 794 | mixed: `/api/companies/offers`, `/api/offers`, `/api/admin/offers` | `requireCompanyUser`, `requirePlatformAdmin`, `optionalAuth`, `requireRole` |
 | 4 | `companyRoutes.js` | 414 | `/api/companies` | public (reg), `requireCompanyUser`, `requirePlatformAdmin` |
 | 5 | `companyUserRoutes.js` | 257 | `/api/company-users` | public (reg), `requireCompanyUser` |
 | 6 | `authRoutes.js` | 367 | `/api/auth` | public (login), `authenticateToken` (logout) |
-| 7 | `platformAdminRoutes.js` | 1,877 | `/api/platform-admins` | public (login), `authenticateToken` + `requirePlatformAdmin`, `requireAdminRole` |
+| 7 | `platformAdminRoutes.js` | 2,067 | `/api/platform-admins` | public (login), `authenticateToken` + `requirePlatformAdmin`, `requireAdminRole` |
 | 8 | `tokenRoutes.js` | 283 | `/api/tokens` | `requirePlatformAdmin`, `optionalAuth` (list), public (detail) |
-| 9 | `walletRoutes.js` | 200 | `/api/wallets` | public (`submit-tx`), `authenticateToken` + `requirePlatformAdmin` |
+| 9 | `walletRoutes.js` | 272 | `/api/wallets` | public (`submit-tx`), `authenticateToken` + `requirePlatformAdmin` |
 | 10 | `webauthnRoutes.js` | 193 | `/api/webauthn` | public (all) |
 | 11 | `contractRoutes.js` | 208 | `/api/admin/contracts` | `requirePlatformAdmin` (global `router.use`) |
 | 12 | `notificationRoutes.js` | 26 | `/api/notifications` | `authenticateToken` (global `router.use`) |
-| 13 | `securityRoutes.js` | 519 | `/api/security` | `authenticateToken`, public (`passkey-config`) |
-| 14 | `adminTransactionRoutes.js` | 593 | `/api/admin/transactions` | `authenticatePlatformAdmin` |
-| 15 | `companyPaymentRoutes.js` | ~260 | `/api/company/payments` | `authenticateToken` + `requireCompanyUser` |
+| 13 | `securityRoutes.js` | 222 | `/api/security` | `authenticateToken`, public (`passkey-config`) |
+| 14 | `adminTransactionRoutes.js` | 634 | `/api/admin/transactions` | `authenticatePlatformAdmin` |
+| 15 | `companyPaymentRoutes.js` | 561 | `/api/company/payments` | `authenticateToken` + `requireCompanyUser` |
 
 ---
 
@@ -107,7 +107,14 @@
 | POST | `/api/companies/:companyId/withdraw/propose` | Withdrawal proposal |
 | POST | `/api/companies/withdraw/submit` | Submit withdrawal |
 | GET/POST | `/api/company-users/*` | Company user CRUD, wallet, withdraw |
-| GET/POST | `/api/company/payments/*` | Company payment lifecycle |
+| GET | `/api/company/payments/:offerId/history` | Payment history |
+| GET | `/api/company/payments/:offerId/upcoming` | Upcoming payments |
+| POST | `/api/company/payments/:offerId/prepare` | Prepare payment TX (returns XDR for signing) |
+| GET | `/api/company/payments/:offerId/yield-status` | Yield job status (for UI progress tracking) |
+| POST | `/api/company/payments/:offerId/submit` | Submit signed payment XDR — **polymorphic:** single `signedXDR` → classic or Soroban path; `signedXDRs[]` → multi-batch YieldDistributor |
+| POST | `/api/company/payments/:offerId/prepare-deposit` ⭐ | Build maturity deposit XDR (SorobanSettlement) |
+| POST | `/api/company/payments/:offerId/submit-deposit` ⭐ | Submit signed deposit TX (notifies admins) |
+| GET | `/api/company/payments/:offerId/settlement-status` ⭐ | Check settlement contract balance |
 
 ### Platform Admin (requirePlatformAdmin)
 
@@ -149,6 +156,11 @@
 | *Contracts* | `/api/admin/contracts/*` | Full Soroban sale admin |
 | *Admin TX* | `/api/admin/transactions/*` | Multisig lifecycle |
 | POST | `/api/admin/offers/:id/reconcile-chain` | On-chain → DB reconciliation (maturity) |
+| POST | `/api/admin/offers/:id/deploy-settlement` ⭐ | Deploy MaturitySettlement contract for debt offer |
+| POST | `/api/admin/offers/:id/init-settlement` ⭐ | Initialize deployed settlement contract |
+| POST | `/api/admin/offers/:id/settlement-deposit` ⭐ | Admin builds deposit XDR (alternative to company-side) |
+| POST | `/api/admin/offers/:id/settle` ⭐ | Execute multi-batch settlement (pays investors, burns tokens) |
+| GET | `/api/admin/offers/:id/settlement-status` ⭐ | Settlement contract balance + state |
 
 ### Security (authenticateToken)
 

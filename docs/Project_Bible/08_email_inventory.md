@@ -42,6 +42,8 @@ From: `Radox <noreply@mail.radox.net>`
 |-------|---------|-----------|---------|----------|
 | **New Company Pending** | Company registation complete | All platform admins | `EmailService.sendNewCompanyNotification` | Company name, review link |
 | **New Offer Pending** | Offer submitted for review | All platform admins | `EmailService.sendNewOfferNotification` | Offer details, review link |
+| **Wallet Low Balance** ⭐ | WalletMonitorService (5min poll, on threshold cross) | `ADMIN_ALERT_EMAIL` env var | `EmailService.sendAdminAlert` | Level (warning/critical), XLM balance, link to /admin/wallets |
+| **Settlement Deposit Received** ⭐ | Company submits deposit for MaturitySettlement | All platform admins | `EmailService.sendAdminAlert` (or direct notify) | Offer ID, deposit amount — triggers admin to call settle_batch |
 
 ---
 

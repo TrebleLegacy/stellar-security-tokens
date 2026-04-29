@@ -20,7 +20,7 @@
 ### Weaknesses 🔴
 | Issue | Risk | Location | Recommendation |
 |-------|------|----------|---------------|
-| **In-memory WebAuthn challenges** | Lost on restart, won't scale horizontally | `authRoutes`, `platformAdminRoutes` | Move to Redis with TTL |
+| ~~**In-memory WebAuthn challenges**~~ | ~~Lost on restart, won't scale horizontally~~ **RESOLVED**: `webauthnController`, `authRoutes`, and `platformAdminRoutes` all use `storeChallenge()`/`getChallenge()` from `redis.js` with TTL. Challenge persistence and horizontal scale are no longer concerns. | ~~`authRoutes`, `platformAdminRoutes`~~ | No action required |
 | **In-memory rate limiting** | Per-instance only, reset on restart | `platformAdminRoutes` (Freighter) | Use Redis-backed rate limiter |
 | **JWT_SECRET defaults to string** | `change_this_in_production` is insecure if unchanged | `docker-compose.yml` | Use `?` guard in prod compose |
 | `approveCompanyDebug` endpoint | Exists behind `NODE_ENV` guard — risky if misconfigured | `companyRoutes.js` | Remove entirely or add API key |
@@ -63,7 +63,7 @@
 ### Weaknesses 🔴
 | Issue | Risk | Location | Recommendation |
 |-------|------|----------|---------------|
-| **No fee collection on-chain** | Platform loses revenue | `FeeService` → only DB log | Implement fee split in `trade()` or post-trade |
+| **No fee collection on-chain** | ~~Platform loses revenue~~ **RESOLVED Apr 2026**: (1) TokenSale v6 `fixed_fee` is additive — platform fee is split in `trade()` to treasury on-chain; (2) YieldDistributor `distribute()` sends `fee_amount` to treasury atomically. Legacy `feeLog` DB record is now an audit trail, not the only collection mechanism. | ~~`FeeService`~~ | No action required |
 | **No contract reentrancy guard** | Low risk (Soroban model prevents this), but no explicit guard | `lib.rs` | Soroban model is safe, document this |
 | Contract admin is single key | If admin key compromised, contract is fully controlled | `lib.rs` | Admin should be a Soroban multisig account |
 
@@ -123,6 +123,6 @@
 | Authorization | 🟢 Strong | Role-based middleware, on-chain two-role model |
 | Transport | 🟢 Strong | Caddy HTTPS, Helmet, CORS |
 | Input validation | 🟡 Good | Needs file type restriction, validator ordering fix |
-| Session management | 🟡 Good | In-memory challenges are the main weakness |
-| On-chain security | 🟡 Good | Fee gap is business-critical, not security-critical |
+| Session management | 🟢 Strong | In-memory challenge weakness **resolved** (all challenge stores migrated to Redis with TTL) |
+| On-chain security | 🟢 Strong | Fee gap **resolved Apr 2026** (TokenSale v6 fixed_fee + YieldDistributor fee_amount); MaturitySettlement adds deposit-hold model |
 | Key management | 🟢 Strong | Docker Secrets, Freighter/Ledger separation |

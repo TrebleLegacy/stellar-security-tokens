@@ -2,6 +2,7 @@
 
 > **Radox / Stellar Security Tokens** — Complete Codebase Reference
 > Full deep read completed: 2026-03-10
+> Last updated: 2026-04-29 (WalletMonitorService, SorobanSettlementService, maturity settlement routes, new env vars)
 > Total files read: ~180+ (backend, frontend, smart contract, deploy)
 
 ---
@@ -10,8 +11,8 @@
 
 | # | Artifact | Scope | Lines Read |
 |---|----------|-------|-----------|
-| 1 | [services_layer.md](services_layer.md) | 28 backend service files | ~12,734 |
-| 2 | [controllers_layer.md](controllers_layer.md) | 13 controller files | ~7,813 |
+| 1 | [services_layer.md](services_layer.md) | 31 backend service files | ~15,000 |
+| 2 | [controllers_layer.md](controllers_layer.md) | 13 controller files | ~6,818 |
 | 3 | [routes_layer.md](routes_layer.md) | 15 route files + HTTP map | ~5,828 |
 | 4 | [frontend_layer.md](frontend_layer.md) | 101 frontend files (API, lib, hooks, pages, components, layouts) | ~8,000+ |
 | 5 | [smart_contract_layer.md](smart_contract_layer.md) | Soroban TokenSale v3 contract + 47 tests | 383 |
@@ -46,7 +47,7 @@
 | Email | Resend (HTTP API) |
 | IPFS | Pinata |
 | Monitoring | Sentry (frontend + backend) |
-| Real-time | Pusher |
+| Real-time | Pusher (backend `config/pusher.js` — optional, graceful no-op if unconfigured; used by `multiSigTransaction.service.js` for governance events. Frontend `pusher-js` client **deleted** commit 7aad8c3) |
 | Reverse Proxy | Caddy 2 (auto-HTTPS) |
 | Container | Docker Compose |
 
@@ -71,11 +72,12 @@
 
 | Priority | Issue | Artifact |
 |----------|-------|----------|
-| 🔴 P0 | Fee collection not on-chain — platform revenue is only logged, not collected | [02_feature_matrix](02_feature_matrix.md), [06_security_audit](06_security_audit.md) |
-| 🔴 P0 | In-memory WebAuthn challenges — breaks horizontal scaling | [06_security_audit](06_security_audit.md) |
-| 🟡 P1 | `platformAdminRoutes.js` — 1,877L mega-file with inline handlers | [routes_layer](routes_layer.md) |
+| ~~🔴 P0~~ | ~~Fee collection not on-chain~~ — **RESOLVED Apr 2026** (Soroban `fixed_fee` + yield spread) | [02_feature_matrix](02_feature_matrix.md) |
+| ~~🔴 P0~~ | ~~In-memory WebAuthn challenges~~ — **RESOLVED** (all stores migrated to Redis with TTL: webauthnController, authRoutes, platformAdminRoutes) | [06_security_audit](06_security_audit.md) |
+| 🟡 P1 | `platformAdminRoutes.js` — 2,067L mega-file with inline handlers | [routes_layer](routes_layer.md) |
 | 🟡 P1 | Duplicate API clients (Axios + fetch) | [frontend_layer](frontend_layer.md) |
 | 🟡 P1 | Type mismatch (snake_case types vs camelCase responses) | [frontend_layer](frontend_layer.md) |
 | 🟡 P2 | Dead code: legacy auth, TransactionManagerService | [04_dead_code](04_dead_code.md) |
 | 🟡 P2 | No TX retry queue for failed Soroban transactions | [07_error_recovery](07_error_recovery.md) |
+| ~~🟡 P2~~ | ~~`WalletMonitorService` has no `stop()`~~ — **RESOLVED 2026-04-29** (`stop()` + graceful shutdown wiring) | [07_error_recovery](07_error_recovery.md) |
 | 🟢 P3 | Email templates are inline HTML strings | [08_email_inventory](08_email_inventory.md) |

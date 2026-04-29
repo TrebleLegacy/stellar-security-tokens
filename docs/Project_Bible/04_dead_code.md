@@ -54,7 +54,7 @@ Items that were listed as dead/potentially dead in prior versions of this doc bu
 
 | File | Code | Reason Deferred |
 |------|------|----------------|
-| `backend/src/services/alert.service.js` | `distributionQueueFailed()` | Needs method-level audit (file is alive, method may be dead) |
+| ~~`backend/src/services/alert.service.js`~~ | ~~`distributionQueueFailed()`~~ | **RESOLVED** — method does not exist; was already removed before Apr 2026 audit. `alert.service.js` contains only: `notify`, `info`, `warning`, `error`, `critical`, `paymentMonitorFailed`, `investmentStuck`. |
 
 ---
 

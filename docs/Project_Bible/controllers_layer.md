@@ -1,6 +1,6 @@
 # Controllers Layer — Full Deep Read
 
-> **13 files · 7,813 lines** | Read date: 2026-03-10
+> **13 files · 6,818 lines** | Read date: 2026-03-10 · Line counts updated 2026-04-29
 > Path: `backend/src/controllers/`
 
 ---
@@ -21,19 +21,19 @@
 
 | # | File | Lines | Style | Methods |
 |---|------|-------|-------|---------|
-| 1 | `investorController.js` | 906 | Exports (named functions) | 16 |
-| 2 | `investmentController.js` | 514 | Class (static) | 5 |
-| 3 | `offerController.js` | 1,121 | Class (static) | 15 |
-| 4 | `companyController.js` | 818 | Class (static) | 14 |
-| 5 | `companyUserController.js` | 577 | Class (static) | 11 |
-| 6 | `platformAdminController.js` | 463 | Class (static) | 9 |
-| 7 | `tokenController.js` | 367 | Exports (named functions) | 8 |
-| 8 | `walletController.js` | 447 | Object literal | 3 + 2 helpers |
-| 9 | `webauthnController.js` | 425 | Class (static) | 4 |
-| 10 | `contractController.js` | 454 | Class (static) | 13 + 4 helpers |
-| 11 | `treasuryController.js` | 41 | Class (static) | 1 |
-| 12 | `notificationController.js` | 81 | Class (static) | 3 |
-| 13 | `investmentMetricsController.js` | 159 | Class (static) | 6 |
+| 1 | `investorController.js` | 830 | Exports (named functions) | 16 |
+| 2 | `investmentController.js` | 822 | Exports (named functions) | 4 (purchase, submitInvestmentTx, getInvestmentStatus, getFeeSchedule) |
+| 3 | `offerController.js` | 1,288 | Class (static) | 15 |
+| 4 | `companyController.js` | 817 | Class (static) | 14 |
+| 5 | `companyUserController.js` | 584 | Class (static) | 11 |
+| 6 | `platformAdminController.js` | 462 | Class (static) | 9 |
+| 7 | `tokenController.js` | 366 | Exports (named functions) | 8 |
+| 8 | `walletController.js` | 482 | Object literal | 3 + 2 helpers |
+| 9 | `webauthnController.js` | 397 | Class (static) | 4 |
+| 10 | `contractController.js` | 492 | Class (static) | 13 + 4 helpers |
+| 11 | `treasuryController.js` | 40 | Class (static) | 1 |
+| 12 | `notificationController.js` | 80 | Class (static) | 3 |
+| 13 | `investmentMetricsController.js` | 158 | Class (static) | 6 |
 
 **Coding style note:** 3 different patterns are used: class-based with static methods (majority), named function exports (`investorController`, `tokenController`), and an object literal (`walletController`). No consistency enforced.
 
@@ -73,13 +73,15 @@
 
 **Key Methods:**
 - `purchase` — Core buy flow: validates supply, maturity cutoff, fee schedule → `SorobanSaleService.buildTradeXdr` → returns unsigned XDR
-- `submitSignedInvestment` — Re-simulates with signed auth entries → `PasskeyWalletService.submitWithSponsorship` → creates DB record → background RPC poll
+- `submitInvestmentTx` — HMAC context integrity check → idempotency guard → race-condition duplicate guard → server-side amount re-derivation → `PasskeyWalletService.submitWithSponsorship` → creates DB record → background RPC poll
 - `getInvestmentStatus` — Fetches investment with transaction hash
 - `getFeeSchedule` — Returns `ConfigService` fee parameters
-- `rateLimit` — In-memory `Map()` rate limiter (1 submission/30s per investor)
 
 **Notable patterns:**
-- Fee is logged to `feeLog` table at purchase time (calculated not collected on-chain)
+- HMAC integrity verification on `investmentContext` (tamper protection — server re-derives amounts, never trusts client)
+- Idempotency: returns existing `trade_submitted` investment if investor already has in-flight TX
+- Race-condition guard: second simultaneous POST that passes idempotency check returns 409
+- Fee is logged to `feeLog` table at purchase time (calculated not collected on-chain for purchase; *yield path does collect fee on-chain via YieldDistributor*)
 - Background `setTimeout` polls RPC for TX confirmation after 5s
 - Maturity cutoff check uses `ConfigService.getFloat('maturity_cutoff_days')`
 
@@ -219,7 +221,7 @@
 - `startAuthentication` — Generates authentication options
 - `completeAuthentication` — Verifies assertion → generates JWT + refresh token + httpOnly cookie
 
-**⚠️ Architecture concern:** Challenges stored in in-memory `Map()` — will not survive server restarts or scale horizontally. Comment acknowledges: "em produção, usar Redis".
+**⚠️ ~~Architecture concern:~~ ✅ RESOLVED**: Challenges previously stored in in-memory `Map()` are now in **Redis** via `storeChallenge()`/`getChallenge()` from `config/redis.js`, keyed as `webauthn:{userType}:{challenge}` with TTL. Server restarts and horizontal scaling no longer affect challenge state.
 
 **User type routing:** `/:userType` param accepts `investor`, `company_user`, `platform_admin`. Each resolves to the appropriate model for lookup.
 
@@ -402,8 +404,8 @@ Controllers that trigger chain operations return `202 Accepted` with `status: 'p
 ### 1. `approveCompanyDebug` (companyController.js)
 **Severity: HIGH** — Debug endpoint that bypasses KYC verification. Should be behind `NODE_ENV !== 'production'` guard or removed entirely.
 
-### 2. In-Memory Challenge Store (webauthnController.js)
-**Severity: MEDIUM** — `const challenges = new Map()` will not survive restarts or scale. Redis migration noted in comment but not implemented.
+### 2. ~~In-Memory Challenge Store~~ (webauthnController.js)
+**RESOLVED** — All challenge stores (webauthnController, authRoutes, platformAdminRoutes) migrated to Redis via `storeChallenge()`/`getChallenge()`. Redis already required in production. No action needed.
 
 ### 3. In-Memory Rate Limiter (investmentController.js)
 **Severity: LOW** — `const txSubmissions = new Map()` for rate limiting. Same horizontality concern but less critical for MVP.
@@ -425,9 +427,9 @@ Controllers that trigger chain operations return `202 Accepted` with `status: 'p
 ## Findings & Recommendations
 
 ### Critical Gaps for MVP
-1. **Fee collection is database-only** — No on-chain mechanism to split/transfer platform fees
-2. **Debug approval endpoint in production** — `approveCompanyDebug` needs guard
-3. **WebAuthn challenges need Redis** — Required before horizontal scaling
+1. ~~**Fee collection is database-only**~~ — **RESOLVED Apr 2026**: YieldDistributor `distribute()` collects `fee_amount` atomically to treasury on-chain. Classic path also has Op 1 fee transfer. Legacy `feeLog` is now an audit trail only.
+2. **Debug approval endpoint in production** — `approveCompanyDebug` gated by `NODE_ENV !== 'production'` (correctly guarded; still exists in dev)
+3. ~~**WebAuthn challenges need Redis**~~ — **RESOLVED**: all challenge stores migrated to Redis with TTL
 
 ### Positive Architecture
 1. **Clean separation** — Controllers are thin wrappers around services, with minimal business logic

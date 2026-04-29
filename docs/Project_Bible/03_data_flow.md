@@ -105,14 +105,14 @@ Investor              CEX/Exchange         Treasury         Backend          Sma
 | Investment records | PostgreSQL `investment` | — | Soroban trade events |
 | Interest payments | PostgreSQL `interestPayment` | — | USDC transfer TX |
 | Fee logs | PostgreSQL `feeLog` | — | ❌ Not on-chain |
-| Passkey credentials | PostgreSQL `passkeyCredential` | — | Smart wallet signers |
-| Notifications | PostgreSQL `notification` | Pusher (real-time) | — |
+| Passkey credentials | PostgreSQL `InvestorWebauthnCredential`, `CompanyUserWebauthnCredential`, `PlatformAdminWebauthnCredential` (3 separate models) | — | Smart wallet signers per user type |
+| Notifications | PostgreSQL `notification` | Pusher (backend `config/pusher.js` — optional, used by multiSigTransaction.service.js for governance events; frontend pusher-js **deleted**) | — |
 | Multisig proposals | PostgreSQL `multiSigTransaction` | — | Stellar TX (when submitted) |
 | Deposits | PostgreSQL `deposit` | — | Stellar payment + SAC transfer |
 | System config | PostgreSQL `systemConfig` | — | — |
 | Sessions/JWT | In-memory + httpOnly cookie | Redis (blocklist) | — |
 | Rate limits | In-memory + Redis | — | — |
-| WebAuthn challenges | ⚠️ In-memory Map | — | — |
+| WebAuthn challenges | ~~⚠️ In-memory Map~~ **Redis** (`storeChallenge` TTL) | — | — |
 | Legal documents | IPFS (Pinata) | PostgreSQL (hash + URL) | — |
 | Soroban metrics | PostgreSQL `sorobanMetric` | In-memory cache | — |
 
