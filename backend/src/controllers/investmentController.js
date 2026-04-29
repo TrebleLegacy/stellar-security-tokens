@@ -252,6 +252,17 @@ export const purchaseInvestment = async (req, res, next) => {
             log.info(`[Investment] Buyer ${investorWallet.slice(0, 8)}… authorized on SAC (tx: ${buyerAuthResult.txHash})`);
           }
         } catch (authErr) {
+          // Operations wallet critically low — return 503 (Service Unavailable).
+          // F-21: this catch is the ONLY place OPERATIONS_WALLET_EMPTY can be handled;
+          // it never reaches catch(txError) below because this block returns directly.
+          if (authErr.code === 'OPERATIONS_WALLET_EMPTY') {
+            log.warn('[Investment] Ops wallet empty — retornando 503 ao cliente');
+            return res.status(503).json({
+              success: false,
+              error: 'Nosso sistema está temporariamente indisponível para novas compras. Por favor, tente novamente em alguns minutos.',
+              code: 'SERVICE_TEMPORARILY_UNAVAILABLE',
+            });
+          }
           log.error(`[Investment] SAC authorization failed: ${authErr.message}`);
           return res.status(500).json({
             success: false,

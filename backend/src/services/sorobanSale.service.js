@@ -648,6 +648,43 @@ export class SorobanSaleService {
         // because ops is a signer on the issuer account with sufficient weight
         tx.sign(opsKeypair);
 
+        // ── Pre-flight: Operations wallet balance guard ──────────────────────────
+        // Prevents opaque "Failed to authorize on SAC" errors when the Operations
+        // wallet lacks XLM to pay fees for the set_authorized TX.
+        //
+        // Uses stellarServer.loadAccount() (Horizon) — returns balances[].
+        // NOT getAccountRPC() (Soroban RPC) — that returns sequence number only.
+        //
+        // opsKeypair is already defined above (line 580) — .publicKey() is direct.
+        {
+            const { stellarServer: horizonSrv } = await import('../config/stellar.js');
+            try {
+                const opsAccount = await horizonSrv.loadAccount(opsKeypair.publicKey());
+                const native = opsAccount.balances.find(b => b.asset_type === 'native');
+                const xlm = parseFloat(native?.balance || '0');
+                const critThreshold = parseFloat(process.env.OPERATIONS_WALLET_CRITICAL_XLM || '5');
+
+                if (xlm < critThreshold) {
+                    log.error(
+                        `[authorizeBuyerOnSac] Ops wallet critically low: ${xlm.toFixed(2)} XLM — bloqueando purchase`
+                    );
+                    const walletErr = new Error(
+                        'Operations wallet sem saldo suficiente — purchase temporariamente indisponível'
+                    );
+                    walletErr.code = 'OPERATIONS_WALLET_EMPTY';
+                    throw walletErr;
+                }
+            } catch (balanceErr) {
+                // Re-throw our own typed error so the controller can return 503
+                if (balanceErr.code === 'OPERATIONS_WALLET_EMPTY') throw balanceErr;
+                // Any other error (Horizon down, timeout) — proceed optimistically.
+                // If wallet truly has no XLM, the TX will fail with a native Stellar error.
+                log.warn(
+                    `[authorizeBuyerOnSac] Balance pre-check falhou (prosseguindo): ${balanceErr.message}`
+                );
+            }
+        }
+
         // Submit and poll (with retry for testnet flakiness)
         const maxAttempts = 2;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
