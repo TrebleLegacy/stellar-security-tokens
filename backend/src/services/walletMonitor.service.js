@@ -27,8 +27,9 @@ const CRIT_XLM = parseFloat(process.env.OPERATIONS_WALLET_CRITICAL_XLM || '5');
 const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 min
 const STARTUP_DELAY_MS  = 10_000;         // t+10s — wait for Horizon + KeyManager ready
 
-let _started = false;
+let _started       = false;
 let _lastAlertLevel = null; // null | 'warning' | 'critical'
+let _intervalId    = null;  // A-02: stored so stop() can clearInterval
 
 /**
  * Core balance check. Non-fatal: all errors are caught and logged.
@@ -125,13 +126,28 @@ export const WalletMonitorService = {
         }
 
         // Immediate check: small delay to let Horizon connection and KeyManager settle
+        // Note: setTimeout handle not stored — fires once, harmless after SIGTERM
         setTimeout(() => { checkOperationsBalance(); }, STARTUP_DELAY_MS);
 
-        // Recurring check
-        setInterval(() => { checkOperationsBalance(); }, CHECK_INTERVAL_MS);
+        // Recurring check — A-02: store handle so stop() can cancel it
+        _intervalId = setInterval(() => { checkOperationsBalance(); }, CHECK_INTERVAL_MS);
 
         log.info(
             `[WalletMonitor] Iniciado — warn<${WARN_XLM} XLM · critical<${CRIT_XLM} XLM · check a cada ${CHECK_INTERVAL_MS / 60_000}min`
         );
+    },
+
+    /**
+     * Stop the wallet monitor. Cancels the recurring interval.
+     * Called by gracefulShutdown in index.js on SIGTERM/SIGINT.
+     * Safe to call even if start() was never called or if already stopped.
+     */
+    stop() {
+        if (_intervalId) {
+            clearInterval(_intervalId);
+            _intervalId = null;
+        }
+        _started = false;
+        log.info('[WalletMonitor] Stopped.');
     },
 };

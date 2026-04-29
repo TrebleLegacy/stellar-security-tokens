@@ -306,6 +306,12 @@ const gracefulShutdown = async (signal) => {
       console.log('Payment monitor stopped.');
     }
 
+    // Stop wallet monitor (A-02: cancel setInterval)
+    try {
+      const { WalletMonitorService } = await import('./services/walletMonitor.service.js');
+      WalletMonitorService.stop();
+    } catch (_) { /* not started — safe to ignore */ }
+
     if (process.env.ENABLE_SOROBAN_SALE === 'true') {
       const { SorobanEventIndexer } = await import('./services/sorobanEventIndexer.js');
       const { SorobanReconciler } = await import('./services/sorobanReconciler.js');
@@ -323,6 +329,7 @@ const gracefulShutdown = async (signal) => {
 
   process.exit(0);
 };
+
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
