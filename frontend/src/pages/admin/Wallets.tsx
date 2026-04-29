@@ -102,6 +102,18 @@ export function Wallets() {
         Operations: 'Operational account for gas fees, channel management, and automated transaction sponsoring.',
     };
 
+    // ─── Operations wallet balance status ─────────────────────────────────
+    // Reads from existing balances[] — no extra API call needed.
+    // Thresholds mirror backend OPERATIONS_WALLET_CRITICAL/WARNING_XLM defaults.
+    const getOpsBalanceStatus = (wallet: WalletStatus) => {
+        if (wallet.name !== 'Operations' || !wallet.exists) return null;
+        const native = wallet.balances.find((b) => b.asset_type === 'native');
+        const xlm = parseFloat(native?.balance || '0');
+        if (xlm < 5)  return { level: 'critical' as const, xlm };
+        if (xlm < 20) return { level: 'warning'  as const, xlm };
+        return null; // OK — no badge
+    };
+
     // ─── Render ───────────────────────────────────────────────────────────
 
     return (
@@ -156,9 +168,23 @@ export function Wallets() {
                                                     <Wallet className="w-4 h-4 text-emerald-400" />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center gap-1.5">
+                                                    <div className="flex items-center gap-1.5 flex-wrap">
                                                         <p className="text-[13px] font-medium text-white">{wallet.name}</p>
                                                         <div className={`w-2 h-2 rounded-full shrink-0 ${wallet.exists ? 'bg-emerald-400' : 'bg-red-400'}`} />
+                                                        {/* Operations wallet low-balance badge */}
+                                                        {(() => {
+                                                            const ops = getOpsBalanceStatus(wallet);
+                                                            if (!ops) return null;
+                                                            return (
+                                                                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded leading-none ${
+                                                                    ops.level === 'critical'
+                                                                        ? 'bg-red-500/20 text-red-400'
+                                                                        : 'bg-amber-500/20 text-amber-400'
+                                                                }`}>
+                                                                    {ops.level === 'critical' ? '🚨 CRÍTICO' : '⚠ LOW'}
+                                                                </span>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     <p className="text-[11px] text-zinc-500 font-mono truncate">
                                                         {wallet.publicKey?.substring(0, 8)}…{wallet.publicKey?.substring(48)}
@@ -237,6 +263,32 @@ export function Wallets() {
                                     {selected.exists ? 'Active on Network' : 'Not Created'}
                                 </Badge>
                             </div>
+
+                            {/* Operations wallet low-balance alert banner */}
+                            {(() => {
+                                const ops = getOpsBalanceStatus(selected);
+                                if (!ops) return null;
+                                return (
+                                    <div className={`flex items-start gap-2.5 p-3 rounded-lg border text-sm ${
+                                        ops.level === 'critical'
+                                            ? 'bg-red-500/10 border-red-500/20 text-red-300'
+                                            : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                                    }`}>
+                                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-semibold mb-0.5">
+                                                {ops.level === 'critical' ? 'Saldo Crítico' : 'Saldo Baixo'}
+                                            </p>
+                                            <p className="text-xs opacity-80">
+                                                {ops.xlm.toFixed(2)} XLM —{' '}
+                                                {ops.level === 'critical'
+                                                    ? 'Compras estão sendo bloqueadas. Recarregue imediatamente.'
+                                                    : 'Saldo próximo do mínimo. Recarregue antes do próximo ciclo de compras.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             {/* Public key */}
                             <div className="space-y-2">

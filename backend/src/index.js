@@ -279,6 +279,18 @@ app.listen(PORT, async () => {
   } else {
     console.log('Soroban event indexer disabled (ENABLE_SOROBAN_SALE != true)');
   }
+
+  // --- OPERATIONS WALLET MONITOR ---
+  // Polls Operations hot wallet balance every 5min via Horizon.
+  // Sends email alerts at warn (<20 XLM) and critical (<5 XLM) thresholds.
+  // Also blocks purchases inline if balance drops below critical threshold.
+  try {
+    const { WalletMonitorService } = await import('./services/walletMonitor.service.js');
+    WalletMonitorService.start();
+    console.log('Operations wallet monitor enabled — checking balance every 5min');
+  } catch (error) {
+    console.error('Failed to start wallet monitor:', error.message);
+  }
 });
 
 // ─── GRACEFUL SHUTDOWN ───
