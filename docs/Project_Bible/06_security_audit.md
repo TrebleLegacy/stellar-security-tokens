@@ -15,7 +15,7 @@
 | Role-based auth | `isAdmin`, `isCompanyUser`, `isInvestor` middleware | `middleware/` |
 | Multisig for admin ops | Critical ops require N-of-M signatures | `MultiSigTransactionService` |
 | 2-step admin transfer | On-chain admin change requires new admin to accept | Smart contract |
-| Ledger support | Hardware wallet for recovery signers | `lib/ledger.ts` |
+| Ledger support | Hardware wallet for recovery signers (Freighter signing in `platformAdminRoutes`; `lib/ledger.ts` referenced in doc but **file does not exist** — Ledger signing is handled client-side by Freighter wallet extension) | `platformAdminRoutes.js` |
 
 ### Weaknesses 🔴
 | Issue | Risk | Location | Recommendation |
@@ -95,7 +95,7 @@
 | `strictLimiter` | 10/min | Sensitive operations |
 | `apiLimiter` | 30/min | Standard API calls |
 | `globalLimiter` | 100/min | Catch-all |
-| Custom (in-memory) | 3 attempts | Freighter login (⚠️ per-instance only) |
+| ~~Custom (in-memory)~~ | ~~3 attempts~~ | ~~Freighter login~~ — **ghost claim**: no in-memory per-IP counter exists in `platformAdminRoutes.js`. Freighter endpoint uses standard `authLimiter` (5/min global). |
 
 ---
 

@@ -44,7 +44,7 @@ POST /api/auth/passkey-login/discover
 ### Investment Purchase (Soroban)
 ```
 POST /api/investments/purchase
-  → investmentRoutes (inline handler)
+  → investmentController.purchaseInvestment (routed via controller, NOT inline)
     → SorobanSaleService.buildTradeXdr
       → sorobanServer.getAccount
       → Contract.call('trade', buyer, amount)
@@ -86,13 +86,17 @@ POST /api/investors/withdraw/submit
 POST /api/investors/:id/deposit/initiate
   → InvestorController.initiateDeposit
     → DepositRelayService.initiateDeposit
-      → prisma.deposit.create (memo = unique hash via computeMemo)
-      → returns { treasuryAddress, memo, expectedAmount }
+      → prisma.investor.findUnique (investor lookup)
+      → crypto.createHash (deterministic memo from investorId)
+      → returns { treasuryAddress, memo, status: 'ready' }
+      ⚠️ NOTE: no prisma.deposit.create here — deposit record created on first payment received
 
 (Background) PaymentMonitorService.start()
   → PaymentMonitorService.startStream() (Horizon SSE on treasury account)
     → on payment received with matching memo:
       → DepositRelayService.handleIncomingPayment
+        → prisma.deposit.findUnique (by memo)
+        → if not found: prisma.investor.findMany → computeMemo reverse-lookup → prisma.deposit.create
         → StellarService.withdrawFromTreasury → investor smart wallet
         → prisma.deposit.update (status: completed)
         → NotificationService.createNotification
@@ -151,11 +155,12 @@ POST /api/company/payments/:offerId/prepare
     → returns { xdr, breakdown, expiresAt }
 
 POST /api/company/payments/:offerId/submit
-  → CompanyPaymentService.submitSignedPayment
+  → CompanyPaymentService.processSignedBatches (multi-batch YieldDistributor path) or
+    CompanyPaymentService.processSignedPayment (single XDR classic/Soroban path)
     → sorobanServer.sendTransaction → poll
     → prisma.interestPayment.createMany
     → prisma.offer.update (lastPaymentDate)
-    → ConfigService.logFee (platform fee)
+    → prisma.feeLog.create (platform fee — direct, not via ConfigService)
     → EmailService.sendInterestPaymentConfirmation (each investor)
 ```
 
@@ -181,8 +186,9 @@ POST /api/platform-admins/freighter/verify
 ```
 POST /api/wallets/transactions (create proposal)
   → WalletController.createTransactionProposal
-    → MultiSigTransactionService.create
-      → prisma.multiSigTransaction.create
+    → prisma.multiSigTransaction.create (direct — bypasses MultiSigTransactionService)
+    → Note: MultiSigTransactionService.create() also exists and does the same via service layer,
+      with additional Pusher broadcast. WalletController skips the service and calls Prisma directly.
 
 GET /api/admin/transactions/:id/xdr
   → adminTransactionRoutes (inline)
@@ -192,7 +198,10 @@ GET /api/admin/transactions/:id/xdr
 POST /api/admin/transactions/:id/sign
   → adminTransactionRoutes (inline)
     → MultiSigTransactionService.addSignature
-      → prisma.multiSigTransaction.update
+      → TransactionBuilder.fromXDR + Keypair.verify (cryptographic signature check)
+      → prisma.multiSigTransaction.update (collectedSignatures, status)
+      → Pusher broadcast ('signature-added')
+      → ⚠️ AUTO-SUBMITS if thresholdMet: calls this.submit(txId) immediately
 
 POST /api/admin/transactions/:id/submit
   → adminTransactionRoutes (inline)

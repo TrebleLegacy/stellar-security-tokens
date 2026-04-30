@@ -37,8 +37,6 @@
 | POST | `/api/investors/verify-email-code` | investorRoutes | Verify 6-digit code |
 | POST | `/api/investors/resend-code` | investorRoutes | Resend code |
 | POST | `/api/investors/register` | investorRoutes | Complete reg with passkey |
-| POST | `/api/investors/verify-email` | investorRoutes | Legacy email verify |
-| POST | `/api/investors/resend-verification` | investorRoutes | Legacy resend |
 | GET | `/api/investors/passkey/config` | investorRoutes | SmartAccountKit client config |
 | GET | `/api/investments/fee-schedule` | investmentRoutes | Current fee schedule |
 | POST | `/api/companies/initiate-registration` | companyRoutes | Company reg step 1 |
@@ -148,13 +146,19 @@
 | POST | `/api/platform-admins/defaults/:offerId/prepare` | Prepare collateral distribution |
 | POST | `/api/platform-admins/defaults/:offerId/distribute` | Execute collateral distribution |
 | POST | `/api/platform-admins/offers/:offerId/unlock-token` | Unlock token for DEX (irreversible, confirm=true) |
+| GET | `/api/platform-admins/yield-jobs` | YieldPaymentJob list |
+| GET | `/api/platform-admins/yield-jobs/:jobId` | Single job detail |
+| POST | `/api/platform-admins/yield-jobs/:jobId/retry` | Retry failed yield job |
 | GET | `/api/platform-admins/soroban/dashboard` | Soroban contract dashboard (on-chain + reconciler) |
 | POST | `/api/platform-admins/passkey/register/options` | Admin passkey reg options |
 | POST | `/api/platform-admins/passkey/register` | Admin passkey reg complete |
 | *Tokens* | `/api/tokens/issue`, `/api/tokens/sync`, `/api/tokens/freeze`, etc. | Token lifecycle |
 | *Wallets* | `/api/wallets`, `/api/wallets/transactions/*` | System wallet + multisig |
 | *Contracts* | `/api/admin/contracts/*` | Full Soroban sale admin |
-| *Admin TX* | `/api/admin/transactions/*` | Multisig lifecycle |
+| *Admin TX* | `/api/admin/transactions/*` | Multisig lifecycle — GET /pending, GET /:id, GET /:id/xdr, POST /:id/sign, POST /:id/submit, POST /:id/reject, GET /stats, POST /deposits/:depositId/retry, POST /deposits/retry-all, POST /setup-thresholds |
+| POST | `/api/wallets/relay` | walletRoutes — relay signed XDR via internal relay pattern |
+| GET | `/api/company/payments/history/all` | All payment history across offers |
+| GET | `/api/company/payments/penalties/all` | All penalties across offers |
 | POST | `/api/admin/offers/:id/reconcile-chain` | On-chain → DB reconciliation (maturity) |
 | POST | `/api/admin/offers/:id/deploy-settlement` ⭐ | Deploy MaturitySettlement contract for debt offer |
 | POST | `/api/admin/offers/:id/init-settlement` ⭐ | Initialize deployed settlement contract |
@@ -169,11 +173,10 @@
 | GET | `/api/security/passkeys` | List user's passkeys |
 | POST | `/api/security/passkeys/verify/challenge` | Get verification challenge |
 | POST | `/api/security/passkeys/add/options` | Reg options for new passkey |
-| POST | `/api/security/passkeys/add` | Add passkey (requires assertion for 2nd+) |
-| DELETE | `/api/security/passkeys/:passkeyId` | Remove passkey (min 1 required) |
+| GET | `/api/security/passkey-config` | Passkey config (public) |
 | GET | `/api/security/recovery-signers` | List Ed25519 recovery signers |
-| POST | `/api/security/recovery-signers/add` | Add Ledger recovery signer |
-| DELETE | `/api/security/recovery-signers/:signerId` | Remove recovery signer |
+
+> ⚠️ **Ghost routes (documented but not in source):** `POST /passkeys/add`, `DELETE /passkeys/:passkeyId`, `POST /recovery-signers/add`, `DELETE /recovery-signers/:signerId` — these do not exist in `securityRoutes.js`.
 
 ---
 

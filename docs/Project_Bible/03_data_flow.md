@@ -114,7 +114,7 @@ Investor              CEX/Exchange         Treasury         Backend          Sma
 | Rate limits | In-memory + Redis | — | — |
 | WebAuthn challenges | ~~⚠️ In-memory Map~~ **Redis** (`storeChallenge` TTL) | — | — |
 | Legal documents | IPFS (Pinata) | PostgreSQL (hash + URL) | — |
-| Soroban metrics | PostgreSQL `sorobanMetric` | In-memory cache | — |
+| Soroban metrics | In-memory cache → `SystemConfig` (upserted via `prisma.systemConfig.upsert`) | — | — |
 
 ---
 
