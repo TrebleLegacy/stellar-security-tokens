@@ -57,6 +57,7 @@
 | `radox.net` | Landing page + SEP-1 |
 | `app.radox.net` | React SPA (investor, company, admin) |
 | `api.radox.net` | REST API + Swagger |
+| `dev.radox.net` | SEP-1 stellar.toml for dev issuer account |
 
 ### Key Accounts (Stellar)
 | Account | Purpose |

@@ -60,19 +60,22 @@
 | `CHANNELS_API_KEY` | ✅ Prod | — | PasskeyWalletService (Channels fee sponsorship) |
 | `ACCOUNT_WASM_HASH` | ✅ Prod | — | PasskeyWalletService (wallet deploy) |
 | `WEBAUTHN_VERIFIER_ADDRESS` | ✅ Prod | — | PasskeyWalletService (passkey signer) |
-| `ED25519_VERIFIER_ADDRESS` | ✅ Prod | — | PasskeyWalletService (Ledger signer) |
+| `ED25519_VERIFIER_ADDRESS` | — | — | **Ghost** — not referenced in source code. Ledger integration was planned but never implemented. |
 | `SALE_WASM_HASH` | When Soroban enabled | — | SorobanSaleService (deploy) |
 | `SETTLEMENT_WASM_HASH` | ✅ Required for debt offers ⭐ | — | SorobanSettlementService. **Kill chain:** missing value does NOT fail at startup \u2014 silently absent. Fails only when admin calls `deploy-settlement` on a matured debt offer. Offer gets stuck in `matured` state with no automated recovery. Set **before** any debt offer is approved. |
 | `XLM_SAC_CONTRACT_ID` | ✅ | Testnet default | platformAdminRoutes (sponsor) |
 | `USDC_SAC_CONTRACT_ID` | ✅ | Testnet default | PasskeyWalletService (balances) |
 | `YIELD_DISTRIBUTOR_CONTRACT_ID` | When Soroban enabled | — | YieldDistributorService (batched yield payments) |
-| `USDC_ISSUER` | ❌ | Auto-detected from network | StellarService |
+| `USDC_CONTRACT_ID` | ✅ Prod | — | PasskeyWalletService (USDC SAC contract for withdrawals/deposits) |
+| `XLM_CONTRACT_ID` | ✅ Prod | — | PasskeyWalletService (XLM SAC contract for withdrawal alternative) |
+| `STELLAR_ISSUER_PUBLIC_KEY` | ❌ | Falls back to `ISSUER_PUBLIC_KEY` | offerController (token issuance flow alias) |
 
 ### Security
 | Variable | Required | Default | Used By |
 |----------|----------|---------|---------|
 | `JWT_SECRET` | ✅ | `change_this_in_production` ⚠️ | auth middleware |
-| `API_KEY` | ❌ | — | API key middleware |
+| ~~`API_KEY`~~ | — | — | **Ghost** — variable not referenced in source code; TRUSTED_API_KEY is the correct variable |
+| `USDC_ISSUER` | ❌ | Auto-detected from network | StellarService |
 
 ### WebAuthn / Passkeys
 | Variable | Required | Default | Used By |
@@ -137,11 +140,13 @@
 | Variable | Required | Default | Used By |
 |----------|----------|---------|---------|
 | `VITE_API_URL` | ❌ | `/api` (prod), `http://localhost:3000/api` (dev) | API client |
-| `VITE_STELLAR_NETWORK` | ❌ | — | Frontend config |
-| `VITE_SOROBAN_RPC_URL` | ❌ | — | Frontend config |
-| `VITE_STELLAR_NETWORK_PASSPHRASE` | ❌ | — | Frontend config |
+| `VITE_STELLAR_NETWORK` | ❌ | — | Frontend network display |
+| ~~`VITE_SOROBAN_RPC_URL`~~ | — | — | **Ghost** — not referenced in frontend source (`import.meta.env.VITE_SOROBAN_RPC_URL` not found) |
+| ~~`VITE_STELLAR_NETWORK_PASSPHRASE`~~ | — | — | **Ghost** — not referenced in frontend source |
 | `VITE_SENTRY_DSN` | ❌ | — | Frontend Sentry |
 | `VITE_APP_VERSION` | ❌ | `1.0.0` | Sentry release tag |
+| `VITE_DEV_TOOLS` | ❌ | `false` | App.tsx — enables dev time-control panel (build-time flag in Dockerfile) |
+| `API_URL` | ❌ | — | swagger.js — Swagger UI server URL |
 | ~~`VITE_PUSHER_KEY`~~ | — | — | **Deleted** (commit 7aad8c3) — frontend pusher-js client removed |
 | ~~`VITE_PUSHER_CLUSTER`~~ | — | — | **Deleted** (commit 7aad8c3) |
 

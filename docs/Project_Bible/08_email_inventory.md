@@ -1,7 +1,7 @@
 # 08 — Email Inventory
 
 > Every email the platform sends, when, to whom, and via what service
-> Generated: 2026-03-10
+> Generated: 2026-03-10 | **Method names verified against source: 2026-04-30**
 
 ---
 
@@ -15,35 +15,35 @@ From: `Radox <noreply@mail.radox.net>`
 
 ### Investor Emails
 
-| Email | Trigger | Recipient | Service | Template |
-|-------|---------|-----------|---------|----------|
-| **Verification Code** | Registration step 1 | Investor email | `EmailService.sendVerificationCode` | 6-digit code, 30-min expiry |
-| **Welcome** | Registration complete | Investor email | `EmailService.sendWelcome` | Welcome + next steps |
-| **KYC Approved** | Admin approves KYC | Investor email | `EmailService.sendKycApproval` | Approval notification |
-| **KYC Rejected** | Admin rejects KYC | Investor email | `EmailService.sendKycRejection` | Rejection with reason |
+| Email | Trigger | Recipient | Service Method | Notes |
+|-------|---------|-----------|----------------|-------|
+| **Verification Code (link)** | Registration step 1 | Investor email | `EmailService.sendVerificationEmail` | Token link, not 6-digit code |
+| **6-Digit OTP Code** | Registration (OTP variant) | Investor email | `EmailService.send6DigitVerificationCode` | Alternative OTP flow |
+| **Welcome** | Registration complete | Investor email | `EmailService.sendWelcomeEmail` | Welcome + smart wallet contractId |
+| **KYC Approved** | Admin approves KYC | Investor email | `EmailService.sendKYCApprovalEmail` | Approval notification |
+| **KYC Rejected** | Admin rejects KYC | Investor email | `EmailService.sendKYCRejectionEmail` | Rejection with reason |
 | **Investment Confirmed** | Trade submitted on-chain | Investor email | `EmailService.sendInvestmentConfirmation` | Amount, token, TX hash |
-| **Payment Received** | Company makes interest payment | Investor email | `EmailService.sendPaymentNotification` | Amount received, offer name |
-| **Deposit Completed** | USDC relay to smart wallet | Investor email | `EmailService.sendDepositConfirmation` | Amount, wallet address |
+| **Interest Payment Received** | Company makes interest payment | Investor email | `EmailService.sendInterestPaymentConfirmation` | Amount, offer name, TX hash |
+| **Bullet Payment Received** | Bullet/lump sum payment | Investor email | `EmailService.sendBulletPaymentConfirmation` | Bullet offer settlement |
+| **Quarterly Payment Received** | Quarterly coupon payment | Investor email | `EmailService.sendQuarterlyPaymentConfirmation` | Quarterly distribution |
+| **Semi-Annual Payment Received** | Semi-annual coupon | Investor email | `EmailService.sendSemiAnnualPaymentConfirmation` | Semi-annual distribution |
+
+> ⚠️ **No deposit confirmation email exists** — deposit relay completion does NOT send email. `sendDepositConfirmation` is a ghost method that does not exist in EmailService.
 
 ### Company Emails
 
-| Email | Trigger | Recipient | Service | Template |
-|-------|---------|-----------|---------|----------|
-| **Company Verification Code** | Registration step 1 | Company email | `EmailService.sendVerificationCode` | Same as investor |
-| **Company Approved** | Admin approves company | Company email | `EmailService.sendCompanyApproved` | Can now create offers |
-| **Company Rejected** | Admin rejects company | Company email | `EmailService.sendCompanyRejected` | Rejection with reason |
-| **Offer Reviewed** | Admin approves/rejects offer | Company email | `EmailService.sendOfferReview` | Status + feedback |
-| **Payment Reminder** | Cron (configurable days before due) | Company email | `PaymentReminderService` → `EmailService.sendPaymentReminder` | Upcoming due date, amount |
-| **Overdue Notice** | Cron (daily) | Company email | `CompanyPaymentService.checkOverdue` → `EmailService.sendOverdueNotice` | Past due amount, penalty |
+| Email | Trigger | Recipient | Service Method | Notes |
+|-------|---------|-----------|----------------|-------|
+| **Company Status Update** | Admin approves or rejects company | Company email | `EmailService.sendCompanyStatusUpdate` | Single method — handles both approved/rejected via `status` param |
+| **Offer Status Update** | Admin approves/rejects offer | Company email | `EmailService.sendOfferStatusUpdate` | Single method — handles both via `status` param |
+
+> ⚠️ **No payment reminder or overdue notice emails** — `sendPaymentReminder`, `sendOverdueNotice`, `sendNewCompanyNotification`, `sendNewOfferNotification` are **ghost methods** that do NOT exist in EmailService. Payment reminder and overdue logic (`checkOverduePayments`) creates DB records only; no email is sent.
 
 ### Admin Emails
 
-| Email | Trigger | Recipient | Service | Template |
-|-------|---------|-----------|---------|----------|
-| **New Company Pending** | Company registation complete | All platform admins | `EmailService.sendNewCompanyNotification` | Company name, review link |
-| **New Offer Pending** | Offer submitted for review | All platform admins | `EmailService.sendNewOfferNotification` | Offer details, review link |
+| Email | Trigger | Recipient | Service Method | Notes |
+|-------|---------|-----------|----------------|-------|
 | **Wallet Low Balance** ⭐ | WalletMonitorService (5min poll, on threshold cross) | `ADMIN_ALERT_EMAIL` env var | `EmailService.sendAdminAlert` | Level (warning/critical), XLM balance, link to /admin/wallets |
-| **Settlement Deposit Received** ⭐ | Company submits deposit for MaturitySettlement | All platform admins | `EmailService.sendAdminAlert` (or direct notify) | Offer ID, deposit amount — triggers admin to call settle_batch |
 
 ---
 
@@ -52,7 +52,8 @@ From: `Radox <noreply@mail.radox.net>`
 Configured via `SystemConfig` in DB:
 - Default reminder days: `[30, 14, 7, 3, 1]` days before due date
 - Overdue check: daily at 00:30 UTC
-- Penalty creation: automatic on overdue detection
+- Penalty creation: automatic on overdue detection (`companyPenalty` record)
+- **No email is sent** — overdue detection updates DB only
 
 ---
 

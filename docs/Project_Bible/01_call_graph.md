@@ -1,7 +1,7 @@
 # 01 — Call Graph
 
 > Full route → controller → service → external dependency map
-> Generated: 2026-03-10
+> Generated: 2026-03-10 | **Method names verified against source: 2026-04-30**
 
 ---
 
@@ -12,19 +12,18 @@
 POST /api/investors/initiate-registration
   → investorRoutes (inline handler)
     → prisma.investor.findUnique
-    → EmailService.sendVerificationCode
-    → prisma.registrationToken.create
+    → EmailService.sendVerificationEmail
+    → prisma.systemConfig (store token)
 
 POST /api/investors/verify-email-code
   → investorRoutes (inline)
-    → prisma.registrationToken.findFirst
-    → returns registrationToken
+    → prisma.systemConfig.findFirst (token lookup)
+    → returns token
 
 POST /api/investors/register
-  → InvestorController.registerInvestor
-    → InvestorService.registerWithPasskey
-      → prisma.investor.create
-      → prisma.registrationToken.delete
+  → investorController.registerInvestorWithPasskey
+    → prisma.investor.create
+    → PasskeyWalletService.createSmartWallet (if passkey)
 ```
 
 ### Passkey Login (Discoverable)
@@ -36,8 +35,8 @@ GET /api/auth/passkey-login/discover
 
 POST /api/auth/passkey-login/discover
   → authRoutes (inline)
-    → prisma.passkeyCredential.findFirst (by credentialId)
-    → maps to investor | companyUser | company
+    → WebAuthnService.findUserByHandle (by credentialId)
+    → maps to investor | companyUser | platformAdmin
     → jwt.sign (access + refresh)
     → res.cookie('refreshToken', httpOnly)
 ```
@@ -69,7 +68,7 @@ POST /api/investments/submit-tx
 ```
 POST /api/investors/:id/withdraw/propose
   → InvestorController.proposeWithdrawal
-    → PasskeyWalletService.buildUsdcWithdrawal
+    → PasskeyWalletService.buildWithdrawalTx
       → sorobanServer.getAccount
       → usdcSac.call('transfer', from, to, amount)
       → sorobanServer.simulateTransaction
@@ -77,7 +76,7 @@ POST /api/investors/:id/withdraw/propose
 
 POST /api/investors/withdraw/submit
   → InvestorController.submitWithdrawal
-    → PasskeyWalletService.submitSignedTransaction
+    → PasskeyWalletService.submitWithdrawalTx
       → sorobanServer.sendTransaction → poll
     → prisma.$transaction (update withdrawal record)
 ```
@@ -87,17 +86,16 @@ POST /api/investors/withdraw/submit
 POST /api/investors/:id/deposit/initiate
   → InvestorController.initiateDeposit
     → DepositRelayService.initiateDeposit
-      → prisma.deposit.create (memo = unique ID)
+      → prisma.deposit.create (memo = unique hash via computeMemo)
       → returns { treasuryAddress, memo, expectedAmount }
 
-(Background) PaymentMonitor.start()
-  → StellarService.streamPayments (treasury account)
+(Background) PaymentMonitorService.start()
+  → PaymentMonitorService.startStream() (Horizon SSE on treasury account)
     → on payment received with matching memo:
-      → DepositRelayService.processDeposit
-        → PasskeyWalletService.forwardToSmartWallet
-          → usdcSac.call('transfer', treasury → investor wallet)
+      → DepositRelayService.handleIncomingPayment
+        → StellarService.withdrawFromTreasury → investor smart wallet
         → prisma.deposit.update (status: completed)
-        → NotificationService.create
+        → NotificationService.createNotification
 ```
 
 ---
@@ -108,21 +106,21 @@ POST /api/investors/:id/deposit/initiate
 ```
 POST /api/companies/offers (multer + FormData)
   → OfferController.createOffer
-    → PinataService.uploadDocument (for each file)
-      → pinata.pinFileToIPFS → returns { hash, url }
+    → IPFSService.uploadFile (for each file)
+      → pinata.upload.file → returns { cid, url }
     → prisma.offer.create (status: pending_review)
 
 PUT /api/admin/offers/:id/review
   → OfferController.reviewOffer
     → prisma.offer.update (status: approved/rejected)
-    → EmailService.sendOfferReview
+    → EmailService.sendOfferStatusUpdate
 
 POST /api/admin/offers/:id/issue
-  → OfferController.issueToken
-    → StellarService.issueToken (forSaleContract: true)
+  → OfferController.issueTokenFromOffer
+    → StellarService.issueSecurityToken (forSaleContract: true)
       → Horizon: setOptions (home_domain, flags re-assertion — no distributor payment)
       → Tokens will be minted via SAC during sale activation
-    → StellarService.deploySAC (if needed)
+    → StellarService.deploySACForAsset (if needed)
       → sorobanServer.simulateTransaction
     → prisma.token.create
     → prisma.offer.update (status: admin_verified)
@@ -131,7 +129,7 @@ POST /api/admin/offers/:id/activate
   → OfferController.activateOffer
     → OfferService.activateOffer
       → SorobanSaleService.buildDeployXdr (sale_deploy)
-      → processEffects chain:
+      → MultiSigTransactionService.processEffects chain:
         → sale_create: contract.create(admin, seller, sell, buy, …)
         → contract_deposit_auth: SAC.set_authorized(contractAddr, true)
         → contract_deposit_transfer: SAC.transfer(issuer → contract, totalSupply) [MINTS]
@@ -157,8 +155,8 @@ POST /api/company/payments/:offerId/submit
     → sorobanServer.sendTransaction → poll
     → prisma.interestPayment.createMany
     → prisma.offer.update (lastPaymentDate)
-    → FeeService.logFee (platform fee)
-    → EmailService.sendPaymentNotification (each investor)
+    → ConfigService.logFee (platform fee)
+    → EmailService.sendInterestPaymentConfirmation (each investor)
 ```
 
 ---
@@ -169,7 +167,7 @@ POST /api/company/payments/:offerId/submit
 ```
 POST /api/platform-admins/freighter/challenge
   → platformAdminRoutes (inline)
-    → StellarService.buildChallengeTx (SEP-10 style)
+    → crypto challenge + SEP-10 style challenge TX (inline, no service call)
     → returns { challengeXdr, networkPassphrase }
 
 POST /api/platform-admins/freighter/verify
@@ -182,14 +180,14 @@ POST /api/platform-admins/freighter/verify
 ### Multisig Transaction Lifecycle
 ```
 POST /api/wallets/transactions (create proposal)
-  → WalletController.createProposal
-    → MultiSigTransactionService.createProposal
+  → WalletController.createTransactionProposal
+    → MultiSigTransactionService.create
       → prisma.multiSigTransaction.create
 
 GET /api/admin/transactions/:id/xdr
   → adminTransactionRoutes (inline)
     → prisma.multiSigTransaction.findUnique
-    → (if Soroban) rebuild XDR with fresh simulation
+    → (if Soroban) MultiSigTransactionService.rebuildSorobanXdr
 
 POST /api/admin/transactions/:id/sign
   → adminTransactionRoutes (inline)
@@ -198,10 +196,10 @@ POST /api/admin/transactions/:id/sign
 
 POST /api/admin/transactions/:id/submit
   → adminTransactionRoutes (inline)
-    → MultiSigTransactionService.submitTransaction
+    → MultiSigTransactionService.submit
       → stellarServer.submitTransaction
-      → MultiSigTransactionService.executePostHooks
-        → chains: issueToken → deploySAC → deployContract → activate
+      → MultiSigTransactionService.processEffects
+        → chains: issueSecurityToken → deploySACForAsset → buildDeployXdr → activateOffer
     → prisma.multiSigTransaction.update (status: executed)
 ```
 
@@ -210,10 +208,10 @@ POST /api/admin/transactions/:id/submit
 PUT /api/platform-admins/investors/:id/approve
   → PlatformAdminController.approveInvestor
     → prisma.investor.update (kycStatus: approved)
-    → StellarService.whitelistInvestorForAllTokens
-      → for each active token: changeTrust + setTrustLineFlags(authorized)
-    → EmailService.sendKycApproval
-    → NotificationService.create
+    → StellarService.authorizeAllUserTrustlines
+      → for each active token: SET_TRUST_LINE_FLAGS(authorized)
+    → EmailService.sendKYCApprovalEmail
+    → NotificationService.createNotification
 ```
 
 ---
@@ -222,14 +220,14 @@ PUT /api/platform-admins/investors/:id/approve
 
 | Service | Trigger | Calls |
 |---------|---------|-------|
-| PaymentMonitor | Startup (streaming) | StellarService.streamPayments → DepositRelayService |
-| PaymentReminderService | Cron (daily) | prisma queries → EmailService.sendPaymentReminder |
+| PaymentMonitorService | Startup (SSE streaming) | `PaymentMonitorService.startStream()` → `DepositRelayService.handleIncomingPayment` |
+| PaymentReminderService | Cron (daily 09:00 UTC) | prisma queries → `EmailService.sendInterestPaymentConfirmation` / `sendBulletPaymentConfirmation` |
 | CompanyPaymentService.checkOverduePayments | Cron (00:30 UTC) | prisma queries → prisma.offer.update → prisma.companyPenalty.create |
 | MultiSigTransactionService.expireOldTransactions | Cron (midnight UTC) | prisma queries → prisma.multiSigTransaction.updateMany |
 | BackupService.fullDatabaseDump | Cron (3:00 AM UTC) | child_process.exec(`pg_dump`) |
-| MaintenanceService | Startup (interval) | StellarService.getContractTTL → SorobanSaleService.extendTTL |
+| MaintenanceService.checkAndExtendAllTTLs | Startup + daily 03:00 UTC | `StellarService.getContractTTL` → `StellarService.extendContractTTL` |
 | SorobanEventIndexer | Startup (30s interval) | sorobanServer.getEvents → prisma.investment.update |
 | SorobanReconciler | Startup (5min interval) | prisma queries → sorobanServer.getTransaction |
-| SorobanMetrics | Startup (10min flush) | prisma aggregations → prisma.sorobanMetric.upsert |
-| YieldPaymentReconciler ⭐ | Startup / ENABLE_SOROBAN_SALE=true (5min interval) | prisma.yieldPaymentJob (stuck `submitting`) → YieldDistributorService.resubmit |
-| WalletMonitorService ⭐ | Startup, always (5min interval) | stellarServer.loadAccount(opsWallet) → EmailService.sendAdminAlert |
+| SorobanMetrics | Startup (10min flush) | in-memory stats → `prisma.systemConfig.upsert` (stores metrics in SystemConfig) |
+| YieldPaymentReconciler ⭐ | Startup / ENABLE_SOROBAN_SALE=true (5min interval) | prisma.yieldPaymentJob (stuck `submitting`) → `YieldDistributorService.submitSingleBatch` (resubmit) |
+| WalletMonitorService ⭐ | Startup, always (5min interval) | stellarServer.loadAccount(opsWallet) → `EmailService.sendAdminAlert` |

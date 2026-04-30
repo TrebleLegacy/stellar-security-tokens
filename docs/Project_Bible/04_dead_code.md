@@ -76,7 +76,7 @@ Items that were listed as dead/potentially dead in prior versions of this doc bu
 |---------|-----|-----|----------------|
 | Password auth | `bcrypt` hash + compare | Passkey (WebAuthn) | investorController, authRoutes |
 | Manual token distribution | TransactionManagerService | Soroban sale contract `trade()` | transactionManager.service.js |
-| Bull job queue | Bull + Redis queues | Direct async + SorobanEventIndexer | References in alert.service.js |
+| Bull job queue | Bull + Redis queues | Direct async + SorobanEventIndexer | Lingering comments only in `index.js` + `middleware/rateLimit.js` — no Bull code remains |
 | Single-step registration | Direct /register | Email-first 3-step flow | investorRoutes, companyRoutes |
 | Link-based email verification | JWT token in email link | 6-digit code via Redis | investorRoutes, email.service.js |
 | Platform-pushed payments | PaymentService batch USDC | Company-initiated Soroban yield distributor | payment.service.js |

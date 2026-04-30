@@ -1,28 +1,43 @@
 # Services Layer — Complete Inventory
 
-> 31 files · ~14,900 lines · Initial read 2026-03-10 · Line counts updated 2026-04-29
+> 31 files · ~14,439 lines · Initial read 2026-03-10 · Line counts updated 2026-04-29
 
 ---
 
 ## 1. Stellar Core
 
 ### stellar.service.js (2,101L)
-**Role:** Full Stellar backbone — token issue, trust, SAC deploy, distribution, treasury ops
+**Role:** Full Stellar backbone — token issue, trust, SAC deploy, distribution, treasury ops, freeze/clawback, verification
 
 | Method | Purpose |
 |---|---|
-| `issueToken` | Create + issue Stellar asset with auth flags + StellarService.prepareSorobanTransaction |
-| `createTrustline` | Investor trustline for asset |
+| `issueSecurityToken` | Create + issue Stellar asset with auth flags (was `issueToken` in old doc) |
+| `createIssuerAccount` | Provision issuer account with correct flags |
+| `setupSponsoredTrustline` | Investor trustline for asset, fee-sponsored by Operations (was `createTrustline`) |
+| `authorizeInvestor` | Authorize specific investor trustline (issuer-signed `SET_TRUST_LINE_FLAGS`) |
+| `authorizeAllUserTrustlines` | Batch authorize all investor trustlines for an asset |
 | `distributeTokens` | ISSUER → Investor (delegates to TransactionManager for multisig routing) |
 | `withdrawFromTreasury` | Treasury → destination with muxed ID + multisig or direct signing |
 | `deploySACForAsset` | Deploy Stellar Asset Contract (SAC) on Soroban |
+| `ensureSACDeployed` | Idempotent SAC deploy: check DB → deploy if missing → persist contractId |
+| `freezeAccount` / `unfreezeAccount` | Toggle issuer-level freeze on investor trustline |
+| `clawbackTokens` | Clawback tokens from investor trustline |
+| `disableClawbackForTrustline` | Remove clawback flag from trustline |
+| `unlockToken` | Unlock asset (remove `AUTH_REVOCABLE` flag from issuer) |
 | `getAccountRPC` | Soroban RPC account load (sequence-safe) |
+| `getAccountInfo` | Horizon account info + trustlines |
+| `getTokenBalance` | Token balance for account |
+| `listAccountAssets` | All assets held by account |
+| `listAssetHolders` | All holders of a specific asset |
 | `prepareSorobanTransaction` | Simulate + prepare Soroban TX |
+| `simulateSorobanTransaction` | Dry-run Soroban TX via RPC |
 | `extendContractTTL` | Bump Soroban entry TTL |
 | `getContractTTL` | Read remaining TTL from ledger |
 | `getSACContractId` | Derive SAC contract ID from Asset |
 | `buildUnsignedTransaction` | Build unsigned classic TX |
+| `buildDisableClawbackOp` | Build setOptions op to remove clawback |
 | `submitTransaction` | Submit raw XDR to Horizon |
+| `verifyUSDCPayment` | Verify incoming USDC payment details on Horizon |
 
 **Calls:** `TransactionManager`, `KeyManager`, `stellar.js` config, `prisma`
 **Called by:** Almost everything — controllers, other services
@@ -55,6 +70,9 @@
 | `authorizeBuyerOnSac` | Convenience: authorize buyer on SAC (inline submit) |
 | `buildSacTransferXdr` | Build SAC `transfer()` for depositing tokens into contract |
 | `buildIssuerThresholdSetupXdr` | Build classic setOptions for issuer multisig threshold config |
+| `precomputeContractId` | Deterministic contract ID pre-computation (static, sync) |
+| `parseContractError` | Parse Soroban contract error codes to human-readable (static, sync) |
+| `toHttpError` | Map Soroban error to HTTP status (static, sync) |
 
 **Calls:** `StellarService`, `KeyManager`, Soroban RPC
 **Called by:** `offer.service.js`, `multiSigTransaction.service.js` (processEffects)
@@ -81,9 +99,15 @@ submit(opts) → KeyManager mode === 'multisig'
 | Method | Purpose |
 |---|---|
 | `create` | Queue TX with XDR, operation type, required signers, expiration |
-| `signTransaction` | Cryptographic signature verification + threshold check |
-| `getPendingForSigner` | List pending TXs for a signer |
+| `getById` | Fetch TX by ID with signers/signatures |
+| `listPending` | List pending TXs (filterable by signer, type, status) |
+| `addSignature` | Cryptographic signature verification + threshold check (was `signTransaction` in old doc) |
+| `submit` | Submit TX when threshold met, update status |
+| `reject` | Reject TX, run `processRejectionEffects` |
+| `markExpired` | Mark single TX expired |
+| `expireOldTransactions` | Batch expire all past-deadline TXs (daily 00:00 UTC cron) |
 | `getStats` | Dashboard metrics |
+| `rebuildSorobanXdr` | Rebuild Soroban XDR for re-signing (handles simulation refresh) |
 | `processEffects` | **13 post-exec hooks** (chain operations) |
 | `processRejectionEffects` | Rollback DB state on reject/expire |
 
@@ -111,9 +135,14 @@ submit(opts) → KeyManager mode === 'multisig'
 | Method | Purpose |
 |---|---|
 | `deploySmartWallet` | OZ SmartAccountClient.deploy → Channels submission → DB update (stellarContractId) |
+| `createSmartWallet` | High-level wrapper: deploySmartWallet + DB record creation for investor/companyUser |
+| `hasSmartWallet` | Check if user has a deployed smart wallet (DB lookup) |
+| `getWalletStatus` | Full wallet status: contract ID, balances, deployment state |
+| `getSorobanWalletBalances` | Query USDC + XLM SAC balances for a contract ID |
 | `buildInvestmentTx` | SAC transfer USDC investor→company (footprint handled by Channels) |
 | `sendTransaction` | Channels submitTransaction → fee-bump fallback |
 | `sendSorobanTransaction` | Channels submitSorobanTransaction (func+auth — auto footprint) |
+| `submitWithSponsorship` | Submit XDR with Operations wallet fee sponsorship (non-Channels path) |
 | `submitWithdrawalTx` | Validates contract allowlist before sponsoring |
 | `buildWithdrawalTx` / `buildWithdrawalTxForCompany` | Build SAC transfer from smart wallet |
 | ~~`addPasskeySigner` / `removePasskeySigner`~~ | ⚠️ **REMOVED** — required passkey auth, backend used wrong key |
@@ -128,14 +157,23 @@ submit(opts) → KeyManager mode === 'multisig'
 ---
 
 ### webauthn.service.js (390L)
-**Role:** WebAuthn CRUD across 3 user types
+**Role:** WebAuthn full lifecycle across 3 user types (investor, companyUser, platformAdmin)
 
 | Method | Purpose |
 |---|---|
-| `registerCredential` | Store WebAuthn credential for investor/companyUser/platformAdmin |
-| `getCredentialByUserId` | Lookup by user |
-| `getCredentialById` | Lookup by credential ID |
-| `updateCounter` | Increment auth counter |
+| `generateRegistrationOptions` | Generate WebAuthn registration challenge |
+| `verifyRegistration` | Verify credential creation response |
+| `saveCredential` | Store WebAuthn credential (was `registerCredential` in old doc) |
+| `generateAuthenticationOptions` | Generate auth challenge for known credential |
+| `generateDiscoverableAuthOptions` | Generate discoverable credential challenge (passkey login) |
+| `verifyAuthentication` | Verify authentication response + update counter |
+| `getUserCredentials` | List all credentials for user (was `getCredentialByUserId`) |
+| `getCredentialById` | Lookup by raw credential ID |
+| `findUserByHandle` | Lookup user by WebAuthn user handle |
+| `updateCredentialCounter` | Increment replay counter (was `updateCounter`) |
+| `updateCredentialLastUsed` | Track last-used timestamp |
+
+*Private helpers (not in public API):* `getCredentialsTableName`, `getPrismaModel`, `getUserIdColumnName`, `getUserIdFieldName` — polymorphic model routing across 3 user types.
 
 ---
 
@@ -165,7 +203,7 @@ submit(opts) → KeyManager mode === 'multisig'
 | `calculateOwedAmount` | Per-investor interest breakdown (locked=DB, unlocked=on-chain) |
 | `calculateBulletPayment` | Principal + accrued interest at maturity |
 | `getUpcomingPayments` | All due payments for a company |
-| `processTokenSaleFees` | 1% platform fee on token sale |
+| ~~`processTokenSaleFees`~~ | **GHOST — method does not exist** in codebase (never implemented or removed; trade-time fees handled by Soroban contract `fixed_fee`) |
 | `createPaymentTransaction` | Build unsigned TX — routes C-wallets through YieldDistributor, G-wallets through classic ops |
 | `processSignedPayment` | Submit periodic TX directly + call `_recordPayments()` |
 | `processSignedBatches` | Submit multi-batch YieldDistributor TXs sequentially with retry |
@@ -207,13 +245,15 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ---
 
-### paymentReminder.service.js (400L)
+### paymentReminder.service.js (409L)
 **Role:** Automated payment reminder scheduler
 
 **Schedule:** Daily cron at 09:00 UTC
 - 30d, 21d, 14d, 7d, 6-2d, 1d, due day → escalating emails + notifications
 - Overdue: daily reminders with late fee calculation, 10-day grace period
 - Updates `paymentDueStatus`: current → upcoming → due → overdue → defaulted
+
+**Methods:** `startReminderScheduler`, `stopReminderScheduler`, `processReminders`, `sendReminder`, `sendOverdueReminder`, `updatePaymentDueStatus`, `getPeriodsPerYear`, `getReminderTitle`, `getReminderMessage`
 
 ---
 
@@ -233,9 +273,11 @@ submit(opts) → KeyManager mode === 'multisig'
 
 | Method | Purpose |
 |---|---|
-| `initiateDeposit` | Generate deterministic memo (`DEP` + sha256) |
-| `handleIncomingPayment` | Create Deposit record on first payment, forward via treasury |
+| `initiateDeposit` | Generate deterministic memo via `computeMemo` (static: DEP + sha256) |
+| `handleIncomingPayment` | Create Deposit record on first payment, forward via treasury (was `processDeposit` in old doc) |
 | `forwardAsset` | `StellarService.withdrawFromTreasury()` → smart wallet |
+| `getInvestorDeposits` | List all deposits for an investor |
+| `computeMemo` | Static: compute deterministic memo string (sha256 prefix) |
 
 ---
 
@@ -247,6 +289,7 @@ submit(opts) → KeyManager mode === 'multisig'
 | Method | Purpose |
 |---|---|
 | `getDefaultedOffers` | List defaulted offers with pro-rata distributions (locked=DB, unlocked=on-chain) |
+| `getDefaultedOfferDetails` | Full detail for single defaulted offer (investors + balances + penalty) |
 | `prepareCollateralDistribution` | Build unsigned batch payment TX |
 | `processCollateralDistribution` | Submit + close offer + enforce penalties + notify investors |
 | `getDefaultStatistics` | Dashboard: pending defaults, resolved, total pending penalties |
@@ -260,39 +303,47 @@ submit(opts) → KeyManager mode === 'multisig'
 
 | Method | Purpose |
 |---|---|
-| `getAll` / `getById` | Prisma queries with relations |
-| `create` | Validate + prisma create |
-| `update` / `updateStatus` | Field updates |
-| `deployToSoroban` | 3-step chain: token issue → SAC deploy → sale deploy → sale create → activate (all via TransactionManager with crash recovery) |
+| `createOffer` | Validate fields (payment, asset, limits) + prisma create |
+| `reviewOffer` | Admin approve/reject + trigger Soroban chain via `issueTokenFromOffer` |
+| `activateOffer` | Mark offer active after contract chain completes |
+| `issueTokenFromOffer` | Entry point: token issue → SAC deploy → sale deploy → sale create (all via TransactionManager) |
+| `retrySorobanInit` | Crash recovery: resume interrupted contract chain from last completed step |
+| `getActiveOffers` | List active offers (with contract state) |
+| `getOffersByType` | Filter offers by payment type / collateral |
+| `getOfferInvestors` | Investors + their token balances for an offer |
 
 ---
 
 ## 6. Infrastructure Services
 
 ### alert.service.js (132L)
-**Role:** Alert logging hub (6 methods: `paymentMonitorFailed`, `transactionFailed`, `distributionQueueFailed`, etc.)
-**⚠️ Dead code:** `distributionQueueFailed` — references removed queue pattern
+**Role:** Alert logging hub (6 methods: `paymentMonitorFailed`, `transactionFailed`, `sorobanEventFailed`, etc.)
+**Note:** `distributionQueueFailed` was already removed from source (confirmed Round 6); doc note was stale.
 
 ### alertRouter.service.js (136L)
 **Role:** Multi-channel alert routing: Slack webhook + PagerDuty + DB notifications
+**Methods:** `send` (main router), `_sendSlack`, `_sendPagerDuty`, `_sendDbNotification`
 
-### notification.service.js (~200L)
-**Role:** CRUD for in-app notifications with Pusher real-time broadcasting
+### notification.service.js (121L)
+**Role:** CRUD for in-app notifications
+**Methods:** `createNotification`, `getUserNotifications`, `markAsRead`, `markAllAsRead`
 
-### email.service.js (~300L)
-**Role:** Resend-based transactional email with 15+ templates
+### email.service.js (976L)
+**Role:** Resend-based transactional email with 16 templates
+**Methods:** `sendVerificationEmail`, `sendWelcomeEmail`, `send6DigitVerificationCode`, `resendVerificationEmail`, `sendInvestmentConfirmation`, `sendInterestPaymentConfirmation`, `sendBulletPaymentConfirmation`, `sendQuarterlyPaymentConfirmation`, `sendSemiAnnualPaymentConfirmation`, `sendKYCApprovalEmail`, `sendKYCRejectionEmail`, `sendCompanyStatusUpdate`, `sendOfferStatusUpdate`, `sendAdminAlert`, `generateVerificationToken`, `getVerificationExpiry`
 
-### config.service.js (~200L)
+### config.service.js (58L)
 **Role:** SystemConfig CRUD + FeeLog management
+**Methods:** `get`, `getFloat`, `logFee`
 
-### backup.service.js (~200L)
-**Role:** Database pg_dump + user snapshot backup with retention
+### backup.service.js (181L)
+**Role:** Database pg_dump + retention management
 
 ---
 
 ## 7. Soroban Monitoring
 
-### sorobanEventIndexer.js (326L)
+### sorobanEventIndexer.js (329L)
 **Role:** 30-second interval Soroban event poller
 
 - Tracks all active sale contracts
@@ -300,11 +351,11 @@ submit(opts) → KeyManager mode === 'multisig'
 - Cursor persisted in SystemConfig
 - Critical events (`wdrw`, `drain`, `padmin`, `aadmin`) → admin notifications
 
-### sorobanMetrics.service.js (104L)
+### sorobanMetrics.service.js (103L)
 **Role:** In-memory trade latency tracking (avg, p95, min, max, error rate)
 - Periodic flush to SystemConfig every 10 min
 
-### sorobanReconciler.js (207L)
+### sorobanReconciler.js (206L)
 **Role:** Fix orphaned Soroban investments (every 5 min)
 
 | Scenario | Action |
@@ -315,7 +366,7 @@ submit(opts) → KeyManager mode === 'multisig'
 | `pending_payment` > 30 min | Auto-cancel |
 | ≥5 orphans in one cycle | Alert via AlertRouter |
 
-### yieldPaymentReconciler.js (~150L)
+### yieldPaymentReconciler.js (150L)
 **Role:** Fix orphaned yield payment jobs (every 5 min)
 
 | Scenario | Action |
@@ -325,12 +376,11 @@ submit(opts) → KeyManager mode === 'multisig'
 | Job stale > 1 hour, no TXs | Mark `failed` |
 | ≥3 stale jobs in one cycle | Alert via AlertRouter |
 
-### maintenance.service.js (~140L)
+### maintenance.service.js (140L)
 **Role:** Daily TTL extension sweep (03:00 UTC + startup)
-- Checks SACs, smart wallets, sale contracts, settlement contracts, YieldDistributor
-- Extends if TTL < 50,000 ledgers (~3.5 days)
+**Methods:** `init()` (registers cron + runs at startup), `checkAndExtendAllTTLs()` (batch TTL check)
 
-### walletMonitor.service.js (6,048B) ⭐ NEW (Apr 2026)
+### walletMonitor.service.js (153L) ⭐ NEW (Apr 2026)
 **Role:** Proactive Operations hot wallet balance monitor
 
 | Method | Purpose |
@@ -352,7 +402,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 7b. Soroban Maturity Settlement
 
-### sorobanSettlement.service.js (24,335B) ⭐ NEW (Apr 2026)
+### sorobanSettlement.service.js (579L) ⭐ NEW (Apr 2026)
 **Role:** Backend wrapper for the MaturitySettlement Soroban contract
 
 | Method | Purpose |
@@ -394,8 +444,9 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 8. TOML & IPFS
 
-### toml.service.js (123L)
+### toml.service.js (184L)
 **Role:** Dynamic `stellar.toml` from DB — all tokens + offers with IPFS legal doc links (SEP-1)
+**Methods:** `generateToml()`
 
 ### ipfs.service.js (146L)
 **Role:** Pinata SDK wrapper — upload, fetch, validate CID. Mock mode if no `PINATA_JWT`
@@ -404,7 +455,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 9. Identity & Keys
 
-### KeyManager.js (447L)
+### KeyManager.js (464L)
 **Role:** Key management with `env` (dev) and `multisig` (prod) modes
 - Resolves keypairs for ISSUER, DISTRIBUTOR, TREASURY, OPERATIONS, CHANNEL_X
 - Configures multisig thresholds
@@ -413,7 +464,7 @@ submit(opts) → KeyManager mode === 'multisig'
 
 ## 10. Metrics & Analytics
 
-### investmentMetrics.service.js (284L)
+### investmentMetrics.service.js (283L)
 **Role:** Dashboard analytics
 
 | Method | Purpose |

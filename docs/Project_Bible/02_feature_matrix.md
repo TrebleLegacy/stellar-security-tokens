@@ -60,7 +60,7 @@
 | Penalties tracking | ✅ companyPaymentRoutes /penalties | ✅ PayInvestors page | ✅ |
 | Company wallet | ✅ companytRoutes /wallet-status | ✅ Wallet page | ✅ |
 | Company withdrawal | ✅ companyRoutes /withdraw | ✅ Wallet page | ✅ |
-| IPFS document info | ✅ PinataService | ✅ IPFSInfo page | ✅ |
+| IPFS document info | ✅ IPFSService.uploadFile | ✅ IPFSInfo page | ✅ |
 | Legal documents | ✅ Stored on upload | ✅ Documents page | ✅ |
 | Company reports | 🟡 Limited endpoints | ✅ Reports page | 🟡 |
 
@@ -73,8 +73,8 @@
 | Investor KYC rejection | ✅ + email notification | ✅ UserManagement | ✅ |
 | Company approval/rejection | ✅ platformAdminRoutes + email | ✅ Companies page | ✅ |
 | Offer review workflow | ✅ offerRoutes /review | ✅ AdminOffers page | ✅ |
-| Token issuance | ✅ StellarService.issueToken | ✅ AdminOffers | ✅ |
-| SAC deployment | ✅ StellarService.deploySAC | ✅ AdminOffers | ✅ |
+| Token issuance | ✅ StellarService.issueSecurityToken | ✅ AdminOffers | ✅ |
+| SAC deployment | ✅ StellarService.deploySACForAsset | ✅ AdminOffers | ✅ |
 | Offer activation (Soroban deploy) | ✅ Full chain via multisig | ✅ AdminOffers | ✅ |
 | Multisig TX queue | ✅ adminTransactionRoutes | ✅ Approvals page | ✅ |
 | System wallet management | ✅ walletRoutes | ✅ Wallets page | ✅ |

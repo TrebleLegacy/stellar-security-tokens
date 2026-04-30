@@ -41,7 +41,7 @@
 
 ## Controller Summaries
 
-### 1. `investorController.js` (906L)
+### 1. `investorController.js` (830L)
 
 **Purpose:** Complete investor lifecycle — registration, profile, portfolio, payments, wallet, deposits.
 
@@ -67,7 +67,7 @@
 
 ---
 
-### 2. `investmentController.js` (514L)
+### 2. `investmentController.js` (822L)
 
 **Purpose:** Investment purchase flow — Soroban-only atomic swaps with fee calculation.
 
@@ -89,7 +89,7 @@
 
 ---
 
-### 3. `offerController.js` (1,121L)
+### 3. `offerController.js` (1,288L)
 
 **Purpose:** Full offer lifecycle — CRUD, review workflow, token issuance, activation.
 
@@ -112,14 +112,14 @@
 
 ---
 
-### 4. `companyController.js` (818L)
+### 4. `companyController.js` (817L)
 
 **Purpose:** Company registration, profile management, wallet operations.
 
 **Key Methods:**
 - `registerCompany` — Single-step: creates Company + ghost CompanyUser + passkey wallet + JWT in one call
-- `registerCompanyStep1/2/3` — Legacy 3-step flow (email → verify → complete)
-- `sendVerificationCode` / `verifyCode` — 6-digit OTP for legacy flow
+- `initiateCompanyRegistration` — Step 1: send OTP code to email
+- `verifyCompanyEmailCode` / `resendCompanyCode` — Step 2: verify OTP
 - `getCompany` / `getCompanyProfile` — Profile with KYC doc formatting
 - `getAllCompanies` — Admin list with pagination
 - `updateCompanyStatus` — Admin approve/reject company
@@ -133,16 +133,15 @@
 
 ---
 
-### 5. `companyUserController.js` (577L)
+### 5. `companyUserController.js` (584L)
 
 **Purpose:** Company user management — registration, wallet, withdrawals.
 
 **Key Methods:**
 - `getCompanyUsers` — List users for a company
 - `updateCompanyUser` — Update name, role, status
-- `registerCompanyUser` — Single-step with passkey data
-- `registerCompanyUserStep1/2/3` — Legacy 3-step flow
-- `sendVerificationCode` / `verifyCode` — 6-digit OTP
+- `registerWithPasskey` — Single-step company user registration with passkey
+- `verifyEmail` / `resendVerificationEmail` — Email verification flow
 - `getWalletStatus` — Smart wallet balance check
 - `proposeWithdrawal` / `submitWithdrawal` — Company user withdrawal
 
@@ -152,7 +151,7 @@
 
 ---
 
-### 6. `platformAdminController.js` (463L)
+### 6. `platformAdminController.js` (462L)
 
 **Purpose:** Admin CRUD, system config, fee logs, investor KYC management, TTL stats.
 
@@ -174,7 +173,7 @@
 
 ---
 
-### 7. `tokenController.js` (367L)
+### 7. `tokenController.js` (366L)
 
 **Purpose:** Token lifecycle — issuance, sync, compliance operations, SAC deployment.
 
@@ -193,7 +192,7 @@
 
 ---
 
-### 8. `walletController.js` (447L)
+### 8. `walletController.js` (482L)
 
 **Purpose:** System wallet management + multisig proposal lifecycle (the "Approval Hub" backend).
 
@@ -211,7 +210,7 @@
 
 ---
 
-### 9. `webauthnController.js` (425L)
+### 9. `webauthnController.js` (397L)
 
 **Purpose:** WebAuthn (passkey) authentication for all 3 user types.
 

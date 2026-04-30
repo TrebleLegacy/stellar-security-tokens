@@ -10,17 +10,17 @@
 | # | File | Lines | Mounts At | Auth Used |
 |---|------|-------|-----------|-----------|
 | 1 | `investorRoutes.js` | 463 | `/api/investors` | public (reg), `authenticateToken`, `requireInvestor`, `requireOwnData` |
-| 2 | `investmentRoutes.js` | 114 | `/api/investments` | `authenticateToken` |
+| 2 | `investmentRoutes.js` | 117 | `/api/investments` | `authenticateToken` |
 | 3 | `offerRoutes.js` | 794 | mixed: `/api/companies/offers`, `/api/offers`, `/api/admin/offers` | `requireCompanyUser`, `requirePlatformAdmin`, `optionalAuth`, `requireRole` |
-| 4 | `companyRoutes.js` | 414 | `/api/companies` | public (reg), `requireCompanyUser`, `requirePlatformAdmin` |
-| 5 | `companyUserRoutes.js` | 257 | `/api/company-users` | public (reg), `requireCompanyUser` |
-| 6 | `authRoutes.js` | 367 | `/api/auth` | public (login), `authenticateToken` (logout) |
+| 4 | `companyRoutes.js` | 413 | `/api/companies` | public (reg), `requireCompanyUser`, `requirePlatformAdmin` |
+| 5 | `companyUserRoutes.js` | 273 | `/api/company-users` | public (reg), `requireCompanyUser` |
+| 6 | `authRoutes.js` | 366 | `/api/auth` | public (login), `authenticateToken` (logout) |
 | 7 | `platformAdminRoutes.js` | 2,067 | `/api/platform-admins` | public (login), `authenticateToken` + `requirePlatformAdmin`, `requireAdminRole` |
-| 8 | `tokenRoutes.js` | 283 | `/api/tokens` | `requirePlatformAdmin`, `optionalAuth` (list), public (detail) |
+| 8 | `tokenRoutes.js` | 282 | `/api/tokens` | `requirePlatformAdmin`, `optionalAuth` (list), public (detail) |
 | 9 | `walletRoutes.js` | 272 | `/api/wallets` | public (`submit-tx`), `authenticateToken` + `requirePlatformAdmin` |
-| 10 | `webauthnRoutes.js` | 193 | `/api/webauthn` | public (all) |
-| 11 | `contractRoutes.js` | 208 | `/api/admin/contracts` | `requirePlatformAdmin` (global `router.use`) |
-| 12 | `notificationRoutes.js` | 26 | `/api/notifications` | `authenticateToken` (global `router.use`) |
+| 10 | `webauthnRoutes.js` | 192 | `/api/webauthn` | public (all) |
+| 11 | `contractRoutes.js` | 207 | `/api/admin/contracts` | `requirePlatformAdmin` (global `router.use`) |
+| 12 | `notificationRoutes.js` | 25 | `/api/notifications` | `authenticateToken` (global `router.use`) |
 | 13 | `securityRoutes.js` | 222 | `/api/security` | `authenticateToken`, public (`passkey-config`) |
 | 14 | `adminTransactionRoutes.js` | 634 | `/api/admin/transactions` | `authenticatePlatformAdmin` |
 | 15 | `companyPaymentRoutes.js` | 561 | `/api/company/payments` | `authenticateToken` + `requireCompanyUser` |

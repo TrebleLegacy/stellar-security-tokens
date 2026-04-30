@@ -129,4 +129,4 @@ process.on('uncaughtException', (error) => {
 | **No dead letter queue for deposits** | Unmatched deposits are logged but not retried | Add periodic reconciliation |
 | **Soroban simulation can go stale** | XDR built, user delays signing → TX may fail | Add expiration check before submit |
 | **No circuit breaker** | All external calls (Horizon, Soroban RPC, Channels) have no circuit breaker | Add circuit breaker pattern |
-| **In-memory challenge store** | Server restart loses all pending WebAuthn challenges | Move to Redis with 5-min TTL |
+| ~~**In-memory WebAuthn challenges**~~ | ~~Won't scale horizontally, lost on restart~~ — **RESOLVED (2026-04-29)**: all challenge stores migrated to Redis with TTL | ~~webauthnController, authRoutes, platformAdminRoutes~~ |

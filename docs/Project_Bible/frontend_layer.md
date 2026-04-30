@@ -42,35 +42,35 @@ Pages → Hooks (useOffer, usePasskey, ...) → API modules (offersApi, ...) →
 | Library | File | Used By | Purpose |
 |---------|------|---------|---------|
 | SmartAccountKit | `lib/passkey.ts` | Investor + Company | Discoverable login, wallet deploy, TX signing |
-| Freighter API | `lib/freighter.ts` (209L) | Admin | Browser extension wallet, SEP-10 challenge signing |
-| Ledger WebUSB | `lib/ledger.ts` (277L) | Admin (recovery) | Hardware wallet TX signing via BIP44 |
+| Freighter API | `lib/freighter.ts` (208L) | Admin | Browser extension wallet, SEP-10 challenge signing |
+| Ledger WebUSB | ~~`lib/ledger.ts`~~ | — | **DELETED / never shipped** — file does not exist in codebase; Ledger integration was planned but not implemented |
 | ~~Pusher~~ | ~~`lib/pusher.ts`~~ | — | **DELETED** (commit 7aad8c3) — WebSocket plan abandoned; `pusher-js` dep also removed |
-| Sentry | `lib/sentry.ts` (159L) | All | Error monitoring, PII scrubbing, production-only |
+| Sentry | `lib/sentry.ts` (158L) | All | Error monitoring, PII scrubbing, production-only |
 
 ---
 
 ## API Modules (9 modules + 1 client = 10 files in `api/`)
 
-All modules export typed object literals wrapping Axios calls.
+All modules export typed object literals (or named async functions) wrapping Axios calls.
 
 | Module | Methods | Key Operations |
 |--------|---------|----------------|
 | ~~`auth.ts`~~ | — | **DELETED** (commit 696f300) — Legacy email/password login, removed with passkey migration |
-| `investors.ts` | 8 | CRUD, portfolio, deposits, KYC status |
-| `companies.ts` | 10 | CRUD, profile, wallet status, offers |
-| `offers.ts` | 16 | Full lifecycle: create (FormData), review, issue, activate, unlock token for DEX |
-| `investments.ts` | 10 | Purchase, status, metrics, statistics, pending |
+| `investors.ts` | 7 | CRUD, portfolio, deposits, KYC status (`getAll`, `getById`, `register`, `getPortfolio`, `updateKycStatus`, `initiateDeposit`, `getDeposits`) |
+| `companies.ts` | 9 | CRUD, profile, wallet status, offers (`getAll`, `getById`, `register`, `update`, `updateStatus`, `updateKycStatus`, `getOffers`, `getProfile`, `getWalletStatus`) |
+| `offers.ts` | 18 | Full lifecycle: getAll, getAllAdmin, getCompanyOffers, getActive, getById, create, update, review, addDueDiligenceNotes, issueToken, verifyIssuance, activate, getInvestors, unlockToken, deploySettlement, buildSettlementDeposit, executeSettlement, getSettlementStatus |
+| `investments.ts` | 9 | Purchase, status, metrics (`getMyInvestments`, `purchase`, `getStatus`, `getAll`, `getPending`, `verifyPayment`, `cancel`, `getMetrics`, `getStatistics`) |
 | `tokens.ts` | 7 | List, detail, freeze, unfreeze, clawback, disable-clawback, sync |
-| `platformAdmins.ts` | 18 | Freighter auth, admin CRUD, investor mgmt, sponsor wallet, analytics (6 endpoints) |
+| `platformAdmins.ts` | 20 | Freighter auth, admin CRUD, investor mgmt, sponsor wallet, system config, analytics (`freighterChallenge`, `freighterVerify`, `getAll`, `getById`, `create`, `update`, `updateStatus`, `getInvestors`, `approveInvestor`, `rejectInvestor`, `sponsorInvestorWallet`, `getSystemConfig`, `updateSystemConfig`, `getFeeLogs`, `getMetrics`, `getStatistics`, `getPendingInvestments`, `getFundraisingProgress`, `getRevenueBreakdown`, `getInvestorCohorts`) |
 | `wallets.ts` | 3 | System wallet statuses, TX proposals, submit signed TX |
 | ~~`companyUsers.ts`~~ | — | **DELETED** (commit 7aad8c3) — Password-based registration removed |
-| `companyPayments.ts` | 9+ | Upcoming, yield-status, prepare XDR, submit (polymorphic: single/batch), history, penalties, prepare-deposit, submit-deposit, settlement-status |
-| `notifications.ts` | 3 | List, mark read, mark all read |
-| `adminDefaults.ts` | 4 | List defaulted offers, details, prepare distribution, distribute collateral |
+| `companyPayments.ts` | 12 | `getUpcomingPayments`, `getPaymentDetails`, `preparePayment`, `submitPayment`, `submitBatchPayment`, `getPaymentHistory`, `getAllPaymentHistory`, `getPenalties`, `prepareDeposit`, `submitDeposit`, `getSettlementStatus`, `getYieldJobStatus` |
+| ~~`notifications.ts`~~ | — | **DOES NOT EXIST** — notification API calls are made directly via `lib/api.ts` inside `NotificationBell.tsx` component (`GET /notifications?limit=10`) |
+| `adminDefaults.ts` | 4 | `getDefaultedOffers`, `getDefaultDetails`, `prepareDistribution`, `distributeCollateral` |
 
 ---
 
-## Type System (`types/index.ts` — 217L)
+## Type System (`types/index.ts` — 151L)
 
 12 domain interfaces: `Investor`, `Company`, `CompanyUser`, `PlatformAdmin`, `Offer`, `Token`, `Investment`, `TokenDistribution`, `InterestPayment`, `ApiResponse<T>`, `LoginResponse`, plus form types (`RegisterInvestorForm`, `RegisterCompanyForm`, `CreateOfferForm`, `InvestmentForm`).
 
@@ -85,7 +85,7 @@ All modules export typed object literals wrapping Axios calls.
 | `usePasskey` | Init SmartAccountKit, discoverable login, register wallet |
 | ~~`usePasskeys`~~ | **DELETED** — passkey management merged into `securityRoutes` page logic |
 | `useFreighter` | Connect Freighter, sign transactions |
-| `useLedger` | Connect Ledger, sign transactions |
+| ~~`useLedger`~~ | **DELETED / never shipped** — hook does not exist in `src/hooks/`; Ledger integration was planned but not implemented |
 | `useInvestment` | Purchase flow orchestration |
 | `useInvestmentFees` | Fee schedule fetching |
 | `useOffer` | Single offer data + actions |
@@ -165,7 +165,7 @@ All modules export typed object literals wrapping Axios calls.
 | `MobileSidebar` | Responsive mobile navigation |
 | `NotificationBell` | Real-time notification indicator |
 | ~~`FreighterConnect`~~ | **DELETED** (commit 7aad8c3) — unused wrapper; admin pages use `useFreighter` hook directly |
-| `LedgerConnect` | Ledger hardware wallet pairing |
+| ~~`LedgerConnect`~~ | **DELETED / never shipped** — component does not exist in codebase |
 | `TokenManagementModal` | Token lifecycle action modal |
 | `InvestmentDialog` | Soroban investment purchase flow |
 | `InfoTooltip`, `TransactionLink` | Utility components (`components/ui/`) |
