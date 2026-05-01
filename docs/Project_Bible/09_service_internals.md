@@ -1,7 +1,7 @@
 # 09 — Service Internals
 
 > **⚠️ AUTO-GENERATED — DO NOT EDIT MANUALLY**  
-> Generated: `2026-04-30T23:14:06.888Z`  
+> Generated: `2026-05-01T03:29:16.197Z`  
 > Source: `backend/src/services/` (31 files)  
 > Regenerate: `npm run docs:services`
 
@@ -11,7 +11,10 @@
 ## 1. KeyManager
 
 **File:** `backend/src/services/KeyManager.js` · **465 lines**
-**Export pattern:** `export const = new KeyManager()`
+**Export:** `export const = new KeyManager()`
+
+**External packages:** `@stellar/stellar-sdk`, `dotenv`, `fs`
+**Internal imports:** `logger`
 
 **Constructor**
 
@@ -69,7 +72,10 @@
 ## 2. ConfigService
 
 **File:** `backend/src/services/config.service.js` · **59 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `feeLog`, `systemConfig`
 
 **Methods**
 
@@ -89,7 +95,11 @@
 ## 3. TransactionManager
 
 **File:** `backend/src/services/transactionManager.service.js` · **89 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `keyManager`, `MultiSigTransactionService`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `signAndSubmitTransaction, getNetworkPassphrase`, `logger`
 
 **Methods**
 
@@ -105,7 +115,9 @@
 ## 4. AlertService
 
 **File:** `backend/src/services/alert.service.js` · **132 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Internal imports:** `logger`
 
 **Methods**
 
@@ -133,7 +145,9 @@
 ## 5. AlertRouter
 
 **File:** `backend/src/services/alertRouter.service.js` · **136 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Internal imports:** `logger`
 
 **Methods**
 
@@ -155,7 +169,16 @@
 ## 6. BackupService
 
 **File:** `backend/src/services/backup.service.js` · **182 lines**
-**Export pattern:** `export const = { }`
+**Export:** `export const = { }`
+
+**External packages:** `node:child_process`, `node:fs/promises`, `node:path`, `node:util`, `node:fs`, `node:stream/promises`, `node:zlib`
+**Internal imports:** `logger`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 23 | `BACKUP_ROOT` | `…` |
 
 **Methods**
 
@@ -177,7 +200,11 @@
 ## 7. TomlService
 
 **File:** `backend/src/services/toml.service.js` · **185 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `keyManager`, `ipfsService`
+**Internal imports:** `getNetworkPassphrase`, `prisma`
+**Prisma models:** `systemConfig`, `token`
 
 **Methods**
 
@@ -193,7 +220,10 @@
 ## 8. SorobanMetrics
 
 **File:** `backend/src/services/sorobanMetrics.service.js` · **104 lines**
-**Export pattern:** `class (not directly exported)`
+**Export:** `class (not directly exported)`
+
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `systemConfig`
 
 **Constants & Static Fields**
 
@@ -227,7 +257,10 @@
 ## 9. NotificationService
 
 **File:** `backend/src/services/notification.service.js` · **122 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `notification`
 
 **Methods**
 
@@ -249,7 +282,12 @@
 ## 10. MaintenanceService
 
 **File:** `backend/src/services/maintenance.service.js` · **141 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`
+**External packages:** `node-cron`
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `investor`, `offer`, `token`
 
 **Constants & Static Fields**
 
@@ -274,7 +312,17 @@
 ## 11. WalletMonitorService
 
 **File:** `backend/src/services/walletMonitor.service.js` · **154 lines**
-**Export pattern:** `export const = { }`
+**Export:** `export const = { }`
+
+**Service dependencies:** `keyManager`, `EmailService`
+**Internal imports:** `stellarServer`, `logger`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 27 | `CHECK_INTERVAL_MS` | `5 * 60 * 1000` |
+| 28 | `STARTUP_DELAY_MS` | `10000` |
 
 **Methods**
 
@@ -292,7 +340,19 @@
 ## 12. YieldPaymentReconciler
 
 **File:** `backend/src/services/yieldPaymentReconciler.js` · **151 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`, `AlertService`
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `yieldPaymentJob`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 16 | `STALE_THRESHOLD_MS` | `10 * 60 * 1000` |
+| 17 | `POLL_INTERVAL_MS` | `5 * 60 * 1000` |
+| 18 | `MAX_AGE_MS` | `60 * 60 * 1000` |
 
 **Constants & Static Fields**
 
@@ -319,7 +379,10 @@
 ## 13. IpfsService
 
 **File:** `backend/src/services/ipfs.service.js` · **146 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**External packages:** `pinata-web3`, `dotenv`, `buffer`, `path`
+**Internal imports:** `logger`
 
 ### IpfsService
 
@@ -375,7 +438,12 @@
 ## 14. DepositRelayService
 
 **File:** `backend/src/services/depositRelay.service.js` · **215 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`
+**External packages:** `@stellar/stellar-sdk`, `crypto`
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `deposit`, `investor`
 
 **Constants & Static Fields**
 
@@ -405,7 +473,19 @@
 ## 15. SorobanEventIndexer
 
 **File:** `backend/src/services/sorobanEventIndexer.js` · **330 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**External packages:** `@stellar/stellar-sdk`, `node-cron`
+**Internal imports:** `getSorobanRpcUrl`, `prisma`, `logger`
+**Prisma models:** `offer`, `platformAdmin`, `systemConfig`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 23 | `INITIAL_LOOKBACK_LEDGERS` | `60` |
+| 25 | `MAX_EVENTS` | `100` |
+| 28 | `CURSOR_PREFIX` | `"eidx_"` |
 
 **Methods**
 
@@ -437,7 +517,19 @@
 ## 16. SorobanReconciler
 
 **File:** `backend/src/services/sorobanReconciler.js` · **207 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `getSorobanRpcUrl`, `prisma`, `logger`
+**Prisma models:** `investment`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 20 | `ORPHAN_TIMEOUT_MS` | `10 * 60 * 1000` |
+| 21 | `PENDING_TTL_MS` | `30 * 60 * 1000` |
+| 22 | `POLL_INTERVAL_MS` | `5 * 60 * 1000` |
 
 **Methods**
 
@@ -458,7 +550,19 @@
 ## 17. WebAuthnService
 
 **File:** `backend/src/services/webauthn.service.js` · **391 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**External packages:** `@simplewebauthn/server`
+**Internal imports:** `prisma`
+**Prisma models:** `companyUser`, `investor`, `model`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 9 | `rpName` | `"Stellar Security Tokens"` |
+| 10 | `rpID` | `…` |
+| 11 | `origin` | `…` |
 
 **Methods**
 
@@ -502,7 +606,10 @@
 ## 18. InvestmentMetricsService
 
 **File:** `backend/src/services/investmentMetrics.service.js` · **284 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Internal imports:** `prisma`, `Investment`
+**Prisma models:** `feeLog`, `investment`, `investor`, `offer`
 
 **Methods**
 
@@ -528,7 +635,12 @@
 ## 19. CollateralDistributionService
 
 **File:** `backend/src/services/collateralDistribution.service.js` · **353 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`, `PaymentService`, `NotificationService`, `EmailService`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `prisma`, `getIssuerKeypair, getDistributorKeypair`, `logger`
+**Prisma models:** `companyPenalty`, `offer`
 
 **Methods**
 
@@ -554,7 +666,10 @@
 ## 20. PaymentMonitor
 
 **File:** `backend/src/services/paymentMonitor.service.js` · **351 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `DepositRelayService`
+**Internal imports:** `stellarServer, createFreshServer`, `logger`
 
 **Constructor**
 
@@ -593,7 +708,12 @@
 ## 21. PaymentReminderService
 
 **File:** `backend/src/services/paymentReminder.service.js` · **410 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `CompanyPaymentService`, `EmailService`, `NotificationService`
+**External packages:** `node-cron`
+**Internal imports:** `prisma`, `logger`
+**Prisma models:** `companyUser`, `offer`, `paymentReminder`
 
 **Methods**
 
@@ -622,7 +742,12 @@
 ## 22. PaymentService
 
 **File:** `backend/src/services/payment.service.js` · **514 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`, `ConfigService`, `keyManager`, `TransactionManager`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `prisma`, `getSorobanRpcUrl, getUsdcIssuer`, `logger`
+**Prisma models:** `companyUser`, `notification`, `offer`
 
 **Methods**
 
@@ -648,7 +773,10 @@
 ## 23. OfferService
 
 **File:** `backend/src/services/offer.service.js` · **575 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Internal imports:** `Offer`, `Token`, `Company`, `prisma`, `logger`
+**Prisma models:** `investment`, `offer`
 
 **Methods**
 
@@ -691,7 +819,20 @@
 ## 24. YieldDistributorService
 
 **File:** `backend/src/services/yieldDistributor.service.js` · **486 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`, `keyManager`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `getNetworkPassphrase, getSorobanRpcUrl`, `getRedisClient`, `logger`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 37 | `MAX_BATCH_SIZE` | `30` |
+| 38 | `LOCK_TTL_SECONDS` | `1800` |
+| 39 | `MAX_RETRIES` | `3` |
+| 40 | `BASE_DELAY_MS` | `3000` |
 
 **Methods**
 
@@ -723,7 +864,21 @@
 ## 25. CompanyPaymentService
 
 **File:** `backend/src/services/companyPayment.service.js` · **1315 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`, `YieldDistributorService`, `PaymentService`, `EmailService`, `AlertService`, `MultiSigTransactionService`, `keyManager`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `prisma`, `getUsdcIssuer, getNetworkPassphrase, getSorobanRpcUrl`, `logger`
+**Prisma models:** `companyPenalty`, `feeLog`, `interestPayment`, `offer`, `yieldPaymentJob`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 25 | `LATE_FEE_PERCENT_PER_DAY` | `0` |
+| 26 | `GRACE_PERIOD_DAYS` | `10` |
+| 27 | `DEFAULT_FEE_PERCENT` | `0` |
+| 29 | `USDC_ASSET_CODE` | `"USDC"` |
 
 **Methods**
 
@@ -761,7 +916,11 @@
 ## 26. MultiSigTransactionService
 
 **File:** `backend/src/services/multiSigTransaction.service.js` · **1206 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `prisma`, `getNetworkPassphrase, stellarServer, createFreshServer`, `logger`
+**Prisma models:** `deposit`, `feeLog`, `interestPayment`, `investment`, `multiSigTransaction`, `offer`, `token`, `tokenDistribution`
 
 **Constants & Static Fields**
 
@@ -805,7 +964,12 @@
 ## 27. UserType
 
 **File:** `backend/src/services/passkeyWallet.service.js` · **1186 lines**
-**Export pattern:** `export const = { }`
+**Export:** `export const = { }`
+
+**Service dependencies:** `StellarService`
+**External packages:** `@openzeppelin/relayer-plugin-channels`, `smart-account-kit-bindings`, `@stellar/stellar-sdk`
+**Internal imports:** `getNetworkPassphrase, getOperationsKeypair, getSorobanRpcUrl, isTestnet, getTreasuryKeypair`, `prisma`, `logger`
+**Prisma models:** `company`, `credentialModel`, `model`, `signerModel`, `userModel`
 
 ### UserType
 
@@ -881,7 +1045,17 @@ _No members extracted._
 ## 28. EmailService
 
 **File:** `backend/src/services/email.service.js` · **977 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**External packages:** `resend`, `crypto`, `dotenv`
+**Internal imports:** `logger`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 12 | `RESEND_API_KEY` | `process.env.RESEND_API_KEY` |
+| 13 | `EMAIL_FROM` | `…` |
 
 **Methods**
 
@@ -927,7 +1101,12 @@ _No members extracted._
 ## 29. StellarService
 
 **File:** `backend/src/services/stellar.service.js` · **2102 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `keyManager`, `TransactionManager`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `stellarServer, createFreshServer, createAsset, buildTransactionWithAccount, signAndSubmitTransaction, getNetworkPassphrase, getOperationsKeypair, getSorobanRpcUrl, getUsdcIssuer`, `logger`
+**Prisma models:** `multiSigTransaction`, `token`
 
 **Methods**
 
@@ -997,7 +1176,11 @@ _No members extracted._
 ## 30. SorobanSaleService
 
 **File:** `backend/src/services/sorobanSale.service.js` · **922 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `getNetworkPassphrase, getSorobanRpcUrl, buildTransactionWithAccount`, `logger`
 
 **Methods**
 
@@ -1070,7 +1253,18 @@ _No members extracted._
 ## 31. SorobanSettlementService
 
 **File:** `backend/src/services/sorobanSettlement.service.js` · **580 lines**
-**Export pattern:** `export class`
+**Export:** `export class`
+
+**Service dependencies:** `StellarService`, `keyManager`
+**External packages:** `@stellar/stellar-sdk`
+**Internal imports:** `getNetworkPassphrase, getSorobanRpcUrl`, `prisma`, `logger`
+**Prisma models:** `offer`
+
+**Module Constants**
+
+| Line | Name | Value |
+|------|------|-------|
+| 43 | `MAX_BATCH_SIZE` | `30` |
 
 **Methods**
 

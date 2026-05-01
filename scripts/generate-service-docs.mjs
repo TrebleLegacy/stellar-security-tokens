@@ -230,6 +230,101 @@ function extractObjectMembers(objExpr, comments) {
   return members;
 }
 
+// ─── AST walker utility ─────────────────────────────────────────────────────
+
+function walkAst(node, visitor) {
+  if (!node || typeof node !== 'object') return;
+  if (visitor[node.type]) visitor[node.type](node);
+  for (const key of Object.keys(node)) {
+    if (key === 'type' || key === 'loc' || key === 'start' || key === 'end') continue;
+    const child = node[key];
+    if (Array.isArray(child)) child.forEach(c => walkAst(c, visitor));
+    else if (child && typeof child === 'object' && child.type) walkAst(child, visitor);
+  }
+}
+
+// ─── Import / dependency extraction ──────────────────────────────────────────
+
+const SERVICE_BASENAMES = new Set(SERVICE_FILES.map(f => f.replace(/\.js$/, '')));
+
+function extractImports(ast) {
+  const serviceImports = [];  // local service deps
+  const externalImports = []; // npm packages
+  const configImports = [];   // ../config/* or ../utils/*
+
+  for (const node of ast.body) {
+    if (node.type !== 'ImportDeclaration') continue;
+    const src = node.source.value;
+    const names = node.specifiers.map(s => s.local?.name ?? s.imported?.name ?? '*').join(', ');
+
+    if (src.startsWith('.')) {
+      // Local import — classify by path
+      const base = src.split('/').pop().replace(/\.js$/, '');
+      if (SERVICE_BASENAMES.has(base) || src.includes('/services/')) {
+        serviceImports.push({ from: src, names });
+      } else if (src.includes('/config/') || src.includes('/utils/') || src.includes('/models/')) {
+        configImports.push({ from: src, names });
+      } else {
+        configImports.push({ from: src, names });
+      }
+    } else {
+      externalImports.push({ from: src, names });
+    }
+  }
+
+  return { serviceImports, externalImports, configImports };
+}
+
+// ─── Module-level constant extraction ────────────────────────────────────────
+
+function extractModuleConstants(ast) {
+  const constants = [];
+  for (const node of ast.body) {
+    // Only top-level const declarations
+    if (node.type !== 'VariableDeclaration') continue;
+    if (node.kind !== 'const') continue;
+    for (const decl of node.declarations) {
+      const name = decl.id?.name;
+      if (!name) continue;
+      const init = decl.init;
+      if (!init) continue;
+      // Skip functions, classes, new expressions (those are services, not constants)
+      if (['FunctionExpression','ArrowFunctionExpression','ClassExpression','NewExpression'].includes(init.type)) continue;
+      // Skip imports-as-vars (CallExpression to require, etc.)
+      if (init.type === 'CallExpression') continue;
+      // Skip objects and arrays (too complex to inline)
+      if (init.type === 'ObjectExpression' || init.type === 'ArrayExpression') continue;
+      const value = reconstructDefault(init);
+      constants.push({ name, value, line: node.loc.start.line });
+    }
+  }
+  return constants;
+}
+
+// ─── Prisma model access extraction ──────────────────────────────────────────
+
+function extractPrismaModels(ast) {
+  const models = new Set();
+  walkAst(ast, {
+    MemberExpression(node) {
+      // prisma.modelName.method()
+      if (node.object?.type === 'Identifier' && node.object.name === 'prisma') {
+        const model = node.property?.name;
+        if (model && /^[a-z]/.test(model)) models.add(model);
+      }
+      // this.prisma.modelName or similar chained
+      if (node.object?.type === 'MemberExpression' &&
+          node.object.property?.name === 'prisma') {
+        const model = node.property?.name;
+        if (model && /^[a-z]/.test(model)) models.add(model);
+      }
+    },
+  });
+  // Remove known non-model prisma properties
+  const nonModels = new Set(['$transaction', '$connect', '$disconnect', '$queryRaw', '$executeRaw', '$use']);
+  return [...models].filter(m => !nonModels.has(m)).sort();
+}
+
 // ─── File parser ──────────────────────────────────────────────────────────────
 
 function parseFile(filename) {
@@ -442,7 +537,12 @@ function parseFile(filename) {
     }
   }
 
-  return { filename, lines: lineCount, exports, standaloneExports };
+  // Extract cross-cutting concerns from the full AST
+  const imports       = extractImports(ast);
+  const constants     = extractModuleConstants(ast);
+  const prismaModels  = extractPrismaModels(ast);
+
+  return { filename, lines: lineCount, exports, standaloneExports, imports, constants, prismaModels };
 }
 
 // ─── Markdown rendering ───────────────────────────────────────────────────────
@@ -478,10 +578,38 @@ function renderSection(index, data) {
   lines.push(`## ${num}. ${displayName}`);
   lines.push('');
   lines.push(`**File:** \`backend/src/services/${data.filename}\` · **${data.lines} lines**`);
+  if (primary) lines.push(`**Export:** \`${primary.pattern}\``);
+  lines.push('');
 
-  if (primary) {
-    lines.push(`**Export pattern:** \`${primary.pattern}\``);
+  // Dependencies
+  const { serviceImports = [], externalImports = [], configImports = [] } = data.imports ?? {};
+  if (serviceImports.length > 0) {
+    lines.push(`**Service dependencies:** ${serviceImports.map(i => `\`${i.names}\``).join(', ')}`);
   }
+  if (externalImports.length > 0) {
+    lines.push(`**External packages:** ${externalImports.map(i => `\`${i.from}\``).join(', ')}`);
+  }
+  if (configImports.length > 0) {
+    lines.push(`**Internal imports:** ${configImports.map(i => `\`${i.names}\``).join(', ')}`);
+  }
+
+  // Prisma models
+  if (data.prismaModels?.length > 0) {
+    lines.push(`**Prisma models:** ${data.prismaModels.map(m => `\`${m}\``).join(', ')}`);
+  }
+
+  // Module-level constants
+  if (data.constants?.length > 0) {
+    lines.push('');
+    lines.push('**Module Constants**');
+    lines.push('');
+    lines.push('| Line | Name | Value |');
+    lines.push('|------|------|-------|');
+    for (const c of data.constants) {
+      lines.push(`| ${c.line} | \`${c.name}\` | \`${c.value}\` |`);
+    }
+  }
+
   lines.push('');
 
   for (const exp of data.exports) {
