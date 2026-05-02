@@ -4,14 +4,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Radox — Digital Securities Platform</title>
-  <meta name="description" content="Radox — tokenization infrastructure for real-world assets on Stellar.">
+  <title>Radox — Imóveis Reais. Retorno em Dólar Digital.</title>
+  <meta name="description" content="Radox — Invista em imóveis tokenizados no Brasil e no exterior. Renda fixa em dólar digital (USDC), sem precisar abrir conta fora do país.">
   <meta name="theme-color" content="#161616">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
 
   <!-- Open Graph -->
-  <meta property="og:title" content="Radox">
-  <meta property="og:description" content="Tokenization infrastructure for real-world assets on Stellar.">
+  <meta property="og:title" content="Radox — Imóveis Reais. Retorno em Dólar.">
+  <meta property="og:description" content="Tokenização imobiliária cross-border. Renda fixa em USD, sem burocracia.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://radox.net">
   <meta property="og:image" content="https://radox.net/og-image.png">
@@ -20,16 +20,20 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Radox">
-  <meta name="twitter:description" content="Tokenization infrastructure for real-world assets on Stellar.">
+  <meta name="twitter:title" content="Radox — Imóveis Reais. Retorno em Dólar.">
+  <meta name="twitter:description" content="Tokenização imobiliária cross-border. Renda fixa em USD, sem burocracia.">
   <meta name="twitter:image" content="https://radox.net/og-image.png">
 
-  <!-- Fonts -->
+  <!-- Fonts: Barlow Semi Condensed (display) + Barlow (body) + Geist Mono (numbers) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap"
     rel="stylesheet">
+  <!-- Geist Mono via CDN -->
+  <link rel="preload" as="style"
+    href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.css">
+  <link href="https://cdn.jsdelivr.net/npm/geist@1.3.0/dist/fonts/geist-mono/style.css" rel="stylesheet">
 
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -49,21 +53,22 @@
       <button id="logo-btn" class="navbar-logo">RADOX</button>
 
       <div class="navbar-links">
-        <button class="navbar-link" data-scroll="how-it-works" data-i18n="nav.howItWorks">How It Works</button>
-        <button class="navbar-link" data-scroll="for-users" data-i18n="nav.forUsers">For Users</button>
-        <button class="navbar-link" data-scroll="for-companies" data-i18n="nav.forCompanies">For Companies</button>
-        <button class="navbar-link" data-scroll="for-investors" data-i18n="nav.forInvestors">For Partners &amp;
-          VCs</button>
-        <button class="navbar-link" data-scroll="security" data-i18n="nav.security">Security</button>
+        <button class="navbar-link" data-scroll="how-it-works" data-i18n="nav.howItWorks">Como Funciona</button>
+        <button class="navbar-link" data-scroll="for-companies" data-i18n="nav.forCompanies">Para Empresas</button>
+        <button class="navbar-link" data-scroll="for-investors" data-i18n="nav.forInvestors">Para Investidores</button>
+        <button class="navbar-link" data-scroll="security" data-i18n="nav.security">Segurança</button>
       </div>
 
       <div class="navbar-right">
-        <button id="lang-btn" class="lang-toggle">EN | PT</button>
-        <a href="https://app.radox.net" target="_blank" rel="noopener noreferrer" class="btn-gold"
-          style="font-size:.875rem;padding:.5rem 1.25rem">Launch App</a>
+        <button id="lang-btn" class="lang-toggle">PT | EN</button>
+        <a href="https://cal.com/pedro-wakigawa-saragossy/radox" target="_blank" rel="noopener noreferrer"
+          class="navbar-ceo-link" data-i18n="nav.ceo">Contact the CEO</a>
+        <a href="https://app.radox.net" target="_blank" rel="noopener noreferrer"
+          class="btn-primary" style="font-size:.875rem;padding:.5rem 1.25rem"
+          data-i18n="nav.app">→ Abrir App</a>
       </div>
 
-      <button id="hamburger" class="navbar-hamburger">
+      <button id="hamburger" class="navbar-hamburger" aria-label="Abrir menu">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <line x1="4" x2="20" y1="12" y2="12" />
@@ -74,16 +79,17 @@
     </div>
 
     <div id="mobile-menu" class="mobile-menu navbar-glass">
-      <button class="mobile-menu-link" data-scroll="how-it-works" data-i18n="nav.howItWorks">How It Works</button>
-      <button class="mobile-menu-link" data-scroll="for-users" data-i18n="nav.forUsers">For Users</button>
-      <button class="mobile-menu-link" data-scroll="for-companies" data-i18n="nav.forCompanies">For Companies</button>
-      <button class="mobile-menu-link" data-scroll="for-investors" data-i18n="nav.forInvestors">For Partners &amp;
-        VCs</button>
-      <button class="mobile-menu-link" data-scroll="security" data-i18n="nav.security">Security</button>
+      <button class="mobile-menu-link" data-scroll="how-it-works" data-i18n="nav.howItWorks">Como Funciona</button>
+      <button class="mobile-menu-link" data-scroll="for-companies" data-i18n="nav.forCompanies">Para Empresas</button>
+      <button class="mobile-menu-link" data-scroll="for-investors" data-i18n="nav.forInvestors">Para Investidores</button>
+      <button class="mobile-menu-link" data-scroll="security" data-i18n="nav.security">Segurança</button>
       <div class="mobile-menu-bottom">
-        <button id="mobile-lang-btn" class="lang-toggle">EN | PT</button>
-        <a href="https://app.radox.net" target="_blank" rel="noopener noreferrer" class="btn-gold"
-          style="font-size:.875rem;padding:.5rem 1.25rem">Launch App</a>
+        <button id="mobile-lang-btn" class="lang-toggle">PT | EN</button>
+        <a href="https://cal.com/pedro-wakigawa-saragossy/radox" target="_blank" rel="noopener noreferrer"
+          class="navbar-ceo-link" data-i18n="nav.ceo">Contact the CEO</a>
+        <a href="https://app.radox.net" target="_blank" rel="noopener noreferrer"
+          class="btn-primary" style="font-size:.875rem;padding:.5rem 1.25rem"
+          data-i18n="nav.app">→ Abrir App</a>
       </div>
     </div>
   </nav>
@@ -94,15 +100,57 @@
     <!-- HERO                                                           -->
     <!-- ============================================================= -->
     <section class="hero">
-      <div class="hero-glow"></div>
       <div class="hero-content">
-        <h1 data-i18n="hero.headline">Accessible Assets to Everyone, Everywhere</h1>
-        <p data-i18n="hero.sub">Fractional ownership of real-world assets, powered by blockchain.
-          Fast, transparent, and open 24/7.</p>
-        <div class="hero-ctas">
-          <button class="btn-gold" data-scroll="waitlist" data-i18n="hero.cta1">Get Early Access</button>
-          <a href="https://cal.com/pedro-wakigawa-saragossy/radox" target="_blank" rel="noopener" class="btn-outline"
-            data-i18n="hero.cta2">Schedule a Meeting</a>
+        <div class="hero-tag reveal" data-i18n="hero.tag">Tokenização Imobiliária Cross-Border</div>
+        <h1 class="reveal" data-i18n="hero.headline">Imóveis reais.<br>Retorno em dólar digital.<br><em class="hero-h1-accent">made easy.</em></h1>
+        <p class="hero-sub reveal" data-i18n="hero.sub">Do primeiro investimento ao rendimento
+          — em 5 minutos, sem burocracia.</p>
+
+        <div class="hero-cta-block reveal">
+          <div class="hero-start-annotation">
+            <span class="hero-start-text" data-i18n="hero.startLabel">começar agora</span>
+            <!-- Seta vertical: começa no topo, desce em curva, ponta aponta para BAIXO -->
+            <svg class="hero-arrow-down" viewBox="0 0 30 60" fill="none"
+              xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M 15 2 C 15 15, 8 30, 15 52"
+                stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+              <polyline points="7,44 15,56 23,44"
+                stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            </svg>
+          </div>
+          <a href="https://app.radox.net" target="_blank" rel="noopener"
+            class="btn-hero" data-i18n="hero.cta">Abrir App
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================= -->
+    <!-- METRICS BAR — prova com números                               -->
+    <!-- ============================================================= -->
+    <section class="metrics-bar reveal">
+      <div class="container">
+        <div class="metrics-grid">
+          <div class="metric">
+            <span class="metric-value" data-i18n="metrics.m1v">R$4T</span>
+            <span class="metric-label" data-i18n="metrics.m1l">Mercado imobiliário Brasil</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <span class="metric-value" data-i18n="metrics.m2v">&lt;1%</span>
+            <span class="metric-label" data-i18n="metrics.m2l">Penetração da tokenização</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <span class="metric-value" data-i18n="metrics.m3v">USD</span>
+            <span class="metric-label" data-i18n="metrics.m3l">Rendimento na sua carteira</span>
+          </div>
+          <div class="metric-divider"></div>
+          <div class="metric">
+            <span class="metric-value" data-i18n="metrics.m4v">5 min</span>
+            <span class="metric-label" data-i18n="metrics.m4l">Para começar a investir</span>
+          </div>
         </div>
       </div>
     </section>
@@ -110,9 +158,9 @@
     <!-- ============================================================= -->
     <!-- TRUST BAR                                                      -->
     <!-- ============================================================= -->
-    <section class="trust-bar section-light">
-      <div class="container text-center reveal">
-        <p class="trust-label" data-i18n="trust.label">Built on</p>
+    <section class="trust-bar reveal">
+      <div class="container text-center">
+        <p class="trust-label" data-i18n="trust.label">Infraestrutura</p>
         <div class="trust-logos">
           <svg class="trust-logo-stellar" width="128" height="32" viewBox="0 0 128 32" fill="currentColor"
             xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stellar">
@@ -148,9 +196,9 @@
     <!-- ============================================================= -->
     <!-- HOW IT WORKS                                                   -->
     <!-- ============================================================= -->
-    <section id="how-it-works" class="how-it-works section-light">
+    <section id="how-it-works" class="how-it-works section-alt">
       <div class="container">
-        <h2 class="text-center" data-i18n="howItWorks.title">How It Works</h2>
+        <h2 class="text-center reveal" data-i18n="howItWorks.title">Como Funciona</h2>
         <div id="steps-grid" class="steps-grid">
           <!-- JS-built -->
         </div>
@@ -158,58 +206,43 @@
     </section>
 
     <!-- ============================================================= -->
-    <!-- FOR USERS                                                      -->
-    <!-- ============================================================= -->
-    <section id="for-users" class="for-users section-dark">
-      <div class="container" style="position:relative;z-index:10">
-        <h2 class="text-center" data-i18n="forUsers.title">Built for the Modern User</h2>
-        <div id="user-grid" class="user-grid">
-          <!-- JS-built -->
-        </div>
-        <div class="text-center" style="margin-top:3rem">
-          <button class="btn-gold" data-scroll="waitlist" data-i18n="forUsers.cta">Join the Waiting List</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============================================================= -->
     <!-- FOR COMPANIES                                                  -->
     <!-- ============================================================= -->
-    <section id="for-companies" class="for-companies section-light">
+    <section id="for-companies" class="for-companies">
       <div class="container">
-        <h2 class="text-center" data-i18n="forCompanies.title">Bring Your Assets to the Digital World</h2>
+        <h2 class="text-center reveal" data-i18n="forCompanies.title">Capte Capital para Seus Ativos</h2>
         <div id="company-grid" class="company-grid">
           <!-- JS-built -->
         </div>
         <div class="text-center" style="margin-top:3rem">
           <a href="https://cal.com/pedro-wakigawa-saragossy/radox" target="_blank" rel="noopener"
-            class="btn-outline-dark" data-i18n="forCompanies.cta">Schedule a Conversation</a>
+            class="btn-outline" data-i18n="forCompanies.cta">Agendar uma Conversa</a>
         </div>
       </div>
     </section>
 
     <!-- ============================================================= -->
-    <!-- FOR INVESTORS                                                  -->
+    <!-- FOR INVESTORS / VCs                                            -->
     <!-- ============================================================= -->
-    <section id="for-investors" class="for-investors section-dark">
+    <section id="for-investors" class="for-investors section-alt">
       <div class="container" style="position:relative;z-index:10">
-        <h2 class="text-center" data-i18n="forInvestors.title">For Partners &amp; VCs</h2>
+        <h2 class="text-center reveal" data-i18n="forInvestors.title">Por Que Investir na Radox</h2>
         <div id="investor-grid" class="investor-grid">
           <!-- JS-built -->
         </div>
         <div class="text-center" style="margin-top:3rem">
-          <a href="https://cal.com/pedro-wakigawa-saragossy/radox" target="_blank" rel="noopener" class="btn-gold"
-            data-i18n="forInvestors.cta">Talk to Our Team</a>
+          <a href="https://cal.com/pedro-wakigawa-saragossy/radox" target="_blank" rel="noopener"
+            class="btn-primary" data-i18n="forInvestors.cta">Falar com o Time</a>
         </div>
       </div>
     </section>
 
     <!-- ============================================================= -->
-    <!-- USE CASES                                                      -->
+    <!-- USE CASES — 6 imobiliários                                    -->
     <!-- ============================================================= -->
-    <section class="use-cases section-dark">
-      <div class="container" style="position:relative;z-index:10">
-        <h2 class="text-center" data-i18n="useCases.title">What Can Be Tokenized?</h2>
+    <section class="use-cases">
+      <div class="container">
+        <h2 class="text-center reveal" data-i18n="useCases.title">O Que Pode Ser Tokenizado</h2>
         <div id="use-grid" class="use-grid">
           <!-- JS-built -->
         </div>
@@ -219,9 +252,9 @@
     <!-- ============================================================= -->
     <!-- SECURITY                                                       -->
     <!-- ============================================================= -->
-    <section id="security" class="security-section section-light">
+    <section id="security" class="security-section section-alt">
       <div class="container">
-        <h2 class="text-center" data-i18n="security.title">Institutional-Grade Security</h2>
+        <h2 class="text-center reveal" data-i18n="security.title">Como Protegemos Seus Investimentos</h2>
         <div id="security-grid" class="security-grid">
           <!-- JS-built -->
         </div>
@@ -231,38 +264,38 @@
     <!-- ============================================================= -->
     <!-- WAITLIST FORM                                                  -->
     <!-- ============================================================= -->
-    <section id="waitlist" class="waitlist section-dark">
+    <section id="waitlist" class="waitlist">
       <div class="waitlist-inner">
-        <h2 id="wl-title">Join the Waiting List</h2>
-        <p class="sub" id="wl-sub">Be among the first to access the platform.</p>
+        <h2 id="wl-title">Entrar na Lista de Espera</h2>
+        <p class="sub" id="wl-sub">Seja um dos primeiros a acessar a plataforma.</p>
 
         <form id="waitlist-form">
           <!-- Honeypot -->
           <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off">
 
           <div>
-            <label id="wl-name-label" for="wl-name">Name</label>
+            <label id="wl-name-label" for="wl-name">Nome</label>
             <input type="text" id="wl-name" name="name" required>
           </div>
           <div>
             <label for="wl-email">Email</label>
-            <input type="email" id="wl-email" name="email" required placeholder="you@example.com">
+            <input type="email" id="wl-email" name="email" required placeholder="você@email.com">
           </div>
           <div>
             <label for="wl-whatsapp">WhatsApp</label>
             <input type="tel" id="wl-whatsapp" name="whatsapp" required placeholder="+55 11 99999-9999">
           </div>
           <div>
-            <label id="wl-role-label" for="wl-role">I am a...</label>
+            <label id="wl-role-label" for="wl-role">Meu perfil é...</label>
             <select id="wl-role" name="role" required>
               <option value="">—</option>
-              <option value="Individual">Individual</option>
-              <option value="Company">Company</option>
-              <option value="Partner / VC">Partner / VC</option>
-              <option value="Other">Other</option>
+              <option value="Investidor Pessoa Física">Investidor Pessoa Física</option>
+              <option value="Empresa Emissora">Empresa Emissora</option>
+              <option value="Parceiro / VC">Parceiro / VC</option>
+              <option value="Outro">Outro</option>
             </select>
           </div>
-          <button type="submit" id="wl-submit" class="btn-gold">Join the Waiting List</button>
+          <button type="submit" id="wl-submit" class="btn-primary">Entrar na Lista de Espera</button>
         </form>
       </div>
     </section>
@@ -272,23 +305,23 @@
   <!-- ============================================================= -->
   <!-- FOOTER                                                         -->
   <!-- ============================================================= -->
-  <footer id="contact" class="footer section-dark">
+  <footer id="contact" class="footer">
     <div class="container">
       <div class="footer-grid">
         <!-- Brand -->
         <div>
           <p class="footer-brand-name">RADOX</p>
-          <p class="footer-brand-tagline" id="ft-tagline">Tokenization infrastructure for real-world assets</p>
+          <p class="footer-brand-tagline" id="ft-tagline">Tokenização imobiliária cross-border</p>
           <p class="footer-copyright">© 2026 Radox Tecnologia</p>
         </div>
 
         <!-- Platform -->
         <div>
-          <h4 id="ft-platform">Platform</h4>
+          <h4 id="ft-platform">Plataforma</h4>
           <div>
-            <button class="footer-link" data-scroll="how-it-works" id="ft-how">How It Works</button>
-            <button class="footer-link" data-scroll="for-investors" id="ft-investors">For Partners &amp; VCs</button>
-            <button class="footer-link" data-scroll="for-companies" id="ft-companies">For Companies</button>
+            <button class="footer-link" data-scroll="how-it-works" id="ft-how">Como Funciona</button>
+            <button class="footer-link" data-scroll="for-investors" id="ft-investors">Para Investidores</button>
+            <button class="footer-link" data-scroll="for-companies" id="ft-companies">Para Empresas</button>
           </div>
         </div>
 
@@ -296,23 +329,23 @@
         <div>
           <h4 id="ft-legal">Legal</h4>
           <div>
-            <a href="#" class="footer-link" id="ft-terms">Terms of Service</a>
-            <a href="#" class="footer-link" id="ft-privacy">Privacy Policy</a>
-            <a href="#" class="footer-link" id="ft-risk">Risk Disclaimer</a>
+            <a href="#" class="footer-link" id="ft-terms">Termos de Serviço</a>
+            <a href="#" class="footer-link" id="ft-privacy">Política de Privacidade</a>
+            <a href="#" class="footer-link" id="ft-risk">Aviso de Risco</a>
           </div>
         </div>
 
         <!-- Connect -->
         <div>
-          <h4 id="ft-connect">Connect</h4>
-          <a href="mailto:contact@radox.net" class="footer-link">pedro@radox.net — Founder</a>
+          <h4 id="ft-connect">Contato</h4>
+          <a href="mailto:pedro@radox.net" class="footer-link">pedro@radox.net — Fundador</a>
         </div>
       </div>
 
       <hr class="footer-divider">
-      <p class="footer-disclaimer" id="ft-disclaimer">Radox is not a broker-dealer or investment advisor. Securities
-        offered through the platform are subject to applicable regulatory requirements. Past performance does not
-        guarantee future results.</p>
+      <p class="footer-disclaimer" id="ft-disclaimer">Radox não é corretora de valores nem consultora de
+        investimentos. Os valores mobiliários oferecidos através da plataforma estão sujeitos aos requisitos
+        regulatórios aplicáveis. Rentabilidade passada não garante resultados futuros.</p>
     </div>
   </footer>
 
