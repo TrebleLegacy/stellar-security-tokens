@@ -13,8 +13,8 @@
     en: {
       nav: { howItWorks: 'How It Works', forCompanies: 'For Companies', forInvestors: 'For Investors', security: 'Security', cta: 'Book a Call', ceo: 'Contact the CEO', app: '→ Open App' },
       hero: {
-        tag: 'Cross-Border Real Estate Tokenization',
-        headline: 'Real estate.\nDollar returns.\n<em class="hero-h1-accent">made easy.</em>',
+        tag: 'Tokenized Private Credit',
+        headline: 'Private credit.\nDollar returns.\n<em class="hero-h1-accent">made easy.</em>',
         sub: 'From your first investment to earnings \u2014 in 5 minutes, no bureaucracy.',
         startLabel: 'start here',
         cta: 'Open App',
@@ -22,35 +22,37 @@
         cta2: 'Join the Waitlist'
       },
       metrics: {
-        m1v: 'R$4T', m1l: 'Brazilian real estate market',
+        m1v: 'R$6T', m1l: 'Brazilian private credit market',
         m2v: '<1%', m2l: 'Tokenization penetration',
         m3v: 'USD',  m3l: 'Returns credited to your wallet',
         m4v: '5 min', m4l: 'To start investing'
       },
       trust: { label: 'Infrastructure' },
       howItWorks: { title: 'How It Works', steps: [
-        { num: '01', title: 'Choose a Property', desc: 'Browse curated real estate assets in Brazil and abroad. Residential, commercial, cross-border.' },
+        { num: '01', title: 'Choose a Credit Asset', desc: 'Browse curated fixed-income instruments — CRI, CRA, CCB, debentures, FIDC and more. Real estate, agro, and corporate.' },
         { num: '02', title: 'Invest from R$500', desc: 'No overseas bank account. No bureaucracy. Done in 5 minutes.' },
-        { num: '03', title: 'Earn in Dollars', desc: 'Returns credited to your wallet. Track your portfolio in real time.' }
+        { num: '03', title: 'Earn in Dollars', desc: 'Returns credited to your wallet in USDC. Track your portfolio in real time.' }
       ]},
       forInvestors: { title: 'Why Invest in Radox', cards: [
-        { title: 'R$4T Market in Motion', desc: 'Brazil holds the largest real estate market in Latin America. Tokenization is at under 1% penetration — we are at the start of the curve.' },
+        { title: 'R$6T Market, <1% Tokenized', desc: 'Brazil\'s private credit market is one of the largest in Latin America. Tokenization penetration is under 1% — we are at the very start of the curve.' },
         { title: 'Auditable, Recurring Revenue', desc: 'Issuance, trading, and custody fees — all on-chain. Visible, predictable, compounding.' },
         { title: 'Compliance-First Since Day One', desc: 'KYC, AML, and securities law baked into the architecture. Zero regulatory retrofitting.' },
         { title: 'Stellar/Soroban Infrastructure', desc: 'Auditable smart contracts, atomic settlement, non-custodial wallets. No dependency on centralized custodians.' }
       ], cta: 'Talk to Our Team' },
-      forCompanies: { title: 'Raise Capital for Your Real Estate Assets', cards: [
-        { title: 'Tokenize Your Portfolio', desc: 'CRIs, FIIs, developments, commercial — any real estate asset can be tokenized.' },
-        { title: 'Reach Global Investors', desc: 'Distribute ownership to investors in Brazil and abroad in a single flow.' },
-        { title: 'Compliance Built In', desc: 'KYC, AML, and multi-signature controls already included. No extra setup.' }
+      forCompanies: { title: 'Raise Capital. Tokenize Your Credit Operations.', cards: [
+        { title: 'Any Credit Structure', desc: 'CRIs, CRAs, CCBs, debentures, FIDCs — any fixed-income instrument can be tokenized and distributed on-chain.' },
+        { title: 'Real Estate as Collateral', desc: 'Use property as collateral to back credit operations. The asset stays yours; capital flows to you.' },
+        { title: 'Compliance Built In', desc: 'KYC, AML, and multi-signature controls already included. Structured for CVM and Bacen frameworks.' }
       ], cta: 'Schedule a Conversation' },
       useCases: { title: 'What Can Be Tokenized', cards: [
-        { title: 'Residential Real Estate', desc: 'Apartments and houses in Brazil and abroad — fractional ownership from R$500.' },
-        { title: 'Commercial Real Estate', desc: 'Offices, logistics warehouses, retail properties with rental income.' },
-        { title: 'Land Developments', desc: 'Development projects with returns on sale and construction milestones.' },
-        { title: 'CRI / CRA', desc: 'Real estate credit with fixed income and on-chain programmable yields.' },
-        { title: 'Tokenized FII', desc: 'Real estate funds fractioned into security tokens — liquid, auditable.' },
-        { title: 'International Properties', desc: 'Properties in Portugal, USA, and Europe with dollar-denominated returns.' }
+        { title: 'CRI / CRA', desc: 'Real estate and agro credit certificates — fixed income with on-chain programmable yields.' },
+        { title: 'CCB', desc: 'Bank credit bills backed by real estate or other collateral, distributed to accredited investors.' },
+        { title: 'Debentures', desc: 'Corporate debt instruments tokenized for transparent, programmable issuance and settlement.' },
+        { title: 'FIDC', desc: 'Receivables investment funds fractioned into security tokens — liquid and auditable.' },
+        { title: 'Agro Credit (CRA / CPR)', desc: 'Agricultural credit backed by land and harvest rights, with dollar-denominated returns.' },
+        { title: 'Precatórios', desc: 'Government judicial debt obligations tokenized for liquidity and fractional trading.' },
+        { title: 'LC (Letra de Câmbio)', desc: 'Exchange bills issued by finance companies, tokenized for broader distribution.' },
+        { title: 'Real Estate (Collateral)', desc: 'Residential and commercial property as collateral backing credit operations — not the primary product.' }
       ]},
       security: { title: 'How We Protect Your Investments', items: [
         { title: 'Multi-Signature Approvals', desc: 'Every critical operation requires multiple approvals. Nothing moves unilaterally.' },
@@ -59,13 +61,13 @@
         { title: 'Passkey Wallets', desc: 'No seed phrases. No complexity. Your wallet is tied to your biometrics.' }
       ]},
       whitelist: { title: 'Join the Waitlist', sub: 'Be among the first to access the platform.', name: 'Name', role: 'My profile is...', roleOptions: ['Individual Investor', 'Issuing Company', 'Partner / VC', 'Other'], submit: 'Join the Waitlist', success: "You're on the waitlist! We'll be in touch soon." },
-      footer: { tagline: 'Cross-border real estate tokenization', platform: 'Platform', legal: 'Legal', connect: 'Contact', terms: 'Terms of Service', privacy: 'Privacy Policy', risk: 'Risk Disclaimer', disclaimer: 'Radox is not a broker-dealer or investment advisor. Securities offered through the platform are subject to applicable regulatory requirements. Past performance does not guarantee future results.' }
+      footer: { tagline: 'Tokenized private credit — on Stellar', platform: 'Platform', legal: 'Legal', connect: 'Contact', terms: 'Terms of Service', privacy: 'Privacy Policy', risk: 'Risk Disclaimer', disclaimer: 'Radox is not a broker-dealer or investment advisor. Securities offered through the platform are subject to applicable regulatory requirements. Past performance does not guarantee future results.' }
     },
     pt: {
       nav: { howItWorks: 'Como Funciona', forCompanies: 'Para Empresas', forInvestors: 'Para Investidores', security: 'Segurança', cta: 'Agendar Reunião', ceo: 'Falar com o CEO', app: '→ Abrir App' },
       hero: {
-        tag: 'Tokenização Imobiliária Cross-Border',
-        headline: 'Imóveis reais.\nRetorno em dólar digital.\n<em class="hero-h1-accent">made easy.</em>',
+        tag: 'Crédito Privado Tokenizado',
+        headline: 'Crédito privado.\nRetorno em dólar digital.\n<em class="hero-h1-accent">made easy.</em>',
         sub: 'Do primeiro investimento ao rendimento \u2014 em 5 minutos, sem burocracia.',
         startLabel: 'comece aqui',
         cta: 'Abrir App',
@@ -73,35 +75,37 @@
         cta2: 'Entrar na Lista'
       },
       metrics: {
-        m1v: 'R$4T', m1l: 'Mercado imobiliário brasileiro',
+        m1v: 'R$6T', m1l: 'Mercado de crédito privado no Brasil',
         m2v: '<1%', m2l: 'Penetração da tokenização',
         m3v: 'USD',  m3l: 'Rendimento na sua carteira',
         m4v: '5 min', m4l: 'Para começar a investir'
       },
       trust: { label: 'Infraestrutura' },
       howItWorks: { title: 'Como Funciona', steps: [
-        { num: '01', title: 'Escolha um Imóvel', desc: 'Navegue por ativos imobiliários selecionados no Brasil e no exterior. Residencial, comercial, cross-border.' },
+        { num: '01', title: 'Escolha um Ativo de Crédito', desc: 'Navegue por instrumentos de renda fixa selecionados — CRI, CRA, CCB, debêntures, FIDC e mais. Imobiliário, agro e corporativo.' },
         { num: '02', title: 'Invista a partir de R$500', desc: 'Sem conta no exterior. Sem burocracia. Em 5 minutos.' },
-        { num: '03', title: 'Receba em Dólar', desc: 'Rendimento creditado na sua carteira. Acompanhe em tempo real.' }
+        { num: '03', title: 'Receba em Dólar', desc: 'Rendimento creditado na sua carteira em USDC. Acompanhe em tempo real.' }
       ]},
       forInvestors: { title: 'Por Que Investir na Radox', cards: [
-        { title: 'Mercado de R$4T em Movimento', desc: 'O Brasil tem o maior mercado imobiliário da América Latina. A tokenização está abaixo de 1% de penetração — estamos no começo da curva.' },
+        { title: 'R$6T de Mercado, <1% Tokenizado', desc: 'O mercado de crédito privado no Brasil é um dos maiores da América Latina. A tokenização está abaixo de 1% — estamos no começo da curva.' },
         { title: 'Receita Recorrente e Auditável', desc: 'Taxas de emissão, negociação e custódia — tudo on-chain. Visíveis, previsíveis, compostas.' },
         { title: 'Compliance Desde o Primeiro Commit', desc: 'KYC, AML e estrutura de valores mobiliários na arquitetura. Zero retrofitting regulatório.' },
         { title: 'Infraestrutura Stellar/Soroban', desc: 'Contratos inteligentes auditáveis, liquidação atômica, custódia não-custodial. Sem dependência de custodians centralizados.' }
       ], cta: 'Falar com o Time' },
-      forCompanies: { title: 'Capte Capital para Seus Ativos Imobiliários', cards: [
-        { title: 'Tokenize Seu Portfólio', desc: 'CRIs, FIIs, loteamentos, comercial — qualquer ativo imobiliário pode ser tokenizado.' },
-        { title: 'Alcance Investidores Globais', desc: 'Distribua cotas para investidores no Brasil e no exterior em um único fluxo.' },
-        { title: 'Compliance Integrado', desc: 'KYC, AML e controle multi-assinatura já incluídos. Sem configuração extra.' }
+      forCompanies: { title: 'Capte Capital. Tokenize Suas Operações de Crédito.', cards: [
+        { title: 'Qualquer Estrutura de Crédito', desc: 'CRIs, CRAs, CCBs, debêntures, FIDCs — qualquer instrumento de renda fixa pode ser tokenizado e distribuído on-chain.' },
+        { title: 'Imóvel como Colateral', desc: 'Use o imóvel como garantia para lastrear operações de crédito. O ativo continua seu; o capital flui para você.' },
+        { title: 'Compliance Integrado', desc: 'KYC, AML e controle multi-assinatura já incluídos. Estruturado para os frameworks da CVM e do Bacen.' }
       ], cta: 'Agendar uma Conversa' },
       useCases: { title: 'O Que Pode Ser Tokenizado', cards: [
-        { title: 'Imóveis Residenciais', desc: 'Apartamentos e casas no Brasil e no exterior — propriedade fracionada a partir de R$500.' },
-        { title: 'Imóveis Comerciais', desc: 'Escritórios, galpões logísticos, varejo com renda de aluguel.' },
-        { title: 'Loteamentos', desc: 'Projetos de desenvolvimento com retorno na venda e marcos de construção.' },
-        { title: 'CRI / CRA', desc: 'Crédito imobiliário com renda fixa e rendimentos programáveis on-chain.' },
-        { title: 'FII Tokenizado', desc: 'Fundo imobiliário fracionado em tokens de segurança — líquido, auditável.' },
-        { title: 'Imóveis no Exterior', desc: 'Propriedades em Portugal, EUA e Europa com rendimento em dólar.' }
+        { title: 'CRI / CRA', desc: 'Certificados de recebíveis imobiliários e do agronegócio — renda fixa com rendimentos programáveis on-chain.' },
+        { title: 'CCB', desc: 'Cédulas de crédito bancário com lastro imobiliário ou outros colaterais, distribuídas para investidores qualificados.' },
+        { title: 'Debêntures', desc: 'Instrumentos de dívida corporativa tokenizados para emissão e liquidação transparentes e programáveis.' },
+        { title: 'FIDC', desc: 'Fundos de investimento em direitos creditórios fracionados em tokens de segurança — líquidos e auditáveis.' },
+        { title: 'Crédito Agro (CRA / CPR)', desc: 'Crédito rural com lastro em terra e direitos de safra, com rendimento em dólar.' },
+        { title: 'Precatórios', desc: 'Obrigações judiciais do governo tokenizadas para liquidez e negociação fracionada.' },
+        { title: 'LC (Letra de Câmbio)', desc: 'Letras de câmbio emitidas por financeiras, tokenizadas para distribuição ampliada.' },
+        { title: 'Imóvel (Colateral)', desc: 'Propriedade residencial e comercial como garantia de operações de crédito — não o produto principal.' }
       ]},
       security: { title: 'Como Protegemos Seus Investimentos', items: [
         { title: 'Aprovação Múltipla', desc: 'Toda operação crítica requer múltiplas aprovações. Nada se move unilateralmente.' },
@@ -110,7 +114,7 @@
         { title: 'Carteiras com Passkey', desc: 'Sem seed phrase. Sem complexidade. Sua carteira é vinculada à sua biometria.' }
       ]},
       whitelist: { title: 'Entrar na Lista de Espera', sub: 'Seja um dos primeiros a acessar a plataforma.', name: 'Nome', role: 'Meu perfil é...', roleOptions: ['Investidor Pessoa Física', 'Empresa Emissora', 'Parceiro / VC', 'Outro'], submit: 'Entrar na Lista de Espera', success: 'Você está na lista! Entraremos em contato em breve.' },
-      footer: { tagline: 'Tokenização imobiliária cross-border', platform: 'Plataforma', legal: 'Legal', connect: 'Contato', terms: 'Termos de Serviço', privacy: 'Política de Privacidade', risk: 'Aviso de Risco', disclaimer: 'Radox não é corretora de valores nem consultora de investimentos. Os valores mobiliários oferecidos através da plataforma estão sujeitos aos requisitos regulatórios aplicáveis. Rentabilidade passada não garante resultados futuros.' }
+      footer: { tagline: 'Crédito privado tokenizado — na Stellar', platform: 'Plataforma', legal: 'Legal', connect: 'Contato', terms: 'Termos de Serviço', privacy: 'Política de Privacidade', risk: 'Aviso de Risco', disclaimer: 'Radox não é corretora de valores nem consultora de investimentos. Os valores mobiliários oferecidos através da plataforma estão sujeitos aos requisitos regulatórios aplicáveis. Rentabilidade passada não garante resultados futuros.' }
     }
   };
 
@@ -195,9 +199,9 @@
     x: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
   };
 
-  /* Use-case icon mapping — 6 real estate focused */
+  /* Use-case icon mapping — 8 credit instruments */
   const USE_ICONS = [
-    'building', 'briefcase', 'hardHat', 'fileText', 'layers', 'globe'
+    'fileText', 'banknote', 'barChart', 'layers', 'leaf', 'landmark', 'coins', 'building'
   ];
 
   /* ------------------------------------------------------------------ */
