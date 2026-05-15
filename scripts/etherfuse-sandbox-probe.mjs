@@ -14,28 +14,21 @@
  *           encrypt key at rest, EtherFuse delivers to the G-address,
  *           Radox forwards to the C-address via SAC transfer.
  *
- * Reads ETHERFUSE_API_KEY from the worktree-root .env (same convention as
- * scripts/bootstrap-admins.js).
+ * Reads ETHERFUSE_API_KEY from .env at the repo root via Node's built-in
+ * --env-file flag (no `dotenv` package dependency).
  *
  * Usage:
- *   node scripts/etherfuse-sandbox-probe.mjs auth
- *   node scripts/etherfuse-sandbox-probe.mjs assets [g-or-c-address-for-fee-quote]
- *   node scripts/etherfuse-sandbox-probe.mjs register-c-address <c-address>
- *   node scripts/etherfuse-sandbox-probe.mjs all <c-address>
+ *   node --env-file=.env scripts/etherfuse-sandbox-probe.mjs auth
+ *   node --env-file=.env scripts/etherfuse-sandbox-probe.mjs assets [g-or-c-address-for-fee-quote]
+ *   node --env-file=.env scripts/etherfuse-sandbox-probe.mjs register-c-address <c-address>
+ *   node --env-file=.env scripts/etherfuse-sandbox-probe.mjs all <c-address>
  *
  * Each mode is idempotent in terms of side-effects on Radox; it ONLY touches
  * EtherFuse sandbox state. It creates ephemeral child organizations on
  * EtherFuse — those linger but are harmless.
  */
 
-import dotenv from 'dotenv';
-import path from 'path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const API_BASE = process.env.ETHERFUSE_API_BASE_URL || 'https://api.sand.etherfuse.com';
 const API_KEY = process.env.ETHERFUSE_API_KEY;
