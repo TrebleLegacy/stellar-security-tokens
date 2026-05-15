@@ -510,7 +510,14 @@ function PixPanel({
 
     // ─── Order created — show PIX BR code + status ─────────────────────────
     if (stage === 'submitted' && order) {
-        return <OrderInProgress order={order} onCopy={onCopy} copied={copied} />;
+        return (
+            <OrderInProgress
+                order={order}
+                onCopy={onCopy}
+                copied={copied}
+                sandbox={!!readiness?.sandbox}
+            />
+        );
     }
 
     return null;
@@ -624,10 +631,13 @@ function OrderInProgress({
     order,
     onCopy,
     copied,
+    sandbox,
 }: {
     order: RampOrder;
     onCopy: (text: string, id: string) => Promise<void>;
     copied: string | null;
+    /** Driven by backend readiness — true when ETHERFUSE_API_BASE_URL is sandbox. */
+    sandbox: boolean;
 }) {
     const brcode = useMemo(() => {
         const p = order.pixInstructions ?? {};
@@ -640,7 +650,7 @@ function OrderInProgress({
     const beneficiary = order.pixInstructions?.beneficiary || order.pixInstructions?.depositAccountHolder || 'EtherFuse';
     const pixExpiresIn = useCountdown(order.pixExpiresAt);
 
-    const isSandbox = import.meta.env.MODE !== 'production';
+    const isSandbox = sandbox;
     const [simulating, setSimulating] = useState(false);
     const [simError, setSimError] = useState<string | null>(null);
 

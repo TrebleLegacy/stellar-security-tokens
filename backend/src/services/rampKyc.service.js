@@ -108,10 +108,18 @@ export class RampKycService {
     else if (customer.kycStatus !== 'approved') blockedReason = 'kyc_pending';
     else if (!usableBank) blockedReason = 'no_active_bank_account';
 
+    // `sandbox` lets the UI conditionally render testnet-only affordances
+    // (e.g. the "Simulate PIX paid" button). True when the backend is wired
+    // to EtherFuse's sandbox URL — the canonical signal of "this environment
+    // can call /ramp/order/fiat_received without real money".
+    const efBase = process.env.ETHERFUSE_API_BASE_URL || '';
+    const sandbox = efBase.includes('.sand.') || process.env.NODE_ENV !== 'production';
+
     return {
       isReady: blockedReason == null,
       blockedReason,
       missingFields,
+      sandbox,
       customer: customer
         ? { etherfuseCustomerId: customer.etherfuseCustomerId, kycStatus: customer.kycStatus, kycRejectionReason: customer.kycRejectionReason }
         : null,
