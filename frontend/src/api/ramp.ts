@@ -53,6 +53,8 @@ export interface RampReadiness {
   isReady: boolean;
   blockedReason: ReadinessBlockedReason;
   missingFields: string[];
+  /** True when backend points at EtherFuse sandbox — enables testnet-only UI affordances. */
+  sandbox: boolean;
   customer: null | {
     etherfuseCustomerId: string;
     kycStatus: RampWalletKycStatus;
