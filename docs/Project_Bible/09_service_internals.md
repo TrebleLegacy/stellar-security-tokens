@@ -1,7 +1,7 @@
 # 09 — Service Internals
 
 > **⚠️ AUTO-GENERATED — DO NOT EDIT MANUALLY**  
-> Generated: `2026-05-15T21:54:28.990Z`  
+> Generated: `2026-05-15T22:03:08.138Z`  
 > Source: `backend/src/services/` (31 files)  
 > Regenerate: `npm run docs:services`
 
@@ -963,7 +963,7 @@
 ---
 ## 27. UserType
 
-**File:** `backend/src/services/passkeyWallet.service.js` · **1186 lines**
+**File:** `backend/src/services/passkeyWallet.service.js` · **1205 lines**
 **Export:** `export const = { }`
 
 **Service dependencies:** `StellarService`
@@ -981,40 +981,40 @@ _No members extracted._
 
 | Line | Name | Value |
 |------|------|-------|
-| 85 | `#rpcServer` | `null` |
-| 88 | `#channelsClient` | `null` |
+| 86 | `#rpcServer` | `null` |
+| 89 | `#channelsClient` | `null` |
 
 **Methods**
 
 | Line | Signature | Async |
 |------|-----------|-------|
-| 98 | `static getRpcServer()` | – |
-| 109 | `static getChannelsClient()` | – |
-| 129 | `static getClientConfig()` | – |
-| 207 | `static async sendTransaction(transaction)` | ✓ |
-| 234 | `static async sendSorobanTransaction(funcXdr, authXdrs = [])` | ✓ |
-| 266 | `static async submitWithSponsorship(txOrXdr)` | ✓ |
-| 443 | `static async deploySmartWallet(credentialId, publicKey)` | ✓ |
-| 519 | `static async createSmartWallet(userType, userId, credentialId, publicKey)` | ✓ |
-| 586 | `static async hasSmartWallet(userType, userId)` | ✓ |
-| 604 | `static async getWalletStatus(userType, userId)` | ✓ |
-| 701 | `static async getSorobanWalletBalances(walletContractId)` | ✓ |
-| 775 | `static async buildWithdrawalTx(userId, destinationAddress, amount, assetCode = "USDC", userType = UserType.INVESTOR)` | ✓ |
-| 865 | `static async buildInvestmentTx(investorContractId, companyWallet, amount)` | ✓ |
-| 941 | `static async submitWithdrawalTx(signedXdr)` | ✓ |
-| 1007 | `static async buildWithdrawalTxForCompany(companyId, destinationAddress, amount, assetCode = "USDC")` | ✓ |
-| 1085 | `static async listUserPasskeys(userType, userId)` | ✓ |
-| 1149 | `static async listEd25519Signers(userType, userId)` | ✓ |
+| 99 | `static getRpcServer()` | – |
+| 110 | `static getChannelsClient()` | – |
+| 130 | `static getClientConfig()` | – |
+| 208 | `static async sendTransaction(transaction)` | ✓ |
+| 235 | `static async sendSorobanTransaction(funcXdr, authXdrs = [])` | ✓ |
+| 267 | `static async submitWithSponsorship(txOrXdr)` | ✓ |
+| 444 | `static async deploySmartWallet(credentialId, publicKey)` | ✓ |
+| 520 | `static async createSmartWallet(userType, userId, credentialId, publicKey)` | ✓ |
+| 587 | `static async hasSmartWallet(userType, userId)` | ✓ |
+| 605 | `static async getWalletStatus(userType, userId)` | ✓ |
+| 702 | `static async getSorobanWalletBalances(walletContractId)` | ✓ |
+| 794 | `static async buildWithdrawalTx(userId, destinationAddress, amount, assetCode = "USDC", userType = UserType.INVESTOR)` | ✓ |
+| 884 | `static async buildInvestmentTx(investorContractId, companyWallet, amount)` | ✓ |
+| 960 | `static async submitWithdrawalTx(signedXdr)` | ✓ |
+| 1026 | `static async buildWithdrawalTxForCompany(companyId, destinationAddress, amount, assetCode = "USDC")` | ✓ |
+| 1104 | `static async listUserPasskeys(userType, userId)` | ✓ |
+| 1168 | `static async listEd25519Signers(userType, userId)` | ✓ |
 
 **Private Methods**
 
 | Line | Signature | Async |
 |------|-----------|-------|
-| 152 | `static #getPrismaModel(userType)` | – |
-| 164 | `static #getCredentialModel(userType)` | – |
-| 176 | `static #getCredentialFkField(userType)` | – |
-| 188 | `static #getEd25519SignerModel(userType)` | – |
-| 963 | `static #validateWithdrawalTx(tx)` | – |
+| 153 | `static #getPrismaModel(userType)` | – |
+| 165 | `static #getCredentialModel(userType)` | – |
+| 177 | `static #getCredentialFkField(userType)` | – |
+| 189 | `static #getEd25519SignerModel(userType)` | – |
+| 982 | `static #validateWithdrawalTx(tx)` | – |
 
 **JSDoc Descriptions**
 
