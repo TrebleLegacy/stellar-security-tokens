@@ -40,6 +40,8 @@
 | Wallet balance | ✅ PasskeyWalletService | ✅ Wallet + useWalletBalance | ✅ |
 | USDC deposit (relay) | ✅ DepositRelayService | ✅ DepositDialog/Tracker | ✅ |
 | USDC withdrawal | ✅ investorRoutes /withdraw | ✅ Wallet page | ✅ |
+| BRL → TESOURO on-ramp (EtherFuse PIX) | ✅ rampRoutes + RampOrderService + webhooks | ✅ DepositDialog `PixPanel` | ✅ |
+| TESOURO/USDC → BRL off-ramp (EtherFuse Anchor) | ✅ RampOfframpService + 5 endpoints, behind `ENABLE_OFFRAMP` (default off pending Phase 0 sandbox probe) | ✅ WithdrawDialog `PixOfframpPanel` | 🟡 v1 — needs anchor-monitor probe before mainnet |
 | Fee schedule display | ✅ investmentRoutes /fee-schedule | ✅ useInvestmentFees | ✅ |
 | Notifications | ✅ notificationRoutes | ✅ NotificationBell | ✅ |
 | Passkey settings | ✅ securityRoutes | ✅ Settings page | ✅ |
