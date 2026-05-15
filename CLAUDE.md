@@ -43,7 +43,7 @@ When you create new files, add new features, or significantly change existing co
 - **Security**: No `eval`, no `exec` (use `execFile`), no `dangerouslySetInnerHTML` without DOMPurify
 
 ## Frontend Design (auto-apply when touching UI)
-No generic aesthetics. No default Tailwind. No cookie-cutter cards. Distinctive typography, cohesive color via CSS custom properties, micro-animations on interactions, gradients and layered shadows for atmosphere. Full spec: `.agent/workflows/frontend-design.md`
+No generic aesthetics. No default Tailwind. No cookie-cutter cards. Distinctive typography, cohesive color via CSS custom properties, micro-animations on interactions, gradients and layered shadows for atmosphere.
 
 ## Stellar Documentation
 Stellar docs are available via the **docker-gateway filesystem MCP** at `/Users/pedrosaragossy/Workspace/Stellar Docs`. Use it to look up SDK methods, transaction operations, or protocol details. Never hallucinate Stellar SDK methods — always verify.
