@@ -309,12 +309,18 @@ function PixPanel({
     const [busy, setBusy] = useState(false);
     const pollHandle = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    // Pre-select the default active bank account.
+    // Pre-select the default usable bank account.
+    // Sandbox leaves accounts in `awaiting_deposit_verification` indefinitely
+    // (per memory: EtherFuse's `compliant: true` is what orders actually
+    // check), so we treat anything except `inactive` as selectable — matches
+    // the readiness gate in rampKyc.service.js.
     useEffect(() => {
         if (!readiness?.bankAccounts) return;
         if (selectedBankId != null) return;
-        const def = readiness.bankAccounts.find((b) => b.isDefault && b.status === 'active')
-            ?? readiness.bankAccounts.find((b) => b.status === 'active');
+        const usable = (b: { status: string }) => b.status !== 'inactive';
+        const def =
+            readiness.bankAccounts.find((b) => b.isDefault && usable(b))
+            ?? readiness.bankAccounts.find(usable);
         if (def) setSelectedBankId(def.id);
     }, [readiness, selectedBankId]);
 
@@ -561,17 +567,27 @@ function BankAccountList({
             <div className="space-y-1.5">
                 {accounts.map((b) => {
                     const selected = selectedId === b.id;
+                    // Sandbox leaves accounts in `awaiting_deposit_verification`;
+                    // EtherFuse's `compliant: true` flag is the real eligibility
+                    // check, so we only block `inactive`. Other non-active states
+                    // are pickable but visually labelled.
+                    const blocked = b.status === 'inactive';
+                    const showStateChip = b.status !== 'active';
+                    const chipTone =
+                        b.status === 'awaiting_deposit_verification' || b.status === 'pending'
+                            ? 'text-amber-400/80'
+                            : 'text-white/40';
                     return (
                         <button
                             key={b.id}
                             onClick={() => onSelect(b.id)}
-                            disabled={b.status !== 'active'}
+                            disabled={blocked}
                             className={
                                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors text-left ' +
                                 (selected
                                     ? 'border-[hsl(43_45%_55%/0.5)] bg-[hsl(43_45%_55%/0.08)]'
                                     : 'border-white/8 bg-white/[0.03] hover:bg-white/[0.05]') +
-                                (b.status !== 'active' ? ' opacity-50 cursor-not-allowed' : '')
+                                (blocked ? ' opacity-50 cursor-not-allowed' : '')
                             }
                         >
                             <div className={
@@ -584,8 +600,8 @@ function BankAccountList({
                                 </div>
                                 {b.label && <div className="text-[10px] text-white/40 mt-0.5">{b.label}</div>}
                             </div>
-                            {b.status !== 'active' && (
-                                <span className="text-[9px] uppercase tracking-wider text-amber-400/80">
+                            {showStateChip && (
+                                <span className={'text-[9px] uppercase tracking-wider ' + chipTone}>
                                     {b.status.replace(/_/g, ' ')}
                                 </span>
                             )}

@@ -273,7 +273,39 @@ export async function listOrders(req, res) {
   }
 }
 
-/** GET /api/ramp/orders/:id — single order detail. */
+const TERMINAL_RAMP_STATUSES = new Set(['completed', 'finalized', 'failed', 'refunded', 'canceled', 'expired']);
+const RECONCILE_STALENESS_MS = 8_000; // EtherFuse needs ~3-10s to index after createOrder
+
+/**
+ * Lazy reconcile: when the frontend polls an order whose local copy is
+ * non-terminal and old enough to have been indexed by EtherFuse, fetch fresh
+ * state and apply the same transition the `order_updated` webhook would have.
+ * This is a defensive fallback — primary path is still the webhook, which
+ * fires synchronously when EtherFuse advances an order. But if a delivery is
+ * dropped (sandbox flakiness, infra change, etc.), the poll will recover state
+ * within one tick.
+ *
+ * Idempotent against late webhooks via the state machine's no-op + invalid-
+ * transition guards.
+ */
+async function reconcileOrderFromUpstream(localOrder) {
+  if (TERMINAL_RAMP_STATUSES.has(localOrder.status)) return localOrder;
+  const ageMs = Date.now() - new Date(localOrder.updatedAt).getTime();
+  if (ageMs < RECONCILE_STALENESS_MS) return localOrder;
+  try {
+    const efOrder = await EtherFuseClient.Orders.get(localOrder.etherfuseOrderId);
+    if (!efOrder?.status || efOrder.status === localOrder.status) return localOrder;
+    log.info(`Reconciling order ${localOrder.id}: local=${localOrder.status} upstream=${efOrder.status}`);
+    await RampOrderService.applyWebhookTransition('order_updated', efOrder);
+    // Re-read; transition may have advanced multiple steps via subsequent webhook race.
+    return await prisma.rampOrder.findUnique({ where: { id: localOrder.id } });
+  } catch (err) {
+    log.debug(`Reconcile skipped (upstream fetch failed): ${err.message}`);
+    return localOrder;
+  }
+}
+
+/** GET /api/ramp/orders/:id — single order detail (with lazy upstream reconcile). */
 export async function getOrder(req, res) {
   try {
     const investorId = investorIdFromReq(req);
@@ -281,10 +313,9 @@ export async function getOrder(req, res) {
     if (!Number.isInteger(id) || id <= 0) {
       return send(res, 400, { success: false, error: 'invalid order id' });
     }
-    const order = await prisma.rampOrder.findFirst({
-      where: { id, investorId },
-    });
+    let order = await prisma.rampOrder.findFirst({ where: { id, investorId } });
     if (!order) return send(res, 404, { success: false, error: 'order not found' });
+    order = await reconcileOrderFromUpstream(order);
     return send(res, 200, { success: true, data: order });
   } catch (err) {
     return handleError(res, err, 'getOrder');
@@ -316,6 +347,16 @@ export async function simulateFiatReceived(req, res) {
       orderId: order.etherfuseOrderId,
       amount: order.amountInFiat?.toString() ?? '0',
     });
+    // EtherFuse will fire `order_updated` webhooks (created → funded → completed)
+    // shortly after this call returns. If webhook delivery is broken we'd miss
+    // them — kick off a reconcile a few seconds later so the next poll already
+    // sees the advanced state.
+    setTimeout(async () => {
+      try {
+        const fresh = await prisma.rampOrder.findFirst({ where: { id: localId, investorId } });
+        if (fresh) await reconcileOrderFromUpstream(fresh);
+      } catch { /* swallow — next poll's reconcile will retry */ }
+    }, 6_000);
     return send(res, 200, { success: true, data: result });
   } catch (err) {
     return handleError(res, err, 'simulateFiatReceived');
