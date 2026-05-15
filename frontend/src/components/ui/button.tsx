@@ -5,8 +5,7 @@ import { cn } from "@/lib/utils"
 
 /**
  * Premium Button Component
- * Following the frontend-design workflow for distinctive, production-grade UX
- * 
+ *
  * Key improvements:
  * - All variants have visible borders/outlines
  * - Clear hover, focus, and active (pressed) states
