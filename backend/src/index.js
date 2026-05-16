@@ -291,6 +291,17 @@ app.listen(PORT, async () => {
   } catch (error) {
     console.error('Failed to start wallet monitor:', error.message);
   }
+
+  // --- RAMP ORDER RECONCILER ---
+  // Sweeps non-terminal RampOrders > 2min old, pulls fresh state from
+  // EtherFuse, applies transition. Backstop for dropped webhook deliveries.
+  try {
+    const { RampOrderReconciler } = await import('./services/rampOrderReconciler.js');
+    RampOrderReconciler.start();
+    console.log('Ramp order reconciler enabled — sweeping stale orders every 5min');
+  } catch (error) {
+    console.error('Failed to start ramp order reconciler:', error.message);
+  }
 });
 
 // ─── GRACEFUL SHUTDOWN ───

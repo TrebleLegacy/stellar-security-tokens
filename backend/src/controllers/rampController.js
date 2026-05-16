@@ -301,11 +301,26 @@ export async function listOrders(req, res) {
   try {
     const investorId = investorIdFromReq(req);
     const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
-    const orders = await prisma.rampOrder.findMany({
+    let orders = await prisma.rampOrder.findMany({
       where: { investorId },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
+
+    // Lazy reconcile non-terminal orders that are old enough to have been
+    // indexed by EtherFuse. The floating RampOrderTracker polls this endpoint
+    // every 8s, so an order that the webhook never delivered to us will catch
+    // up here. Bounded by LIST_RECONCILE_MAX so a large in-flight backlog
+    // can't slow the request down.
+    const stale = orders.filter(reconcileEligible);
+    if (stale.length > 0) {
+      const updated = await Promise.all(
+        stale.slice(0, LIST_RECONCILE_MAX).map((o) => reconcileOrderFromUpstream(o).catch(() => o))
+      );
+      const updatedById = new Map(updated.map((o) => [o.id, o]));
+      orders = orders.map((o) => updatedById.get(o.id) ?? o);
+    }
+
     return send(res, 200, { success: true, data: orders });
   } catch (err) {
     return handleError(res, err, 'listOrders');
@@ -314,6 +329,12 @@ export async function listOrders(req, res) {
 
 const TERMINAL_RAMP_STATUSES = new Set(['completed', 'finalized', 'failed', 'refunded', 'canceled', 'expired']);
 const RECONCILE_STALENESS_MS = 8_000; // EtherFuse needs ~3-10s to index after createOrder
+const LIST_RECONCILE_MAX = 10; // bound per-request upstream calls to keep latency predictable
+
+function reconcileEligible(order) {
+  if (TERMINAL_RAMP_STATUSES.has(order.status)) return false;
+  return Date.now() - new Date(order.updatedAt).getTime() >= RECONCILE_STALENESS_MS;
+}
 
 /**
  * Lazy reconcile: when the frontend polls an order whose local copy is
