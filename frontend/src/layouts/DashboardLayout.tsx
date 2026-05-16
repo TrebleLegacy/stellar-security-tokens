@@ -51,7 +51,7 @@ export function DashboardLayout() {
     const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
     const investor = authStorage.getUser<Investor>('investor');
-    const contractId = investor?.stellar_contract_id;
+    const contractId = investor?.stellarContractId;
     const truncatedAddress = contractId ? `${contractId.slice(0, 6)}…${contractId.slice(-4)}` : null;
     const identiconSeed = contractId ?? sessionStorage.getItem('radox_passkey_credential');
 
