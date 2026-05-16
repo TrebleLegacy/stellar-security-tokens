@@ -900,7 +900,7 @@ export class PasskeyWalletService {
       'transfer',
       xdr.ScVal.scvAddress(walletAddress.toScAddress()),
       xdr.ScVal.scvAddress(destination.toScAddress()),
-      xdr.ScVal.scvI128(xdr.Int128Parts.fromBigInt(amountBigInt))
+      nativeToScVal(amountBigInt, { type: 'i128' })
     );
 
     const builder = new TransactionBuilder(
@@ -1306,7 +1306,7 @@ export class PasskeyWalletService {
       'transfer',
       xdr.ScVal.scvAddress(walletAddress.toScAddress()),
       xdr.ScVal.scvAddress(destination.toScAddress()),
-      xdr.ScVal.scvI128(xdr.Int128Parts.fromBigInt(amountBigInt))
+      nativeToScVal(amountBigInt, { type: 'i128' })
     );
 
     const tx = new TransactionBuilder(
