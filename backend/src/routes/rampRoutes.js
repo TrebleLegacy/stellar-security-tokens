@@ -40,6 +40,7 @@ import {
   listOrders,
   getOrder,
   simulateFiatReceived,
+  cancelOnrampOrder,
   createOfframpQuote,
   createOfframpOrder,
   prepareOfframpTx,
@@ -65,6 +66,7 @@ router.post('/quotes', createQuote);
 router.post('/orders', createOrder);
 router.get('/orders', listOrders);
 router.get('/orders/:id', getOrder);
+router.post('/orders/:id/cancel', cancelOnrampOrder);
 
 // Sandbox-only — handler returns 404 in production.
 router.post('/dev/fiat-received/:orderId', simulateFiatReceived);
