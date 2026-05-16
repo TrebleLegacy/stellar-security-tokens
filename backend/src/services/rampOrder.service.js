@@ -131,6 +131,20 @@ export class RampOrderService {
     };
     if (walletAddress) payload.walletAddress = walletAddress;
 
+    // Platform partner fee. EtherFuse caps at 500 bps (5%). Applied on the
+    // BRL leg by EtherFuse, deducted from the user's quote, accrued offline
+    // for periodic disbursement to us. Currently on-ramp only — off-ramp
+    // user pays platform fee at offer-purchase time, not at off-ramp.
+    if (orderType === 'onramp') {
+      const partnerFeeBps = Number(process.env.PLATFORM_PARTNER_FEE_BPS) || 0;
+      if (partnerFeeBps > 0) {
+        if (partnerFeeBps > 500) {
+          throw new Error(`PLATFORM_PARTNER_FEE_BPS=${partnerFeeBps} exceeds EtherFuse max of 500`);
+        }
+        payload.partnerFeeBps = partnerFeeBps;
+      }
+    }
+
     log.info('Creating EtherFuse quote', { investorId, etherfuseQuoteId, orderType, sourceAsset, targetAsset });
     const efResponse = await EtherFuseClient.Quotes.create(payload);
 

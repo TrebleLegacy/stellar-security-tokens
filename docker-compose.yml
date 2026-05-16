@@ -109,6 +109,9 @@ services:
       ETHERFUSE_WEBHOOK_SECRET: ${ETHERFUSE_WEBHOOK_SECRET:-}
       ETHERFUSE_TESOURO_ASSET_IDENTIFIER: ${ETHERFUSE_TESOURO_ASSET_IDENTIFIER:-}
       ETHERFUSE_WEBHOOK_URL: ${ETHERFUSE_WEBHOOK_URL:-}
+      # Platform partner fee (bps) — EtherFuse holds it off-chain and disburses
+      # to us periodically. Cap = 500 bps (5%). On-ramp only. 0 = disabled.
+      PLATFORM_PARTNER_FEE_BPS: ${PLATFORM_PARTNER_FEE_BPS:-0}
       # Off-ramp (Anchor Mode + per-investor relayer G; default OFF)
       ENABLE_OFFRAMP: ${ENABLE_OFFRAMP:-false}
       OFFRAMP_KEYRING_SECRET: ${OFFRAMP_KEYRING_SECRET:-}
