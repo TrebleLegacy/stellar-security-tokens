@@ -48,6 +48,8 @@ export function NotificationBell() {
     const [loading, setLoading] = useState(false);
     const [ramps, setRamps] = useState<RampOrder[]>([]);
     const [rampDismissed, setRampDismissed] = useState<Set<number>>(new Set());
+    const [canceling, setCanceling] = useState<Set<number>>(new Set());
+    const [confirmCancelId, setConfirmCancelId] = useState<number | null>(null);
     const rampDismissedRef = useRef(rampDismissed);
     rampDismissedRef.current = rampDismissed;
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -112,6 +114,32 @@ export function NotificationBell() {
         fetchRamps();
         const t = setInterval(fetchRamps, RAMP_POLL_MS);
         return () => clearInterval(t);
+    }, [fetchRamps]);
+
+    // Emergency cancel: two-tap confirm (first tap arms, second tap fires).
+    // Auto-resets the confirm state after 4s if user doesn't follow through.
+    useEffect(() => {
+        if (confirmCancelId == null) return;
+        const t = setTimeout(() => setConfirmCancelId(null), 4000);
+        return () => clearTimeout(t);
+    }, [confirmCancelId]);
+
+    const cancelRamp = useCallback(async (order: RampOrder) => {
+        setCanceling((prev) => new Set([...prev, order.id]));
+        try {
+            const fn = order.orderType === 'offramp' ? rampApi.cancelOfframpOrder : rampApi.cancelOnrampOrder;
+            await fn(order.id);
+            await fetchRamps();
+        } catch {
+            /* failure surfaces as the order staying in flight; next poll reconciles */
+        } finally {
+            setCanceling((prev) => {
+                const next = new Set(prev);
+                next.delete(order.id);
+                return next;
+            });
+            setConfirmCancelId(null);
+        }
     }, [fetchRamps]);
 
     // Close dropdown when clicking outside
@@ -267,6 +295,35 @@ export function NotificationBell() {
                                                     >
                                                         EtherFuse <ExternalLink className="w-2.5 h-2.5" />
                                                     </a>
+                                                )}
+                                                {/* Emergency cancel — only while `created` (EtherFuse rejects after funded). */}
+                                                {order.status === 'created' && (
+                                                    canceling.has(order.id) ? (
+                                                        <span className="text-[10px] text-white/40 inline-flex items-center gap-1 ml-auto">
+                                                            <Loader2 className="w-2.5 h-2.5 animate-spin" /> Canceling…
+                                                        </span>
+                                                    ) : confirmCancelId === order.id ? (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                cancelRamp(order);
+                                                            }}
+                                                            className="text-[10px] text-red-300 hover:text-red-200 font-medium uppercase tracking-wider transition-colors ml-auto"
+                                                        >
+                                                            Confirm cancel
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setConfirmCancelId(order.id);
+                                                            }}
+                                                            className="text-[10px] text-red-400/70 hover:text-red-300 transition-colors ml-auto"
+                                                            title="Cancel this order on EtherFuse"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    )
                                                 )}
                                                 {(isComplete || isFailed) && (
                                                     <button

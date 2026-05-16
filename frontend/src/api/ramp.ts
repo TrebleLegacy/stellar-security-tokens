@@ -230,6 +230,12 @@ export const rampApi = {
     return res.data;
   },
 
+  /** Cancel a `created` on-ramp order (before PIX is paid). Twin of cancelOfframpOrder. */
+  cancelOnrampOrder: async (id: number): Promise<ApiResponse<RampOrder>> => {
+    const res = await api.post(`/ramp/orders/${id}/cancel`);
+    return res.data;
+  },
+
   /** Sandbox-only: simulate the PIX deposit. 404 in production. */
   simulateFiatReceived: async (orderId: number): Promise<ApiResponse<unknown>> => {
     const res = await api.post(`/ramp/dev/fiat-received/${orderId}`);
