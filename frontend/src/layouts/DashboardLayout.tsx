@@ -11,7 +11,8 @@ import { authStorage } from '@/utils/authStorage';
 import { passkeyClient } from '@/lib/passkey';
 import { useAuthRefresh } from '@/hooks/useAuthRefresh';
 import { DepositTracker } from '@/components/wallet/DepositTracker';
-import { RampOrderTracker } from '@/components/wallet/RampOrderTracker';
+// RampOrderTracker was a floating widget; ramps now surface inside the
+// NotificationBell dropdown for a unified notification surface.
 import { Identicon } from '@/components/Identicon';
 
 export function DashboardLayout() {
@@ -157,7 +158,6 @@ export function DashboardLayout() {
                 <div className="flex-1 p-4 md:p-6 overflow-auto">
                     <Outlet />
                     <DepositTracker />
-                    <RampOrderTracker />
                 </div>
             </main>
         </div>
