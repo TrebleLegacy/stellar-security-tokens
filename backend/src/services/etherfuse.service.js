@@ -310,9 +310,24 @@ export const Webhooks = {
     return request('POST', '/ramp/webhook', { body: { url, eventType } });
   },
 
-  /** GET /ramp/webhook — list subscriptions. */
-  async list() {
-    return request('GET', '/ramp/webhook');
+  /**
+   * POST /ramp/webhooks — list subscriptions (paginated).
+   *
+   * Note the path/method drift from create/get/delete:
+   *   - Create:  POST   /ramp/webhook   (singular)
+   *   - Get one: GET    /ramp/webhook/{id}
+   *   - Delete:  DELETE /ramp/webhook/{id}
+   *   - List:    POST   /ramp/webhooks  (PLURAL, with paged body)
+   * That's how EtherFuse's OpenAPI defines it. The plural+POST list endpoint
+   * is non-obvious; `GET /ramp/webhook` returns 404. Verified against
+   * api.sand.etherfuse.com 2026-05-16.
+   *
+   * @param {object} [pagination]
+   * @param {number} [pagination.pageSize=50]  max 100
+   * @param {number} [pagination.pageNumber=0]
+   */
+  async list({ pageSize = 50, pageNumber = 0 } = {}) {
+    return request('POST', '/ramp/webhooks', { body: { pageSize, pageNumber } });
   },
 
   /** DELETE /ramp/webhook/{id} */
