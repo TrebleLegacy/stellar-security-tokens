@@ -528,6 +528,25 @@ export async function cancelOfframpOrder(req, res) {
   }
 }
 
+/**
+ * POST /api/ramp/orders/:id/cancel — cancel a `created` on-ramp order before
+ * the investor pays the PIX. After `funded`, requires refund flow (not
+ * implemented). Twin of cancelOfframpOrder.
+ */
+export async function cancelOnrampOrder(req, res) {
+  try {
+    const investorId = investorIdFromReq(req);
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return send(res, 400, { success: false, error: 'invalid order id' });
+    }
+    const result = await RampOrderService.cancelOnrampOrder(investorId, id);
+    return send(res, 200, { success: true, data: result });
+  } catch (err) {
+    return handleError(res, err, 'cancelOnrampOrder');
+  }
+}
+
 export default {
   getReadiness,
   submitKyc,
@@ -539,6 +558,7 @@ export default {
   listOrders,
   getOrder,
   simulateFiatReceived,
+  cancelOnrampOrder,
   createOfframpQuote,
   createOfframpOrder,
   prepareOfframpTx,

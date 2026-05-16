@@ -483,6 +483,31 @@ export class RampOrderService {
   }
 
   /**
+   * Cancel an on-ramp order. EtherFuse only accepts cancel before `funded` —
+   * after funded, the PIX has been credited and we'd need a refund flow.
+   * Off-ramp uses RampOfframpService.cancelOrder; this is the on-ramp twin.
+   *
+   * Returns the updated local order row after the upstream-applied transition.
+   */
+  static async cancelOnrampOrder(investorId, localOrderId) {
+    const order = await prisma.rampOrder.findFirst({
+      where: { id: Number(localOrderId), investorId, orderType: 'onramp' },
+    });
+    if (!order) throw new Error(`On-ramp order ${localOrderId} not found`);
+    if (order.status !== 'created') {
+      throw new Error(`Cannot cancel on-ramp order in status "${order.status}" (only created is cancellable)`);
+    }
+
+    log.info(`Canceling on-ramp order ${order.id} (${order.etherfuseOrderId})`);
+    await EtherFuseClient.Orders.cancel(order.etherfuseOrderId);
+    // Pull fresh state and apply via the standard transition path so
+    // notifications + bookkeeping stay consistent.
+    const upstream = await EtherFuseClient.Orders.get(order.etherfuseOrderId);
+    await this.applyWebhookTransition('order_updated', upstream);
+    return prisma.rampOrder.findUnique({ where: { id: order.id } });
+  }
+
+  /**
    * Side-effect: in-app notification on state changes. Best-effort —
    * failures here MUST NOT prevent the state transition from being recorded.
    */
