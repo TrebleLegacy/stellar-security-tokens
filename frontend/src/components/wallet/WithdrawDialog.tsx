@@ -943,9 +943,18 @@ function OfframpTracker({ order, asset }: { order: RampOrder; asset: OfframpAsse
 
     const statusIndex = steps.findIndex((s) => s.key === order.status);
 
+    const isPolling = !isComplete && !isFailed;
+
     return (
         <div className="py-2 space-y-5">
-            <OfframpStatusPill status={order.status} />
+            <div className="space-y-1.5">
+                <OfframpStatusPill status={order.status} />
+                {isPolling && (
+                    <p className="text-center text-[10px] text-white/40 uppercase tracking-[0.14em]">
+                        Auto-updates every 4s
+                    </p>
+                )}
+            </div>
 
             <div className="px-5 py-5 rounded-xl bg-white/[0.04] border border-white/10 space-y-3">
                 <div className="flex items-baseline justify-between">

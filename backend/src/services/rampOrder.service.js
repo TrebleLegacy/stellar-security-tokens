@@ -50,8 +50,16 @@ const log = logger.scope('RampOrderService');
  * either no-ops (already in target state) or backward (stale webhook).
  */
 const ALLOWED_TRANSITIONS = new Map([
-  ['created',   new Set(['funded', 'canceled', 'expired', 'failed'])],
-  ['funded',    new Set(['completed', 'refunded', 'failed'])],
+  // Forward LEAPS are explicitly allowed (created → completed without funded,
+  // funded → finalized without completed, etc.). Reasons:
+  //   - EtherFuse off-ramps can skip the `funded` event for anchor-mode orders
+  //   - Webhook deliveries get dropped (tunnel down, network blip); the lazy
+  //     reconcile in rampController.getOrder catches up by fetching the LATEST
+  //     upstream state, which may be several states ahead. The state machine
+  //     must accept that leap as a valid forward move, not reject it as invalid.
+  // Backward / no-op transitions remain rejected (handled separately upstream).
+  ['created',   new Set(['funded', 'completed', 'finalized', 'canceled', 'expired', 'failed', 'refunded'])],
+  ['funded',    new Set(['completed', 'finalized', 'refunded', 'failed'])],
   ['completed', new Set(['finalized'])], // off-ramp only
   // Terminal:
   ['finalized', new Set()],
@@ -61,7 +69,27 @@ const ALLOWED_TRANSITIONS = new Map([
   ['expired',   new Set()],
 ]);
 
+const FORWARD_SUCCESS_STATUSES = new Set(['funded', 'completed', 'finalized']);
+
 const TERMINAL_STATUSES = new Set(['completed', 'finalized', 'failed', 'refunded', 'canceled', 'expired']);
+
+/**
+ * EtherFuse's off-ramp create response doesn't include `statusPage` — it gets
+ * populated later via webhook once the burn tx is detected. This leaves the
+ * frontend with a null statusPage in the polling window between create and
+ * funded, which can take minutes. Derive a fallback URL from the orderId so
+ * the "View on EtherFuse" link is available immediately.
+ *
+ * Sandbox only — production URL pattern not yet verified. On prod, returns
+ * null and lets the webhook-populated value land naturally.
+ */
+function deriveStatusPageUrl(etherfuseOrderId) {
+  const apiBase = process.env.ETHERFUSE_API_BASE_URL || 'https://api.sand.etherfuse.com';
+  if (apiBase.includes('api.sand.')) {
+    return `https://devnet.etherfuse.com/ramp/order/${etherfuseOrderId}`;
+  }
+  return null;
+}
 
 export class RampOrderService {
   /**
@@ -236,7 +264,7 @@ export class RampOrderService {
         withdrawAnchorAccount: inner.withdrawAnchorAccount ?? null,
         withdrawMemo: inner.withdrawMemo ?? null,
         withdrawMemoType: inner.withdrawMemoType ?? null,
-        statusPage: inner.statusPage ?? efResponse?.statusPage ?? null,
+        statusPage: inner.statusPage ?? efResponse?.statusPage ?? deriveStatusPageUrl(etherfuseOrderId),
       },
     });
 
@@ -344,7 +372,10 @@ export class RampOrderService {
       stellarClaimTransaction: order.stellarClaimTransaction ?? existing.stellarClaimTransaction,
       statusPage: order.statusPage ?? existing.statusPage,
     };
-    if (status === 'funded' && !existing.fundedAt) update.fundedAt = now;
+    // Backfill fundedAt when leaping past `funded` (so denormalized timestamps
+    // stay consistent for reporting). Only for the success path — failure
+    // terminals never had funds flow, so fundedAt stays null.
+    if (FORWARD_SUCCESS_STATUSES.has(status) && !existing.fundedAt) update.fundedAt = now;
     if (TERMINAL_STATUSES.has(status) && !existing.completedAt) update.completedAt = now;
 
     await prisma.rampOrder.update({ where: { etherfuseOrderId: orderId }, data: update });
