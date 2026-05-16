@@ -24,6 +24,8 @@ const TERMINAL_STATUSES = new Set<RampOrder['status']>([
 ]);
 const POLL_INTERVAL_MS = 8_000;
 const AUTO_DISMISS_TERMINAL_MS = 10_000;
+const MAX_AGE_MS = 60 * 60 * 1000;        // hide non-terminal orders older than 1h (abandoned)
+const VISIBLE_CAP = 3;                     // max cards visible at once; remainder collapses to "+N more"
 
 function tokenCodeOf(order: RampOrder): string {
     const id = order.orderType === 'offramp' ? order.sourceAsset : order.targetAsset;
@@ -67,6 +69,7 @@ export function RampOrderTracker() {
     const [orders, setOrders] = useState<RampOrder[]>([]);
     const [dismissed, setDismissed] = useState<Set<number>>(new Set());
     const [minimized, setMinimized] = useState(false);
+    const [expanded, setExpanded] = useState(false);
     const dismissedRef = useRef(dismissed);
     dismissedRef.current = dismissed;
     const navigate = useNavigate();
@@ -75,15 +78,19 @@ export function RampOrderTracker() {
         try {
             const res = await rampApi.listOrders(20);
             if (!res.success || !res.data) return;
-            // Keep non-terminal always, plus terminal orders not yet auto-dismissed
-            // (they linger briefly so the user sees the success state).
+            const now = Date.now();
             const relevant = res.data.filter((o) => {
-                if (!TERMINAL_STATUSES.has(o.status)) return true;
-                return !dismissedRef.current.has(o.id);
+                // Drop abandoned non-terminal orders that are way past their PIX window.
+                // EtherFuse will eventually expire/cancel them, but until then the tracker
+                // shouldn't pile them up. Auto-dismiss locally without action.
+                const age = now - new Date(o.createdAt).getTime();
+                if (!TERMINAL_STATUSES.has(o.status) && age > MAX_AGE_MS) return false;
+                // Terminal orders: only show if not yet auto-dismissed
+                if (TERMINAL_STATUSES.has(o.status)) return !dismissedRef.current.has(o.id);
+                return true;
             });
             setOrders(relevant);
 
-            // Schedule auto-dismiss for newly-terminal orders
             relevant.forEach((o) => {
                 if (TERMINAL_STATUSES.has(o.status) && !dismissedRef.current.has(o.id)) {
                     setTimeout(() => {
@@ -105,12 +112,17 @@ export function RampOrderTracker() {
     const visible = orders.filter((o) => !dismissed.has(o.id));
     if (visible.length === 0) return null;
 
+    // Cap visible cards so the widget never covers the viewport. Excess collapses
+    // into the minimize chip ("+N more") which the user can click to expand.
+    const overflowCount = Math.max(0, visible.length - VISIBLE_CAP);
+    const cardsToRender = expanded ? visible : visible.slice(0, VISIBLE_CAP);
+
     return (
-        <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-2 max-w-sm">
+        <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-2 max-w-sm w-[22rem] max-h-[80vh]">
             <div className="flex items-center gap-2">
                 <button
                     onClick={() => setMinimized(!minimized)}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-800/90 border border-white/10 text-[10px] text-gray-400 hover:text-white transition-colors backdrop-blur-xl"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-900/95 border border-white/10 text-[10px] text-gray-400 hover:text-white transition-colors backdrop-blur-xl"
                 >
                     {minimized ? (
                         <>
@@ -126,14 +138,27 @@ export function RampOrderTracker() {
                 </button>
                 <button
                     onClick={fetch}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-800/90 border border-white/10 text-[10px] text-gray-400 hover:text-white transition-colors backdrop-blur-xl"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-900/95 border border-white/10 text-[10px] text-gray-400 hover:text-white transition-colors backdrop-blur-xl"
                     aria-label="Refresh"
                 >
                     <RefreshCw className="w-3 h-3" />
                 </button>
+                {overflowCount > 0 && !minimized && (
+                    <button
+                        onClick={() => setExpanded(!expanded)}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-900/95 border border-white/10 text-[10px] text-amber-300/80 hover:text-white transition-colors backdrop-blur-xl ml-auto"
+                    >
+                        {expanded ? `Show ${VISIBLE_CAP}` : `+${overflowCount} more`}
+                    </button>
+                )}
             </div>
 
-            {!minimized && visible.map((order) => {
+            {!minimized && (
+                <div className={cn(
+                    'flex flex-col gap-2',
+                    expanded ? 'overflow-y-auto pr-1' : '',
+                )} style={expanded ? { maxHeight: 'calc(80vh - 3rem)' } : undefined}>
+                {cardsToRender.map((order) => {
                 const code = tokenCodeOf(order);
                 const isOfframp = order.orderType === 'offramp';
                 const isComplete = order.status === 'completed' || order.status === 'finalized';
@@ -213,6 +238,8 @@ export function RampOrderTracker() {
                     </div>
                 );
             })}
+                </div>
+            )}
         </div>
     );
 }
