@@ -771,7 +771,7 @@ export class PasskeyWalletService {
     };
 
     const xlmSacContractId = process.env.XLM_SAC_CONTRACT_ID;
-    const usdcSacContractId = process.env.USDC_SAC_CONTRACT_ID;
+    const usdcSacContractId = process.env.USDC_SAC_CONTRACT_ID || process.env.USDC_CONTRACT_ID;
 
     // TESOURO (EtherFuse BR/PIX on-ramp delivery asset). The SAC contract ID
     // is deterministic from CODE:ISSUER, so we compute it on the fly from
@@ -1284,8 +1284,8 @@ export class PasskeyWalletService {
 
     let tokenContractId;
     if (assetCode === 'USDC') {
-      tokenContractId = process.env.USDC_CONTRACT_ID;
-      if (!tokenContractId) throw new Error('USDC_CONTRACT_ID not configured');
+      tokenContractId = process.env.USDC_SAC_CONTRACT_ID || process.env.USDC_CONTRACT_ID;
+      if (!tokenContractId) throw new Error('USDC SAC contract not configured (set USDC_SAC_CONTRACT_ID)');
     } else if (assetCode === 'XLM') {
       tokenContractId = process.env.XLM_CONTRACT_ID;
       if (!tokenContractId) throw new Error('XLM_CONTRACT_ID not configured');
