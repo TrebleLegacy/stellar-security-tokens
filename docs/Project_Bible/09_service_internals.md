@@ -1,7 +1,7 @@
 # 09 — Service Internals
 
 > **⚠️ AUTO-GENERATED — DO NOT EDIT MANUALLY**  
-> Generated: `2026-05-17T21:25:57.491Z`  
+> Generated: `2026-05-17T21:38:42.498Z`  
 > Source: `backend/src/services/` (31 files)  
 > Regenerate: `npm run docs:services`
 
