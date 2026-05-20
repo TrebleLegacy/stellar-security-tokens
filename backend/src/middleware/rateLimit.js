@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import RedisStore from 'rate-limit-redis';
 import { createClient } from 'redis';
 import logger from '../utils/logger.js';
@@ -166,10 +166,15 @@ export const perUserLimiter = createLimiter({
     max: 60,
     message: 'Per-user rate limit exceeded. Slow down or contact support.',
     keyPrefix: 'rl:user',
-    keyGenerator: (req) =>
+    // For authenticated requests: key on userId.
+    // For anonymous requests: use express-rate-limit's `ipKeyGenerator` helper —
+    // it normalizes IPv6 addresses so single users can't bypass the limit by
+    // varying the trailing bits of their /64 prefix. Required by
+    // express-rate-limit v7+ to avoid ERR_ERL_KEY_GEN_IPV6.
+    keyGenerator: (req, res) =>
         req.user?.userId
             ? `u:${req.user.userType ?? 'unk'}:${req.user.userId}`
-            : (req.ip ?? 'anon'),
+            : ipKeyGenerator(req, res),
 });
 
 /**
