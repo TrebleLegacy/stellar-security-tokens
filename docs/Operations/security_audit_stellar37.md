@@ -102,10 +102,12 @@ if (process.env.NODE_ENV !== 'production') {
 
 ### §2 Gestão de Chaves
 
-#### F-003 ✅ RESOLVED 2026-05-20
+#### F-003 ✅ RESOLVED 2026-05-20 (contract + operator UI)
 **[HIGH] (confidence: 9/10) [VERIFIED] [contracts/maturity_settlement/src/lib.rs](contracts/maturity_settlement/src/lib.rs) — MaturitySettlement contract has no pause / no admin transfer**
 
-**Resolution**: Contract bumped to **v2**. Added `pause()`, `resume()`, `propose_admin()`, `accept_admin()`, plus `is_paused()` / `get_active_admin()` helpers. `deposit`, `settle_batch`, `withdraw`, `refund` now gated on `!is_paused()`. `upgrade` and `accept_admin` intentionally NOT pause-gated (recovery paths). 13 new tests added; all 125 contract tests pass. **Deploy required**: build new WASM and call `upgrade()` on the deployed testnet contract before any debt offer.
+**Resolution (contract layer)**: Contract bumped to **v2**. Added `pause()`, `resume()`, `propose_admin()`, `accept_admin()`, plus `is_paused()` / `get_active_admin()` helpers. `deposit`, `settle_batch`, `withdraw`, `refund` now gated on `!is_paused()`. `upgrade` and `accept_admin` intentionally NOT pause-gated (recovery paths). 13 new tests added; all 125 contract tests pass. WASM uploaded to testnet at hash `fb54e7a3e21839abe493a4ed0e95c639d6458975fa0c49291bd55318826f9abb`.
+
+**Resolution (operator layer — follow-up shipped 2026-05-20)**: Caroline's <30-min incident-containment lever is now reachable in 2 clicks from `AdminOffers.tsx`. New endpoints under `/api/admin/settlements/:offerId/*` (`status`, `pause`, `resume`, `propose-admin`, `accept-admin`) mounted with `strictLimiter` (10/min) and auto-audited via `requirePlatformAdmin`. New service methods in [backend/src/services/sorobanSettlement.service.js](backend/src/services/sorobanSettlement.service.js): `buildPauseXdr`, `buildResumeXdr`, `buildProposeAdminXdr`, `buildAcceptAdminXdr`, plus read-only queries `getPaused`, `getActiveAdmin`, `getPendingAdmin`, `getVersion` (with v1-contract auto-detection). New controller [backend/src/controllers/settlementController.js](backend/src/controllers/settlementController.js) and routes [backend/src/routes/settlementAdminRoutes.js](backend/src/routes/settlementAdminRoutes.js). KeyManager thresholds = 1 (no multisig — mirrors `contract_pause` pattern). Frontend admin panel extended in [frontend/src/pages/admin/AdminOffers.tsx](frontend/src/pages/admin/AdminOffers.tsx) with paused indicator, current/pending admin display, v1-banner, and four new dialogs. Propose-admin requires double-entry of the 56-char address per F-013 address-poisoning concern.
 
 **Description**: Function inventory grep across [contracts/maturity_settlement/src/lib.rs](contracts/maturity_settlement/src/lib.rs):
 - `initialize` (one-shot, line 116)
@@ -358,7 +360,7 @@ Per recon, the X-Confirm header is set in the API client, so the gate is purely 
 
 - **Testnet**: ✅ GO.
 - **Mainnet — investor funds in TokenSale**: 🟡 → 🟢 PENDING TASKS. F-001, F-010, F-011 code-resolved; remaining ops: (a) run the Prisma migration in prod, (b) confirm prod compose `JWT_SECRET` is set in real env. Then GO. Strongly recommended before launch: F-005 (WASM hash registry).
-- **Mainnet — debt offers using MaturitySettlement**: 🔴 → 🟡 v2 contract written + tests pass. Remaining ops: build the v2 WASM (`cargo build --release --target wasm32-unknown-unknown` + `stellar contract optimize`), call `upgrade()` on the deployed testnet contract, smoke-test the new pause/admin-rotation flows on testnet, then deploy mainnet.
+- **Mainnet — debt offers using MaturitySettlement**: 🔴 → 🟢 v2 contract code + WASM upload + operator UI all shipped. Remaining ops: smoke-test the pause/admin-rotation flows on testnet via the admin panel, then deploy mainnet.
 
 ---
 
