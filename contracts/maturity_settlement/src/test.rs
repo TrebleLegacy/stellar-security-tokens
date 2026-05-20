@@ -175,7 +175,7 @@ fn test_initialize_extends_ttl() {
     let client = MaturitySettlementClient::new(&e, &contract_id);
     client.initialize(&admin, &usdc.address, &sec_token.address, &Address::generate(&e), &5000);
     // Subsequent calls shouldn't panic due to expired TTL
-    assert_eq!(client.version(), 2);
+    assert_eq!(client.version(), 3);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -931,11 +931,11 @@ fn test_refund_returns_full_amount() {
 // ═══════════════════════════════════════════════════════
 
 #[test]
-fn test_version_returns_2() {
+fn test_version_returns_3() {
     let e = Env::default();
     let contract_id = e.register(MaturitySettlement, ());
     let client = MaturitySettlementClient::new(&e, &contract_id);
-    assert_eq!(client.version(), 2);
+    assert_eq!(client.version(), 3);
 }
 
 #[test]
@@ -2148,7 +2148,7 @@ fn test_golden_state_post_settlement() {
     assert_eq!(client.get_deposit(&company), deposit);
 
     // 4. version still works
-    assert_eq!(client.version(), 2);
+    assert_eq!(client.version(), 3);
 
     // 5. extend_ttl still works
     client.extend_ttl();
@@ -2500,7 +2500,7 @@ fn test_full_lifecycle_init_deposit_settle_withdraw() {
     let contract_id = e.register(MaturitySettlement, ());
     let client = MaturitySettlementClient::new(&e, &contract_id);
     client.initialize(&admin, &usdc.address, &sec_token.address, &treasury, &5000);
-    assert_eq!(client.version(), 2);
+    assert_eq!(client.version(), 3);
     assert_eq!(client.get_balance(), 0);
 
     // === 2. SETUP INVESTORS ===
@@ -2581,7 +2581,7 @@ fn test_full_lifecycle_init_deposit_settle_withdraw() {
     client.extend_ttl();
 
     // State is preserved
-    assert_eq!(client.version(), 2);
+    assert_eq!(client.version(), 3);
     assert_eq!(client.get_deposit(&company), 115 * 10_000_000); // stale but preserved
 }
 
@@ -2998,11 +2998,11 @@ fn test_v2_new_admin_can_act_after_rotation() {
 }
 
 #[test]
-fn test_v2_version_bumped_to_2() {
+fn test_v2_version_bumped_to_3() {
     let e = Env::default();
     e.mock_all_auths();
 
     let (client, _admin, _company, _investor, _treasury, _usdc, _, _, _, _) = setup(&e);
 
-    assert_eq!(client.version(), 2);
+    assert_eq!(client.version(), 3);
 }
