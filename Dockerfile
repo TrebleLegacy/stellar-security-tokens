@@ -3,10 +3,18 @@ FROM node:22-alpine
 # Install pg_dump for daily database backups (backup.service.js)
 RUN apk add --no-cache postgresql-client
 
+# Create non-root user (alpine base image runs as root by default).
+# F-003-followup / O-001 hardening: drop privileges so a container escape
+# doesn't give the attacker root inside the namespace.
+RUN addgroup -g 1001 nodeapp \
+  && adduser -D -u 1001 -G nodeapp nodeapp \
+  && mkdir -p /app /app/logs /app/backups \
+  && chown -R nodeapp:nodeapp /app
+
 WORKDIR /app
 
 # Copy backend dependency files
-COPY backend/package*.json ./backend/
+COPY --chown=nodeapp:nodeapp backend/package*.json ./backend/
 
 # Install backend dependencies (including devDependencies for build)
 WORKDIR /app/backend
@@ -14,16 +22,16 @@ RUN npm ci
 
 # Return to root and copy source code
 WORKDIR /app
-COPY backend/ ./backend/
-COPY scripts/ ./scripts/
+COPY --chown=nodeapp:nodeapp backend/ ./backend/
+COPY --chown=nodeapp:nodeapp scripts/ ./scripts/
 
 # Generate Prisma Client
 WORKDIR /app/backend
 RUN npx prisma generate
 WORKDIR /app
 
-# Create logs directory
-RUN mkdir -p /app/logs
+# Switch to the non-root user for runtime.
+USER nodeapp
 
 # Expose port
 EXPOSE 3000

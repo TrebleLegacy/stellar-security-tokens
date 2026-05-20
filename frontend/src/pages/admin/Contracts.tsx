@@ -96,6 +96,21 @@ export function Contracts() {
     const [actionInput, setActionInput] = useState<Record<string, string>>({});
     const [submitting, setSubmitting] = useState(false);
 
+    // F-014 typed-confirm state. For irreversible ops (drain / upgrade) the
+    // operator must type the offer's asset code before the confirm button
+    // becomes enabled. Mirrors the propose-admin double-entry pattern in
+    // AdminOffers.tsx — protects against late-night misclicks.
+    const [confirmTypedValue, setConfirmTypedValue] = useState('');
+    const isTypedConfirmRequired = action.type === 'drain' || action.type === 'upgrade';
+    const typedConfirmMatches = isTypedConfirmRequired
+        ? confirmTypedValue.trim().toUpperCase() === (selected?.offer.assetCode || '').toUpperCase()
+        : true;
+    const closeAction = () => {
+        closeAction();
+        setActionInput({});
+        setConfirmTypedValue('');
+    };
+
     // ─── Data loading ──────────────────────────────
 
     const loadContracts = async () => {
@@ -204,7 +219,7 @@ export function Contracts() {
             } else {
                 toast.success(`${action.type} executed`);
             }
-            setAction({ type: null });
+            closeAction();
             await loadDetail(offerId);
             await loadContracts();
         } catch (err: any) {
@@ -510,7 +525,7 @@ export function Contracts() {
             </div>
 
             {/* ── Action dialogs ── */}
-            <Dialog open={!!action.type} onOpenChange={() => setAction({ type: null })}>
+            <Dialog open={!!action.type} onOpenChange={() => closeAction()}>
                 <DialogContent className="bg-slate-900 border-white/10 text-white">
                     <DialogHeader>
                         <DialogTitle className={action.type === 'drain' || action.type === 'upgrade' ? 'text-red-400' : 'text-blue-400'}>
@@ -560,10 +575,32 @@ export function Contracts() {
                             onChange={e => setActionInput({ ...actionInput, newAdmin: e.target.value })} className="bg-black/20 border-white/10" />
                     )}
 
+                    {/* F-014 — typed-confirm gate for irreversible ops. */}
+                    {isTypedConfirmRequired && selected && (
+                        <div className="space-y-2 pt-1">
+                            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                                <strong>This action is destructive.</strong> Type the asset code
+                                <code className="mx-1 px-1.5 py-0.5 rounded bg-red-500/20 text-red-100 font-mono">{selected.offer.assetCode}</code>
+                                to enable the confirm button.
+                            </div>
+                            <Input
+                                placeholder={`Type ${selected.offer.assetCode} to confirm`}
+                                value={confirmTypedValue}
+                                onChange={e => setConfirmTypedValue(e.target.value)}
+                                className="bg-black/20 border-red-500/30 font-mono"
+                                spellCheck={false}
+                                autoCapitalize="off"
+                                autoCorrect="off"
+                            />
+                        </div>
+                    )}
+
                     <DialogFooter>
-                        <Button variant="outline" onClick={() => setAction({ type: null })} className="border-white/10">Cancel</Button>
-                        <Button onClick={executeAction} disabled={submitting}
-                            className={action.type === 'drain' || action.type === 'upgrade' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}
+                        <Button variant="outline" onClick={() => closeAction()} className="border-white/10">Cancel</Button>
+                        <Button
+                            onClick={executeAction}
+                            disabled={submitting || !typedConfirmMatches}
+                            className={`${action.type === 'drain' || action.type === 'upgrade' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'} disabled:opacity-40`}
                         >
                             {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-2" />}
                             Confirm

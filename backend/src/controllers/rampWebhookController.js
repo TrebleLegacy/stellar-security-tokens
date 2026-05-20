@@ -35,10 +35,71 @@ const KNOWN_EVENT_TYPES = new Set([
 ]);
 
 /**
+ * Optional defense-in-depth IP allowlist for EtherFuse callbacks.
+ * HMAC signature verification is the primary gate; this just adds a perimeter
+ * check that drops obviously-wrong-source traffic before crypto work.
+ *
+ * Set ETHERFUSE_ALLOWED_IPS as comma-separated IP literals or CIDRs.
+ * Empty / unset → no IP check (preserves the dev-easy default).
+ *
+ * O-003 from the Stellar 37º audit.
+ */
+function isIpAllowed(req) {
+  const raw = process.env.ETHERFUSE_ALLOWED_IPS;
+  if (!raw || !raw.trim()) return true; // not configured, skip check
+
+  const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  if (entries.length === 0) return true;
+
+  // x-forwarded-for is set by reverse proxies (Caddy) — pick the client-most.
+  const xff = req.get('x-forwarded-for');
+  const candidate = (xff ? String(xff).split(',')[0].trim() : null) || req.ip || req.connection?.remoteAddress;
+  if (!candidate) return false;
+
+  // Strip IPv6-mapped-IPv4 prefix.
+  const ip = candidate.replace(/^::ffff:/, '');
+
+  for (const entry of entries) {
+    if (entry === ip) return true;
+    if (entry.includes('/')) {
+      try {
+        if (ipInCidr(ip, entry)) return true;
+      } catch {
+        // ignore parse failure on individual entry
+      }
+    }
+  }
+  return false;
+}
+
+// Minimal IPv4 CIDR match (no extra deps; avoids pulling `ip` or `netmask`).
+// IPv6 not supported — EtherFuse publishes IPv4 ranges.
+function ipInCidr(ip, cidr) {
+  const [range, bitsStr] = cidr.split('/');
+  const bits = parseInt(bitsStr, 10);
+  if (Number.isNaN(bits) || bits < 0 || bits > 32) return false;
+  const toInt = (s) => s.split('.').reduce((acc, oct) => (acc << 8) + parseInt(oct, 10), 0) >>> 0;
+  const ipInt = toInt(ip);
+  const rangeInt = toInt(range);
+  if (bits === 0) return true;
+  const mask = bits === 32 ? 0xffffffff : (~((1 << (32 - bits)) - 1)) >>> 0;
+  return (ipInt & mask) === (rangeInt & mask);
+}
+
+/**
  * Express handler. The route registers `express.raw({ type: 'application/json' })`
  * before this handler so `req.body` is a Buffer — needed for JCS canonicalization.
  */
 export async function handleWebhook(req, res) {
+  // Optional IP allowlist (O-003 defense-in-depth). HMAC is the real gate.
+  if (!isIpAllowed(req)) {
+    log.warn('Webhook from disallowed IP', {
+      ip: req.ip,
+      xff: req.get('x-forwarded-for')?.slice(0, 64),
+    });
+    return res.status(401).json({ error: 'origin not allowed' });
+  }
+
   const secretB64 = process.env.ETHERFUSE_WEBHOOK_SECRET;
   if (!secretB64) {
     log.error('ETHERFUSE_WEBHOOK_SECRET is not set; rejecting webhook delivery');

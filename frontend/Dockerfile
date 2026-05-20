@@ -44,7 +44,19 @@ COPY --from=builder /app/frontend/dist /usr/share/nginx/html
 # Copy custom nginx configuration
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
-EXPOSE 80
+# F-003-followup / O-001 hardening: drop to non-root.
+# nginx:alpine ships with the `nginx` user. We need to:
+#   1) Make /var/cache/nginx and /var/run writable for the nginx user.
+#   2) Point pid to a writable location.
+#   3) Bind to port 8080 instead of 80 (ports <1024 require root).
+RUN sed -i 's/listen\s*80;/listen 8080;/g' /etc/nginx/conf.d/default.conf \
+  && chown -R nginx:nginx /var/cache/nginx /var/run /usr/share/nginx/html /etc/nginx/conf.d \
+  && touch /var/run/nginx.pid \
+  && chown nginx:nginx /var/run/nginx.pid
+
+USER nginx
+
+# Expose port (8080 to allow non-root bind)
+EXPOSE 8080
 
 CMD ["nginx", "-g", "daemon off;"]
