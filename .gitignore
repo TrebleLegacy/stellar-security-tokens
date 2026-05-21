@@ -20,7 +20,18 @@ coverage/
 .obsidian/core-plugins.json
 .obsidian/workspace.json
 backend/tests/integration/models/PlatformAdmin.test.js
-docs/ADMIN_CREDENTIALS.md
+
+# Internal operational docs (not for public consumption)
+docs/Operations/
+docs/Project_Bible/
+docs/superpowers/
+
+# Internal Claude Code skills (proprietary)
+.claude/skills/tokenomics-expert/
+.claude/skills/plan-deploy-review/
+
+# Testnet harvest scripts (contained secret keys, now swept)
+scripts/testnet-usdc-harvest/
 
 # Rust/Soroban build artifacts
 **/target/
