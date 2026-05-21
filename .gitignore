@@ -21,17 +21,21 @@ coverage/
 .obsidian/workspace.json
 backend/tests/integration/models/PlatformAdmin.test.js
 
-# Internal operational docs (not for public consumption)
-docs/Operations/
-docs/Project_Bible/
-docs/superpowers/
-
-# Internal Claude Code skills (proprietary)
-.claude/skills/tokenomics-expert/
-.claude/skills/plan-deploy-review/
-
-# Testnet harvest scripts (contained secret keys, now swept)
-scripts/testnet-usdc-harvest/
+# Internal: docs, internal guides, design context — NOT for public consumption.
+# This repo is a code-only mirror; everything below lives in the private repo.
+AGENTS.md
+CLAUDE.md
+.agent/
+.claude/skills/
+docs/
+deploy/Caddyfile
+deploy/bootstrap-admin.sh
+deploy/bootstrap-admin.dev.sh
+deploy/setup-vm.sh
+deploy/maintenance.html
+deploy/landing/
+scripts/
+frontend/README.md
 
 # Rust/Soroban build artifacts
 **/target/
