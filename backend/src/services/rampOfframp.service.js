@@ -33,8 +33,8 @@
  *     the one EtherFuse's webhook will reference)
  *
  * Recovery: if TX 2 fails after TX 1 succeeds, tokens are stranded on the
- *   relayer. See docs/Operations/OFFRAMP_RUNBOOK.md for the manual recovery
- *   script. Monitor logs for `RELAYER_STRANDED` warnings.
+ *   relayer. A manual recovery script handles this case; monitor logs for
+ *   `RELAYER_STRANDED` warnings to trigger it.
  *
  *   Flow:
  *     createQuote  → EtherFuse `/ramp/quote` (type=offramp)

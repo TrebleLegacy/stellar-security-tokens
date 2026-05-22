@@ -5,20 +5,18 @@ use soroban_sdk::{
 };
 
 // v2 (May 2026): adds pause/resume + 2-step admin rotation (propose_admin/accept_admin).
-// v3 (May 2026, F-006 audit follow-up): canonical USDC SAC is hardcoded per
-// network and validated at initialize(). Prevents address-poisoning attacks
-// where a malicious or compromised admin could initialize the contract with
-// a fake USDC SAC. The `testing` feature disables the check so unit tests
-// can use generated SACs; production WASMs are built with
-// `--no-default-features --features testnet|mainnet`.
-// See docs/Operations/security_audit_stellar37.md F-003, F-006.
+// v3: canonical USDC SAC is hardcoded per network and validated at
+// initialize(). Prevents address-poisoning attacks where a malicious or
+// compromised admin could initialize the contract with a fake USDC SAC.
+// The `testing` feature disables the check so unit tests can use generated
+// SACs; production WASMs are built with `--no-default-features --features
+// testnet|mainnet`.
 const CONTRACT_VERSION: u32 = 3;
 // ~30 days at 5s per ledger
 const TTL_THRESHOLD: u32 = 518_400;
 const TTL_EXTEND: u32 = 518_400;
 
-// Canonical USDC Stellar Asset Contract — F-006.
-// IMPORTANT: when changing, also update docs/Operations/DEPLOYMENTS.md.
+// Canonical USDC Stellar Asset Contract.
 #[cfg(feature = "testnet")]
 const USDC_SAC: &str = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 

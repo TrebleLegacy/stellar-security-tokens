@@ -14,8 +14,7 @@ const CONTRACT_VERSION: u32 = 7;
 const TTL_THRESHOLD: u32 = 518_400;
 const TTL_EXTEND: u32 = 518_400;
 
-// Canonical USDC Stellar Asset Contract — F-006.
-// IMPORTANT: when changing, also update docs/Operations/DEPLOYMENTS.md.
+// Canonical USDC Stellar Asset Contract.
 #[cfg(feature = "testnet")]
 const USDC_SAC: &str = "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA";
 
