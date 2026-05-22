@@ -40,9 +40,7 @@ frontend/README.md
 
 # Rust/Soroban build artifacts
 **/target/
-Radox-Pitch-v2-EN.pdf
 .gitignore
-Radox-Pitch-v2-EN.pptx
 
 # VSCode launch config (internal)
 .claude/launch.json
