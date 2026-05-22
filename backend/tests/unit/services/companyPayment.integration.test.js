@@ -213,6 +213,7 @@ mock.module('@stellar/stellar-sdk', {
         Contract: class { constructor() {} call() { return {}; } },
         Address: class { constructor() {} },
         nativeToScVal: () => ({}),
+        scValToNative: () => ({}),
         xdr: { ScVal: {} },
         rpc: { Server: class { constructor() {} } },
         BASE_FEE: '100',
