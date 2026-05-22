@@ -4,8 +4,6 @@
  */
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { HELP_CONTENT } from '@/constants/help-content';
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Users, DollarSign, Building2, Loader2, CheckCircle, ArrowRight } from "lucide-react";
 import { adminDefaultsApi, type DefaultedOffer, type DefaultStats } from "@/api/adminDefaults";
@@ -87,7 +85,6 @@ export function DefaultCases() {
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                         Default Cases
-                        <InfoTooltip content={HELP_CONTENT.defaultCases.collateralDistribution.content} side="right" />
                     </h2>
                     <p className="text-muted-foreground">Manage defaulted offers and distribute collateral to investors</p>
                 </div>
@@ -244,7 +241,6 @@ export function DefaultCases() {
                                         ) : (
                                             <>
                                                 Distribute Collateral
-                                                <InfoTooltip content={HELP_CONTENT.defaultCases.collateralDistribution.content} side="top" />
                                                 <ArrowRight className="w-4 h-4 ml-2" />
                                             </>
                                         )}

@@ -3,8 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { DollarSign, Users, TrendingUp, Loader2, AlertCircle, Clock, CheckCircle } from 'lucide-react';
 import { platformAdminsApi, type Investor } from '@/api/platformAdmins';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
-import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { HELP_CONTENT } from '@/constants/help-content';
 
 const COLORS = ['#10B981', '#F59E0B', '#EF4444', '#6366F1'];
 
@@ -108,7 +106,6 @@ export function AdminDashboard() {
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-1.5">
                             Total Revenue
-                            <InfoTooltip content={HELP_CONTENT.dashboard.totalRevenue.content} side="top" />
                         </CardTitle>
                         <DollarSign className="h-4 w-4 text-emerald-400" />
                     </CardHeader>
@@ -124,7 +121,6 @@ export function AdminDashboard() {
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-1.5">
                             Total Invested
-                            <InfoTooltip content={HELP_CONTENT.dashboard.totalInvested.content} side="top" />
                         </CardTitle>
                         <TrendingUp className="h-4 w-4 text-blue-400" />
                     </CardHeader>
@@ -140,7 +136,6 @@ export function AdminDashboard() {
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-1.5">
                             Success Rate
-                            <InfoTooltip content={HELP_CONTENT.dashboard.successRate.content} side="top" />
                         </CardTitle>
                         <CheckCircle className="h-4 w-4 text-purple-400" />
                     </CardHeader>
@@ -156,7 +151,6 @@ export function AdminDashboard() {
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium flex items-center gap-1.5">
                             Avg Processing
-                            <InfoTooltip content={HELP_CONTENT.dashboard.avgProcessingTime.content} side="top" />
                         </CardTitle>
                         <Clock className="h-4 w-4 text-yellow-400" />
                     </CardHeader>
