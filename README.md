@@ -1,15 +1,24 @@
-# stellar-security-tokens
+# Radox — Stellar Security Tokens
 
-Source code repository.
+Real-world asset tokenization platform built on Stellar. Source code published as part of the Stellar Accelerator program.
 
-This repository is published as an open-source code submission for the Stellar Accelerator program. It contains application source code only — no operational documentation, internal guides, architecture notes, or business context is provided here.
+## What's here
+
+This repository contains the application source code only. Operational documentation, internal guides, architecture notes, and business context live in a private mirror.
+
+## Stellar integrations
+
+- **Soroban contracts** (Rust): primary issuance, yield distribution, and maturity settlement
+- **Passkey smart wallets** (WebAuthn): keyless onboarding via OpenZeppelin Smart Account Kit
+- **Etherfuse anchor**: BRL ↔ USDC / TESOURO ramps over Pix
+- **Stellar SDK v14**: account management, asset operations, TOML publishing
 
 ## Tech stack
 
-- Node.js + Express
-- React + TypeScript + Vite
-- PostgreSQL + Prisma
-- Stellar SDK + Soroban (Rust)
+- **Backend**: Node.js 22 + Express + Prisma + PostgreSQL + Redis
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind
+- **Contracts**: Soroban (Rust, wasm32-unknown-unknown)
+- **Infra**: Docker + Caddy
 
 ## License
 
