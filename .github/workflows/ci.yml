@@ -68,6 +68,12 @@ jobs:
         working-directory: backend
         run: npm run lint
 
+      - name: Generate Prisma Client
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stellar_tokens_test
+        run: npx prisma generate
+
       - name: Backend CI tests (mocked)
         working-directory: backend
         env:
