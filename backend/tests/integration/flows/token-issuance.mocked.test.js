@@ -66,7 +66,8 @@ describe('Token Issuance Flow (Mocked)', () => {
                 total_supply: '1000000',
                 annual_interest_rate: 8.5,
                 offer_type: 'collateral',
-                payment_type: 'monthly'
+                payment_type: 'monthly',
+                maturity_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
             });
 
         assert.strictEqual(offerResponse.status, 201);

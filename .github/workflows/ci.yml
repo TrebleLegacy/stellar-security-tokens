@@ -81,6 +81,12 @@ jobs:
           REDIS_HOST: localhost
           REDIS_PORT: 6379
           JWT_SECRET: ci_test_jwt_secret_do_not_use_in_prod
+          # Throwaway public keys for KeyManager in multisig mode.
+          # Tests mock the network — these keys are never used for signing.
+          TREASURY_PUBLIC_KEY: GDQNY3PBOJOKYZSRMK2S7LHV4GVFSPM7DKEMZD7VLUFKB7YXMD7DDD7D
+          ISSUER_PUBLIC_KEY: GCBJQHWN6IJ2RWZQDQGZ7H7WCG6S5LBVPIRESVZWZAFOAPCNTQ2RPNHA
+          DISTRIBUTOR_PUBLIC_KEY: GA72FBPN3WVMNHFM5IJ6QM3PIAYFGE7VYFXBVMG7RGZNDLZTECHV4KFC
+          OPERATIONS_PUBLIC_KEY: GAOR4FKMHLNK4UA3OGYL3KQK6UAOJAVMHQUIRYP3ZHDFRMOPZ54PVMQX
         run: npm run test:ci
 
       - name: Backend npm audit (prod deps, high+)

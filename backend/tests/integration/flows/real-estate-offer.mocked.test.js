@@ -60,6 +60,7 @@ describe('Real Estate Offer Flow (Mocked)', () => {
                 .field('total_supply', '500000')
                 .field('annual_interest_rate', '10.5')
                 .field('offer_type', 'collateral')
+                .field('maturity_date', new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString())
                 .field('collateral_value', '800000')
                 .field('collateral_description', 'Casa de alto padrão')
                 .attach('matricula', filePath);
