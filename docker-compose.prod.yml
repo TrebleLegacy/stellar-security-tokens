@@ -89,6 +89,11 @@ services:
         NODE_ENV: production
     secrets:
       - operations_key
+      - channel_1_key
+      - channel_2_key
+      - channel_3_key
+      - channel_4_key
+      - channel_5_key
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -113,7 +118,10 @@ services:
       SOROBAN_RPC_URL: ${SOROBAN_RPC_URL:-https://soroban-testnet.stellar.org}
       # Stellar Accounts - PUBLIC KEYS ONLY (signing via Freighter/Ledger multisig)
       ISSUER_PUBLIC_KEY: ${ISSUER_PUBLIC_KEY:?ISSUER_PUBLIC_KEY is required}
-      DISTRIBUTOR_PUBLIC_KEY: ${DISTRIBUTOR_PUBLIC_KEY:?DISTRIBUTOR_PUBLIC_KEY is required}
+      # DISTRIBUTOR — legacy classic-distribution account, superseded by the Soroban sale
+      # contract (trade() delivers tokens). No live code path consumes it; guard relaxed so
+      # boot doesn't require a dead var. Slated for removal — see distributor-pipe cleanup task.
+      DISTRIBUTOR_PUBLIC_KEY: ${DISTRIBUTOR_PUBLIC_KEY:-}
       OPERATIONS_PUBLIC_KEY: ${OPERATIONS_PUBLIC_KEY:?OPERATIONS_PUBLIC_KEY is required}
       TREASURY_PUBLIC_KEY: ${TREASURY_PUBLIC_KEY:?TREASURY_PUBLIC_KEY is required}
       # USDC (empty on testnet = auto-detect, required on mainnet)
@@ -149,6 +157,18 @@ services:
       ADMIN_ALERT_EMAIL: ${ADMIN_ALERT_EMAIL:-}
       WEBAUTHN_RP_NAME: ${WEBAUTHN_RP_NAME:-Radox}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      # ── Passthrough fix (2026-05-30) — code reads these but prod previously dropped them ──
+      # Admin seeding: bootstrap-admins.js reads ADMIN_*; were undefined in-container → seeded nothing.
+      ADMIN_1_EMAIL: ${ADMIN_1_EMAIL:-}
+      ADMIN_1_NAME: ${ADMIN_1_NAME:-}
+      ADMIN_2_EMAIL: ${ADMIN_2_EMAIL:-}
+      ADMIN_2_NAME: ${ADMIN_2_NAME:-}
+      # YieldDistributor governance admin: deploy-yield-distributor.mjs:53 defaults to the hot
+      # ops wallet if unset on mainnet. Set this to the issuer/governance G-address before deploy.
+      YIELD_DISTRIBUTOR_ADMIN_ADDRESS: ${YIELD_DISTRIBUTOR_ADMIN_ADDRESS:-}
+      # Soroban RPC auth headers for keyed/paid mainnet RPC providers (stellar.js:70-83).
+      SOROBAN_RPC_API_KEY: ${SOROBAN_RPC_API_KEY:-}
+      SOROBAN_RPC_HEADER: ${SOROBAN_RPC_HEADER:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -260,6 +280,18 @@ services:
 secrets:
   operations_key:
     file: /root/.secrets/operations_key
+  # Channel-pool hot keys — same tmpfs protection as the ops key.
+  # These files must exist on the server (mainnet AND dev.radox.net) before deploy.
+  channel_1_key:
+    file: /root/.secrets/channel_1_key
+  channel_2_key:
+    file: /root/.secrets/channel_2_key
+  channel_3_key:
+    file: /root/.secrets/channel_3_key
+  channel_4_key:
+    file: /root/.secrets/channel_4_key
+  channel_5_key:
+    file: /root/.secrets/channel_5_key
 
 volumes:
   postgres_data:

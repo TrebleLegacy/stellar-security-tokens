@@ -57,7 +57,7 @@ class KeyManager {
         // tx_bad_seq errors under concurrent load and are distinct from the privileged
         // ISSUER/DISTRIBUTOR/TREASURY keys that multisig mode protects.
         for (let i = 1; i <= 10; i++) {
-            const secret = process.env[`CHANNEL_${i}_SECRET_KEY`];
+            const secret = this.#readChannelSecret(i);
             if (secret) {
                 try {
                     this.channels.push(Keypair.fromSecret(secret));
@@ -78,6 +78,39 @@ class KeyManager {
         } else {
             log.info(`Initialized channel pool with ${this.channels.length} accounts.`);
         }
+    }
+
+    /**
+     * Read a channel-pool secret with the same priority as the operations key:
+     * Docker Secret file (/run/secrets/channel_<i>_key, tmpfs — never on disk) in
+     * production, with an env-var fallback (CHANNEL_<i>_SECRET_KEY) for dev/tests.
+     * Keeps channel keys in Docker Secrets alongside the ops key, not plaintext .env.
+     * @private
+     * @param {number} i - channel index (1-based)
+     * @returns {string|null}
+     */
+    #readChannelSecret(i) {
+        const envName = `CHANNEL_${i}_SECRET_KEY`;
+        const DOCKER_SECRET_PATH = `/run/secrets/channel_${i}_key`;
+
+        // ENV mode (tests/dev): env var wins so injected throwaway keys aren't shadowed.
+        if (this.mode === 'env') {
+            const envSecret = process.env[envName];
+            if (envSecret) return envSecret;
+        }
+
+        // Docker Secret (production — tmpfs, never on disk)
+        if (existsSync(DOCKER_SECRET_PATH)) {
+            try {
+                const secret = readFileSync(DOCKER_SECRET_PATH, 'utf8').trim();
+                if (secret) return secret;
+            } catch (e) {
+                log.error(`Failed to read Docker Secret for CHANNEL_${i}:`, e.message);
+            }
+        }
+
+        // Fallback: env var (covers any setup still using .env)
+        return process.env[envName] || null;
     }
 
     /**

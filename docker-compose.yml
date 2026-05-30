@@ -57,7 +57,8 @@ services:
       STELLAR_HOME_DOMAIN: ${STELLAR_HOME_DOMAIN:-}
       # Stellar Accounts - Public keys (always required)
       ISSUER_PUBLIC_KEY: ${ISSUER_PUBLIC_KEY}
-      DISTRIBUTOR_PUBLIC_KEY: ${DISTRIBUTOR_PUBLIC_KEY}
+      # DISTRIBUTOR — legacy (pre-Soroban). Optional; no live consumer. See cleanup task.
+      DISTRIBUTOR_PUBLIC_KEY: ${DISTRIBUTOR_PUBLIC_KEY:-}
       OPERATIONS_PUBLIC_KEY: ${OPERATIONS_PUBLIC_KEY}
       TREASURY_PUBLIC_KEY: ${TREASURY_PUBLIC_KEY}
       # Stellar Accounts - OPERATIONS_SECRET_KEY is the ONLY secret stored server-side (both dev & prod)
